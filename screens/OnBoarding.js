@@ -1,5 +1,13 @@
-import { Dimensions, FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import React from "react";
+import {
+	Dimensions,
+	FlatList,
+	Image,
+	StyleSheet,
+	Text,
+	TouchableOpacity,
+	View,
+} from "react-native";
+import React, { useState } from "react";
 import AppIntroSlider from "react-native-app-intro-slider";
 import { OnBoard } from "../constants/OnBoardData";
 import { colors } from "../constants/styling";
@@ -7,35 +15,47 @@ import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 import ActiveButton from "../components/ActiveButton";
 import InActiveButton from "../components/InActiveButton";
 import Indicator from "../components/Indicator";
+import Footer from "../components/Footer";
 const { width, height } = Dimensions.get("screen");
 
 const OnBoarding = () => {
+	const [currentIndex, setCurrentIndex]= useState(0)
+
+	const scrollFunction =(e)=>{
+		console.log(e.nativeEvent.contentOffset.x)
+		const contentOffsetX= e.nativeEvent.contentOffset.x
+		setCurrentIndex(Math.round(contentOffsetX/width))
+	}
 	return (
 		<View style={styles.container}>
-		<FlatList
-			data={OnBoard}
-			horizontal
-			pagingEnabled
-		    showsHorizontalScrollIndicator={false}
-			renderItem={({item})=>(
-				<>
+			<FlatList
+				data={OnBoard}
+				horizontal
+				onMomentumScrollEnd={scrollFunction}
+				pagingEnabled
+				style={{ flex: 0.65 }}
+				showsHorizontalScrollIndicator={false}
+				renderItem={({ item }) => (
+					<>
 						<Image
 							source={item.image}
 							style={styles.image}
 							resizeMode="cover"
 						/>
-						<BottomSheet style={styles.Sheet} handleComponent={null} snapPoints={["50%"]}>
+						<BottomSheet
+							style={styles.Sheet}
+							handleComponent={null}
+							snapPoints={["35%"]}
+						>
 							<View style={styles.contain}>
 								<Text style={styles.title}>{item.title}</Text>
 								<Text style={styles.subTitle}>{item.subTitle}</Text>
-								<ActiveButton title={"Next"}/>
-								<InActiveButton title={"Skip"}/>
-								<Indicator item={OnBoard}/>
 							</View>
 						</BottomSheet>
 					</>
-			)}
-		/>
+				)}
+			/>
+			<Footer currentIndex={currentIndex}/>
 		</View>
 	);
 };
@@ -66,17 +86,16 @@ const styles = StyleSheet.create({
 		textAlign: "center",
 		flexWrap: "wrap",
 		maxWidth: width - 120,
-        marginBottom: 50,
-		lineHeight:20
-	},	
-	Sheet:{
+		lineHeight: 20,
+	},
+	Sheet: {
 		shadowColor: "#000",
-        shadowOffset: {
-            width: 0,
-            height: 2,
-        },
-        shadowOpacity: 0.25,
-        shadowRadius: 3.84,
-        elevation: 10,
-	}
+		shadowOffset: {
+			width: 0,
+			height: 2,
+		},
+		shadowOpacity: 0.25,
+		shadowRadius: 3.84,
+		elevation: 200,
+	},
 });

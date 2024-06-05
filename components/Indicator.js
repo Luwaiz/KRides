@@ -2,11 +2,11 @@ import { StyleSheet, Text, View } from 'react-native'
 import React from 'react'
 import { colors } from '../constants/styling'
 
-const Indicator = ({item}) => {
+const Indicator = ({item,currentIndex}) => {
   return (
     <View style={styles.container}>
     {item.map((_,index)=>(
-        <View key={index} style={styles.indicate}/>
+        <View key={index} style={[styles.indicate,currentIndex === index && styles.currentIndicator]}/>
     ))}
     </View>
   )
@@ -23,12 +23,16 @@ const styles = StyleSheet.create({
         position:"absolute",
         bottom:10
     },
-    indicate:{
-        width:20,
-        height:20,
-        borderRadius:10,
+    currentIndicator:{
         backgroundColor:colors.primaryBlue,
-        borderWidth:2,
-        borderColor:"#fff"
+    },
+    indicate:{
+        backgroundColor:colors.secondary,
+        borderWidth:0.5,
+        borderColor:"black",
+        borderRadius:20,
+        width:18,
+        height:18,
+        marginHorizontal:3
     }
 })
