@@ -2,9 +2,10 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import React from "react";
 import { colors } from "../constants/styling";
 
-const InActiveButton = ({title}) => {
+// Inactive button component
+const InActiveButton = ({title,onPress}) => {
 	return (
-		<TouchableOpacity>
+		<TouchableOpacity onPress={onPress}>
 			<View style={styles.button}>
 				<Text style={styles.buttonText}>{title}</Text>
 			</View>

@@ -3,6 +3,7 @@ import React from 'react'
 import { colors } from '../constants/styling'
 
 const Indicator = ({item,currentIndex}) => {
+    // Indicator for onBoarding Page
   return (
     <View style={styles.container}>
     {item.map((_,index)=>(
@@ -31,8 +32,8 @@ const styles = StyleSheet.create({
         borderWidth:0.5,
         borderColor:"black",
         borderRadius:20,
-        width:18,
-        height:18,
+        width:16,
+        height:16,
         marginHorizontal:3
     }
 })

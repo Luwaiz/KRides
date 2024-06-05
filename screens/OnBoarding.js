@@ -7,28 +7,51 @@ import {
 	TouchableOpacity,
 	View,
 } from "react-native";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import AppIntroSlider from "react-native-app-intro-slider";
 import { OnBoard } from "../constants/OnBoardData";
 import { colors } from "../constants/styling";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
-import ActiveButton from "../components/ActiveButton";
-import InActiveButton from "../components/InActiveButton";
-import Indicator from "../components/Indicator";
 import Footer from "../components/Footer";
 const { width, height } = Dimensions.get("screen");
 
-const OnBoarding = () => {
-	const [currentIndex, setCurrentIndex]= useState(0)
+const OnBoarding = ({navigation}) => {
+	const [currentIndex, setCurrentIndex] = useState(0);
+	const slideRef = useRef(null);
 
-	const scrollFunction =(e)=>{
-		console.log(e.nativeEvent.contentOffset.x)
-		const contentOffsetX= e.nativeEvent.contentOffset.x
-		setCurrentIndex(Math.round(contentOffsetX/width))
-	}
+	// function for dectecting the current page and updating indicator Bar
+	const scrollFunction = (e) => {
+		console.log(e.nativeEvent.contentOffset.x);
+		const contentOffsetX = e.nativeEvent.contentOffset.x;
+		setCurrentIndex(Math.round(contentOffsetX / width));
+	};
+
+	//Next button function
+	const NextPage = () => {
+		const nextSlide = currentIndex + 1;
+		if (nextSlide < OnBoard.length) {
+			const offset = nextSlide * width;
+			slideRef?.current?.scrollToOffset({ offset });
+			setCurrentIndex(nextSlide);
+		}
+	};
+	// Skip button function
+	const SkipPage = () => {
+		const lastSlide = OnBoard.length - 1;
+		const offset = lastSlide * width;
+		slideRef?.current?.scrollToOffset({ offset });
+		setCurrentIndex(lastSlide);
+	};
+
+	// function to navigate to home screen
+	const navigateToHome = () => {
+        navigation.replace("AuthScreen");
+    };
+
 	return (
 		<View style={styles.container}>
 			<FlatList
+				ref={slideRef}
 				data={OnBoard}
 				horizontal
 				onMomentumScrollEnd={scrollFunction}
@@ -55,7 +78,7 @@ const OnBoarding = () => {
 					</>
 				)}
 			/>
-			<Footer currentIndex={currentIndex}/>
+			<Footer currentIndex={currentIndex} NextPage={NextPage} SkipPage={SkipPage} navigateToHome={navigateToHome}/>
 		</View>
 	);
 };
