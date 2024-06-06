@@ -45,7 +45,9 @@ const OnBoarding = ({navigation}) => {
 
 	// function to navigate to home screen
 	const navigateToHome = () => {
-        navigation.replace("AuthScreen");
+        navigation.replace("AuthStack",{
+			params: "AuthScreen"
+		});
     };
 
 	return (
@@ -68,6 +70,7 @@ const OnBoarding = ({navigation}) => {
 						<BottomSheet
 							style={styles.Sheet}
 							handleComponent={null}
+							backgroundStyle={{borderRadius:30}}
 							snapPoints={["35%"]}
 						>
 							<View style={styles.contain}>

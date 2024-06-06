@@ -1,6 +1,6 @@
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import React from "react";
-import { colors } from "../constants/styling";
+import { colors } from "../../constants/styling";
 
 //active button component
 const ActiveButton = ({title,onPress}) => {
@@ -23,9 +23,6 @@ const styles = StyleSheet.create({
         borderRadius: 10,
         alignItems: "center",
         justifyContent: "center",
-        top: 0,
-        left: 0,
-        right: 69,
     },
     buttonText: {
         color: colors.secondary,
