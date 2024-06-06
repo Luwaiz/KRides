@@ -1,10 +1,11 @@
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import React from "react";
-import { colors } from "../constants/styling";
+import { colors } from "../../constants/styling";
 
-const ActiveButton = ({title}) => {
+//active button component
+const ActiveButton = ({title,onPress}) => {
 	return (
-        <TouchableOpacity>
+        <TouchableOpacity onPress={onPress}>
         <View style={styles.button}>
             <Text style={styles.buttonText}>{title}</Text>
         </View>
@@ -22,9 +23,6 @@ const styles = StyleSheet.create({
         borderRadius: 10,
         alignItems: "center",
         justifyContent: "center",
-        top: 0,
-        left: 0,
-        right: 69,
     },
     buttonText: {
         color: colors.secondary,

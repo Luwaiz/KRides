@@ -1,17 +1,23 @@
 import { StyleSheet, Text, View } from "react-native";
 import React, { useState } from "react";
 import { colors } from "../constants/styling";
-import ActiveButton from "./ActiveButton";
-import InActiveButton from "./InActiveButton";
+import ActiveButton from "../components/buttons/ActiveButton";
+import InActiveButton from "../components/buttons/InActiveButton";
 import Indicator from "./Indicator";
 import { OnBoard } from "../constants/OnBoardData";
 
-const Footer = ({currentIndex}) => {
+const Footer = ({ currentIndex, NextPage, SkipPage, navigateToHome }) => {
+	// footer of the on boarding page
 	return (
 		<View style={styles.container}>
-			<ActiveButton title={"Next"} />
-			<InActiveButton title={"Skip"} />
-			<Indicator item={OnBoard}  currentIndex={currentIndex}/>
+			<ActiveButton
+				title={currentIndex !== OnBoard.length - 1 ? "Next" : "Get started"}
+				onPress={() =>
+					currentIndex !== OnBoard.length - 1 ? NextPage() : navigateToHome()
+				}
+			/>
+			{currentIndex !== OnBoard.length - 1 && <InActiveButton title={"Skip"} onPress={() => SkipPage()} />}
+			<Indicator item={OnBoard} currentIndex={currentIndex} />
 		</View>
 	);
 };
