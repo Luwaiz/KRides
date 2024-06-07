@@ -1,12 +1,19 @@
 import { StyleSheet, Text, View } from "react-native";
-import React from "react";
+import React, { useState } from "react";
 import { OtpInput } from "react-native-otp-entry";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { colors } from "../constants/styling";
-import BackButton from "../components/buttons/BackButton";
-import ActiveButton from "../components/buttons/ActiveButton";
+import { colors } from "../../constants/styling";
+import BackButton from "../../components/buttons/BackButton";
+import ActiveButton from "../../components/buttons/ActiveButton";
+import UnSuccessNo from "../../components/modals/UnSuccessNo";
+import SuccessNo from "../../components/modals/SuccessNo";
 
 const VerifyNo = () => {
+	const [modal, setModal] = useState(false);
+	const ModalVisible = () => {
+		setModal(true);
+	};
+
 	return (
 		<SafeAreaView style={styles.container}>
 			<View style={styles.topCont}>
@@ -29,9 +36,10 @@ const VerifyNo = () => {
 					}}
 				/>
 				<Text style={styles.infoText3}>I haven’t received a code (1:27)</Text>
-                <View style={styles.button}>
-                <ActiveButton title={"Verify Number"} />
-                </View>
+				<View style={styles.button}>
+					<ActiveButton title={"Verify Number"} onPress={ModalVisible} />
+					{modal && <SuccessNo modal={modal} setModal={setModal} />}
+				</View>
 			</View>
 		</SafeAreaView>
 	);
@@ -52,35 +60,8 @@ const styles = StyleSheet.create({
 		fontSize: 24,
 		fontWeight: "700",
 	},
-	bottomCont: {
-		flex: 1,
-		paddingHorizontal: 16,
-	},
-	inputCont: {
-		justifyContent: "space-between",
-        marginBottom: 14,
-	},
-	codeCont: {
-		width: 72,
-		height: 72,
-		borderWidth: 1,
-		borderColor: "white",
-		justifyContent: "center",
-		backgroundColor: colors.lightGrey2,
-	},
-	focused: {
-		borderColor: colors.primaryBlue,
-	},
-	focusStick: {
-		display: "none",
-	},
-	pinCodeText: {
-		fontWeight: "bold",
-		fontSize: 24,
-	},
 	infoCont: {
-		marginVertical: 14,
-		height: 80,
+		marginVertical: 16,
 		paddingHorizontal: 16,
 		gap: 4,
 		justifyContent: "center",
@@ -96,9 +77,32 @@ const styles = StyleSheet.create({
 	infoText3: {
 		color: colors.primaryBlue,
 	},
-    button: {
-        width:"100",
-        marginTop:"auto",
-        marginBottom:16
-    }
+	bottomCont: {
+		flex: 1,
+		paddingHorizontal: 16,
+	},
+	inputCont: {
+		justifyContent: "space-between",
+		marginBottom: 14,
+	},
+	codeCont: {
+		width: 72,
+		height: 72,
+		borderWidth: 1,
+		backgroundColor: colors.lightGrey2,
+	},
+	focused: {
+		borderColor: colors.primaryBlue,
+	},
+	focusStick: {
+		display: "none",
+	},
+	pinCodeText: {
+		fontWeight: "bold",
+		fontSize: 24,
+	},
+	button: {
+		marginTop: "auto",
+		marginBottom: 16,
+	},
 });
