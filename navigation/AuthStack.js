@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import AuthScreen from '../screens/AuthScreen'
 import Login from '../screens/Login'
 import Signup from '../screens/Signup'
+import VerifyNo from '../screens/VerifyNo'
 
 const Stack = createNativeStackNavigator()
 
@@ -13,6 +14,7 @@ const AuthStack = () => {
         <Stack.Screen component={AuthScreen} name='AuthScreen'/>
         <Stack.Screen component={Login} name='Login'/>
         <Stack.Screen component={Signup} name='Signup'/>
+        <Stack.Screen component={VerifyNo} name='VerifyNo'/>
     </Stack.Navigator>
   )
 }

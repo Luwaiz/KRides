@@ -22,7 +22,7 @@ const styles = StyleSheet.create({
         justifyContent:"center",
         paddingVertical:10,
         position:"absolute",
-        bottom:10
+        bottom:16
     },
     currentIndicator:{
         backgroundColor:colors.primaryBlue,

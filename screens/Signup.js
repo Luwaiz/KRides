@@ -3,23 +3,21 @@ import React from "react";
 import BottomSheet from "@gorhom/bottom-sheet";
 import { colors } from "../constants/styling";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { AntDesign } from "@expo/vector-icons";
 import TextInput1 from "../components/TextInput1";
 import ActiveButton from "../components/buttons/ActiveButton";
 import GoogleButton from "../components/buttons/GoogleButton";
 import Terms from "../components/Terms";
+import BackButton from "../components/buttons/BackButton";
 const { width, height } = Dimensions.get("screen");
 
-const Signup = () => {
+const Signup = ({ navigation }) => {
+	const ToVerifyNumber = () => {
+		navigation.navigate("VerifyNo");
+	};
 	return (
 		<SafeAreaView style={styles.container}>
 			<View style={styles.topCont}>
-				<View style={styles.headCont}>
-					<View style={styles.back}>
-						<AntDesign name="arrowleft" size={24} color="black" />
-					</View>
-					<Text style={styles.headText}>Sign Up</Text>
-				</View>
+				<BackButton text={<Text style={styles.headText}>Sign Up</Text>} />
 			</View>
 			<BottomSheet
 				snapPoints={["85%"]}
@@ -43,16 +41,16 @@ const Signup = () => {
 							placeholder={"*************"}
 							password
 						/>
-						<ActiveButton title={"Sign up"} />
+						<ActiveButton title={"Sign up"} onPress={ToVerifyNumber} />
 						<View style={styles.OrContainer}>
 							<View style={styles.dash} />
 							<Text style={styles.OrText}>OR</Text>
 							<View style={styles.dash} />
 						</View>
 						<GoogleButton title={"Continue with Google"} />
-						<Terms />
 					</View>
 				</View>
+				<Terms />
 			</BottomSheet>
 		</SafeAreaView>
 	);
@@ -69,21 +67,6 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: colors.primaryBlue,
 		paddingTop: 26,
-	},
-	headCont: {
-		width,
-		paddingHorizontal: 16,
-		flexDirection: "row",
-		alignItems: "center",
-		gap: 10,
-	},
-	back: {
-		width: 48,
-		height: 48,
-		borderRadius: 50,
-		backgroundColor: colors.lightGrey2,
-		alignItems: "center",
-		justifyContent: "center",
 	},
 	headText: {
 		color: colors.secondary,

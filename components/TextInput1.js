@@ -14,7 +14,7 @@ const TextInput1 = ({ text, placeholder, password}) => {
 		<View style={styles.container}>
 			<Text>{text}</Text>
 			<View style={styles.inputCont}>
-				<BottomSheetTextInput
+				<TextInput
                     secureTextEntry={password && !passwordVisible}
 					placeholder={placeholder}
 					placeholderTextColor={colors.lightGrey}

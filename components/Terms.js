@@ -18,7 +18,7 @@ export default Terms;
 const styles = StyleSheet.create({
     terms: {
 		textAlign: "center",
-		marginBottom: 20,
+		marginBottom: 16,
 		color: colors.lightGrey,
 		fontWeight: "200",
 	},
