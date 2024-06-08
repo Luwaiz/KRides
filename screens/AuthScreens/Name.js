@@ -7,7 +7,12 @@ import BackButton from "../../components/buttons/BackButton";
 import ActiveButton from "../../components/buttons/ActiveButton";
 import TextInput1 from "../../components/TextInput1";
 
-const Name = () => {
+const Name = ({navigation}) => {
+  const ToHome =()=>{
+    navigation.navigate("AppStack",{
+      params:"Home"
+    });
+  }
 	return (
 		<SafeAreaView style={styles.container}>
 			<View style={styles.topCont}>
@@ -20,7 +25,7 @@ const Name = () => {
         <TextInput1 text={"First Name"} placeholder={"e.g John"}/>
         <TextInput1 text={"Last Name"} placeholder={"e.g Dotun"}/>
         <View style={styles.button}>
-        <ActiveButton title={"Submit"}/>
+        <ActiveButton title={"Submit"} onPress={ToHome}/>
         </View>
       </View>
 		</SafeAreaView>
