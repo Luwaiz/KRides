@@ -5,6 +5,7 @@ import { NavigationContainer } from "@react-navigation/native";
 import OnBoarding from "../screens/OnBoarding";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import AuthStack from "./AuthStack";
+import AppStack from "./AppStack";
 
 const Stack = createNativeStackNavigator();
 const Navigation = () => {
@@ -31,6 +32,7 @@ const Navigation = () => {
 				<Stack.Navigator screenOptions={{ headerShown: false }}>
 					<Stack.Screen component={OnBoarding} name="OnBoarding" />
           <Stack.Screen component={AuthStack} name="AuthStack"/>
+          <Stack.Screen component={AppStack} name="AppStack"/>
 				</Stack.Navigator>
 			</NavigationContainer>
 		)

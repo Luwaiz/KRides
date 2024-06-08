@@ -1,10 +1,10 @@
 import { Image, StyleSheet, Text, View } from "react-native";
 import React from "react";
 import BottomSheet from "@gorhom/bottom-sheet";
-import { colors } from "../constants/styling";
-import ActiveButton from "../components/buttons/ActiveButton";
-import LoginButton from "../components/buttons/LoginButton";
-import Terms from "../components/Terms";
+import { colors } from "../../constants/styling";
+import ActiveButton from "../../components/buttons/ActiveButton";
+import LoginButton from "../../components/buttons/LoginButton";
+import Terms from "../../components/Terms";
 
 const AuthScreen = ({ navigation }) => {
 	const ToLogin = () => {
@@ -16,7 +16,7 @@ const AuthScreen = ({ navigation }) => {
 	return (
 		<View style={styles.container}>
 			<View style={styles.topContainer}>
-				<Image source={require("../assets/images/Logoswhite.png")} />
+				<Image source={require("../../assets/images/Logoswhite.png")} />
 			</View>
 			<BottomSheet
 				backgroundStyle={{ borderRadius: 30 }}

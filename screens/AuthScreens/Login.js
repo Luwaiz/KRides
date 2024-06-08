@@ -1,23 +1,20 @@
 import { Dimensions, StyleSheet, Text, View } from "react-native";
 import React from "react";
 import BottomSheet from "@gorhom/bottom-sheet";
-import { colors } from "../constants/styling";
+import { colors } from "../../constants/styling";
 import { SafeAreaView } from "react-native-safe-area-context";
-import TextInput1 from "../components/TextInput1";
-import ActiveButton from "../components/buttons/ActiveButton";
-import GoogleButton from "../components/buttons/GoogleButton";
-import Terms from "../components/Terms";
-import BackButton from "../components/buttons/BackButton";
+import TextInput1 from "../../components/TextInput1";
+import ActiveButton from "../../components/buttons/ActiveButton";
+import GoogleButton from "../../components/buttons/GoogleButton";
+import Terms from "../../components/Terms";
+import BackButton from "../../components/buttons/BackButton";
 const { width, height } = Dimensions.get("screen");
 
-const Signup = ({ navigation }) => {
-	const ToVerifyNumber = () => {
-		navigation.navigate("VerifyNo");
-	};
+const Login = () => {
 	return (
 		<SafeAreaView style={styles.container}>
 			<View style={styles.topCont}>
-				<BackButton text={<Text style={styles.headText}>Sign Up</Text>} />
+				<BackButton text={<Text style={styles.headText}>Login</Text>} />
 			</View>
 			<BottomSheet
 				snapPoints={["85%"]}
@@ -30,18 +27,13 @@ const Signup = ({ navigation }) => {
 							text={"Email Address"}
 							placeholder={"johndoe22@gmail.com"}
 						/>
-						<TextInput1 text={"Phone Number"} placeholder={"08123456789"} />
 						<TextInput1
 							text={"Password"}
 							placeholder={"*************"}
 							password
 						/>
-						<TextInput1
-							text={"Confirm Password"}
-							placeholder={"*************"}
-							password
-						/>
-						<ActiveButton title={"Sign up"} onPress={ToVerifyNumber} />
+						<Text style={styles.forgot}>Forgot password?</Text>
+						<ActiveButton title={"Login"} />
 						<View style={styles.OrContainer}>
 							<View style={styles.dash} />
 							<Text style={styles.OrText}>OR</Text>
@@ -56,7 +48,7 @@ const Signup = ({ navigation }) => {
 	);
 };
 
-export default Signup;
+export default Login;
 
 const styles = StyleSheet.create({
 	container: {
@@ -82,6 +74,11 @@ const styles = StyleSheet.create({
 	textInputCont: {
 		width: "100%",
 		flex: 1,
+	},
+	forgot: {
+		alignSelf: "flex-end",
+		marginTop: -10,
+		marginBottom: 16,
 	},
 	OrContainer: {
 		flexDirection: "row",
