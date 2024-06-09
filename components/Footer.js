@@ -6,7 +6,7 @@ import InActiveButton from "../components/buttons/InActiveButton";
 import Indicator from "./Indicator";
 import { OnBoard } from "../constants/OnBoardData";
 
-const Footer = ({ currentIndex, NextPage, SkipPage, navigateToHome }) => {
+const Footer = ({ currentIndex, NextPage, SkipPage, navigateToHome,setCurrentIndex }) => {
 	// footer of the on boarding page
 	return (
 		<View style={styles.container}>
@@ -17,7 +17,7 @@ const Footer = ({ currentIndex, NextPage, SkipPage, navigateToHome }) => {
 				}
 			/>
 			{currentIndex !== OnBoard.length - 1 && <InActiveButton title={"Skip"} onPress={() => SkipPage()} />}
-			<Indicator item={OnBoard} currentIndex={currentIndex} />
+			<Indicator item={OnBoard} currentIndex={currentIndex} setCurrentIndex={setCurrentIndex}/>
 		</View>
 	);
 };

@@ -14,7 +14,7 @@ const BackButton = ({text}) => {
 	//back button component
 	return (
         <View style={styles.headCont}>
-		<TouchableOpacity activeOpacity={0.5} onPress={goBack}>
+		<TouchableOpacity activeOpacity={0.8} onPress={goBack}>
 			<View style={styles.back}>
 				<AntDesign name="arrowleft" size={24} color="black" />
 			</View>

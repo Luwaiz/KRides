@@ -5,7 +5,7 @@ import { colors } from "../../constants/styling";
 // Inactive button component
 const InActiveButton = ({title,onPress}) => {
 	return (
-		<TouchableOpacity onPress={onPress}>
+		<TouchableOpacity onPress={onPress} activeOpacity={0.5}>
 			<View style={styles.button}>
 				<Text style={styles.buttonText}>{title}</Text>
 			</View>
@@ -30,6 +30,6 @@ const styles = StyleSheet.create({
 	buttonText: {
 		fontSize: 16,
 		color:colors.lightGrey,
-        fontWeight:"200"
+        fontWeight:"300"
 	},
 });

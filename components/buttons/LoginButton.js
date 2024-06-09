@@ -4,7 +4,7 @@ import { colors } from '../../constants/styling'
 
 const LoginButton = ({title,onPress}) => {
   return (
-    <TouchableOpacity onPress={onPress}>
+    <TouchableOpacity onPress={onPress} activeOpacity={0.5}>
     <View style={styles.button}>
         <Text style={styles.buttonText}>{title}</Text>
     </View>

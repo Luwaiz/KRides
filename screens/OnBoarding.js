@@ -81,7 +81,7 @@ const OnBoarding = ({navigation}) => {
 					</>
 				)}
 			/>
-			<Footer currentIndex={currentIndex} NextPage={NextPage} SkipPage={SkipPage} navigateToHome={navigateToHome}/>
+			<Footer currentIndex={currentIndex} setCurrentIndex={setCurrentIndex} NextPage={NextPage} SkipPage={SkipPage} navigateToHome={navigateToHome}/>
 		</View>
 	);
 };
