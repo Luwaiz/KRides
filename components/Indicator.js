@@ -1,13 +1,18 @@
-import { StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import React from 'react'
 import { colors } from '../constants/styling'
 
-const Indicator = ({item,currentIndex}) => {
+const Indicator = ({item,currentIndex,setCurrentIndex}) => {
+    const currentSlide = (index)=>{
+        setCurrentIndex(index)
+    }
     // Indicator for onBoarding Page
   return (
     <View style={styles.container}>
     {item.map((_,index)=>(
-        <View key={index} style={[styles.indicate,currentIndex === index && styles.currentIndicator]}/>
+        <TouchableOpacity key={index}>
+        <View style={[styles.indicate,currentIndex === index && styles.currentIndicator]}/>
+        </TouchableOpacity>
     ))}
     </View>
   )

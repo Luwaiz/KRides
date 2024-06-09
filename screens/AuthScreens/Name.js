@@ -9,9 +9,11 @@ import TextInput1 from "../../components/TextInput1";
 
 const Name = ({navigation}) => {
   const ToHome =()=>{
-    navigation.navigate("AppStack",{
+    navigation.navigate("drawer",{
+		params:"AppStack",
+		params:{
       params:"Home"
-    });
+    }});
   }
 	return (
 		<SafeAreaView style={styles.container}>

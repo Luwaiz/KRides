@@ -5,7 +5,7 @@ import { colors } from "../../constants/styling";
 //active button component
 const GoogleButton = ({title,onPress}) => {
 	return (
-        <TouchableOpacity onPress={onPress}>
+        <TouchableOpacity onPress={onPress} activeOpacity={0.5}>
         <View style={styles.button}>
         <Image source={require("../../assets/images/Google svg.png")} resizeMode="cover" style={styles.google}/>
             <Text style={styles.buttonText}>{title}</Text>
