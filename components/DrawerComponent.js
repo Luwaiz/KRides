@@ -1,13 +1,14 @@
 import { StyleSheet, Text, View } from "react-native";
 import { DrawerContentScrollView, DrawerItem } from "@react-navigation/drawer";
-import React from "react";
+import React, { useState } from "react";
 import { AntDesign } from "@expo/vector-icons";
 import { Foundation } from "@expo/vector-icons";
 import { Ionicons } from "@expo/vector-icons";
-import { Avatar, Title } from "react-native-paper";
 import { colors } from "../constants/styling";
 import { useNavigation } from "@react-navigation/native";
 import { TouchableOpacity } from "react-native-gesture-handler";
+import Confirmation1 from "./modals/Confirmation1";
+import Avatar from "../assets/svg/Frame 77avatar.svg";
 
 const details = [
 	{
@@ -36,18 +37,22 @@ const details = [
 ];
 const DrawerLayout = ({ icon, title, navgateTo }) => {
 	const navigation = useNavigation();
+	const [modal, setModal] = useState(false);
 	return (
-		<DrawerItem
-            labelStyle={styles.label}
-			style={styles.items}
-			icon={() => icon}
-			label={title}
-			onPress={
-				title === "Logout" || title === "Delete Account"
-					? null
-					: () => navigation.navigate(navgateTo)
-			}
-		/>
+		<>
+			<DrawerItem
+				labelStyle={title === "Delete Account" && styles.label}
+				style={styles.items}
+				icon={() => icon}
+				label={title}
+				onPress={
+					title === "Logout" || title === "Delete Account"
+						? () => setModal(true)
+						: () => navigation.navigate(navgateTo)
+				}
+			/>
+			<Confirmation1 modal={modal} setModal={setModal} title={title} />
+		</>
 	);
 };
 
@@ -73,10 +78,7 @@ const DrawerComponent = (props) => {
 				<TouchableOpacity onPress={() => navigation.navigate("Profile")}>
 					<View style={styles.topCont}>
 						<View>
-							<Avatar.Image
-								source={require("../assets/images/Frame 77avatar.png")}
-								size={60}
-							/>
+							<Avatar />
 						</View>
 						<View style={styles.container}>
 							<Text style={styles.title}>Tobi</Text>
@@ -98,7 +100,6 @@ const styles = StyleSheet.create({
 	container: {},
 	topCont: {
 		flexDirection: "row",
-		width: "100%",
 		marginHorizontal: 15,
 		paddingVertical: 10,
 		gap: 16,
@@ -120,14 +121,15 @@ const styles = StyleSheet.create({
 		padding: 0,
 		gap: 0,
 	},
-    label:{
-        margin: 0,
+	label: {
+		margin: 0,
 		padding: 0,
 		gap: 0,
-    },
-    bottomCont: {
+		color: "red",
+	},
+	bottomCont: {
 		borderBottomWidth: 1,
 		borderBottomColor: colors.lightGrey,
-        marginHorizontal: 15,
-    },
+		marginHorizontal: 15,
+	},
 });
