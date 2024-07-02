@@ -1,22 +1,32 @@
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
-import Navigation from './navigation/Navigation';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import "react-native-gesture-handler";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { StatusBar } from "expo-status-bar";
+import { StyleSheet, Text, View } from "react-native";
+import Navigation from "./navigation/Navigation";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import FontResources from "./react-native-config";
+import { PaperProvider } from "react-native-paper";
 
 export default function App() {
-  return (
-    <GestureHandlerRootView style={styles.container}>
-    <SafeAreaProvider>
-    <Navigation/>
-      <StatusBar style="auto" />
-    </SafeAreaProvider>
-    </GestureHandlerRootView>
-  );
+	const fontLoaded = FontResources();
+	if (!fontLoaded) {
+		return null;
+	} else {
+		return (
+			<GestureHandlerRootView style={styles.container}>
+				<SafeAreaProvider>
+					<PaperProvider>
+						<Navigation />
+						<StatusBar style="auto" />
+					</PaperProvider>
+				</SafeAreaProvider>
+			</GestureHandlerRootView>
+		);
+	}
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+	container: {
+		flex: 1,
+	},
 });

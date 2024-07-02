@@ -8,9 +8,7 @@ import {
 	View,
 } from "react-native";
 import React, { useRef, useState } from "react";
-import AppIntroSlider from "react-native-app-intro-slider";
 import { OnBoard } from "../constants/OnBoardData";
-import { colors } from "../constants/styling";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 import Footer from "../components/Footer";
 const { width, height } = Dimensions.get("screen");
@@ -21,7 +19,7 @@ const OnBoarding = ({navigation}) => {
 
 	// function for dectecting the current page and updating indicator Bar
 	const scrollFunction = (e) => {
-		console.log(e.nativeEvent.contentOffset.x);
+		// console.log(e.nativeEvent.contentOffset.x);
 		const contentOffsetX = e.nativeEvent.contentOffset.x;
 		setCurrentIndex(Math.round(contentOffsetX / width));
 	};
@@ -70,7 +68,7 @@ const OnBoarding = ({navigation}) => {
 						<BottomSheet
 							style={styles.Sheet}
 							handleComponent={null}
-							backgroundStyle={{borderRadius:30}}
+							backgroundStyle={{borderRadius:30,}}
 							snapPoints={["35%"]}
 						>
 							<View style={styles.contain}>
@@ -103,9 +101,10 @@ const styles = StyleSheet.create({
 	},
 	title: {
 		fontSize: 24,
-		fontWeight: "bold",
+		// fontWeight: "bold",
 		textAlign: "center",
 		marginBottom: 30,
+		fontFamily:"Albert-SemiBold"
 	},
 	subTitle: {
 		fontSize: 16,
@@ -113,6 +112,7 @@ const styles = StyleSheet.create({
 		flexWrap: "wrap",
 		maxWidth: width - 120,
 		lineHeight: 20,
+		// fontFamily:"AlbertSans-ExtraBold"
 	},
 	Sheet: {
 		shadowColor: "#000",
