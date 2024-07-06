@@ -7,7 +7,7 @@ import { colors } from "../../constants/styling";
 import ActiveButton from "../../components/buttons/ActiveButton";
 import { DrawerActions, useNavigation } from "@react-navigation/native";
 import WhereTo from "../../components/WhereTo";
-
+import { useAuthStore } from "../../constants/Store";
 const MainPage = () => {
 	const navigation = useNavigation();
 	const OpenDrawer = () => {
@@ -36,7 +36,7 @@ const MainPage = () => {
 						</Text>
 						<Text style={styles.where}>Where are you going?</Text>
 					</View>
-					<WhereTo/>
+					<WhereTo />
 					<View style={styles.dateCont}>
 						<Feather name="calendar" size={24} color={colors.primaryBlue} />
 						<Text style={styles.date}>14/7/2023</Text>

@@ -9,7 +9,7 @@ import TextInput1 from "../../components/TextInput1";
 
 const Name = ({navigation}) => {
   const ToHome =()=>{
-    navigation.navigate("drawer",{
+    navigation.replace("drawer",{
 		params:"AppStack",
 		params:{
       params:"Home"
