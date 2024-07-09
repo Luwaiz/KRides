@@ -1,19 +1,20 @@
 import { Dimensions, Image, Modal, StyleSheet, Text, View } from "react-native";
 import React from "react";
 import ActiveButton from "../buttons/ActiveButton";
+import Keke from "../../assets/svg/Keke.svg";
+
 import InActiveButton from "../buttons/InActiveButton";
 
 import { useNavigation } from "@react-navigation/native";
 import LoginButton from "../buttons/LoginButton";
 const { width, height } = Dimensions.get("screen");
 
-const Confirmation1 = ({ modal, setModal, title }) => {
+const RideConfirm = ({ modal, setModal }) => {
 	const navigation = useNavigation();
+
 	const ToAuthScreen = () => {
 		setModal(false);
-		navigation.navigate("AuthStack", {
-			params: title === "Logout" ? "Login" : "Signup",
-		});
+    
 	};
 	const ToName = () => {
 		setModal(false);
@@ -21,24 +22,19 @@ const Confirmation1 = ({ modal, setModal, title }) => {
 	return (
 		<Modal
 			visible={modal}
-			style={StyleSheet.absoluteFill}
+			style={styles.modalCont}
 			transparent
 			statusBarTranslucent
 		>
 			<View style={styles.modal}>
 				<View style={styles.container}>
-					{title === "Logout" ? (
-						<Text style={styles.text}>Are you sure you want to logout</Text>
-					) : (
-						<Text style={styles.text}>
-							Are you sure you want to permanently{"\n"} delete your Kampus
-							Riders account?
-						</Text>
-					)}
+					<Keke />
+					<Text style={styles.text1}>Ride has been accepted</Text>
+                    <Text style={styles.text2}>Henry Ade</Text>
 
 					<View style={styles.button}>
-						<ActiveButton title={"Yes"} onPress={ToAuthScreen} />
-						<LoginButton title={"Cancel"} onPress={ToName} />
+						<ActiveButton title={"Proceed"} onPress={ToAuthScreen} />
+						<LoginButton title={"Cancel Ride"} onPress={ToName} />
 					</View>
 				</View>
 			</View>
@@ -46,21 +42,23 @@ const Confirmation1 = ({ modal, setModal, title }) => {
 	);
 };
 
-export default Confirmation1;
+export default RideConfirm;
 
 const styles = StyleSheet.create({
+	modalCont: {
+		flex: 1,
+	},
 	modal: {
 		justifyContent: "center",
 		alignItems: "center",
 		backgroundColor: "rgba(0, 0, 0, 0.5)",
 		flex: 1,
 	},
-	text: {
-		fontWeight: "regular",
+	text1: {
+		fontFamily: "Albert-Regular",
 		textAlign: "center",
 		fontSize: 16,
 		color: "black",
-		marginBottom: 10,
 	},
 	container: {
 		backgroundColor: "white",
@@ -72,5 +70,11 @@ const styles = StyleSheet.create({
 	},
 	button: {
 		marginTop: "auto",
+	},
+    text2: {
+		fontFamily: "Albert-SemiBold",
+		textAlign: "center",
+		fontSize: 16,
+        marginBottom: 10,
 	},
 });

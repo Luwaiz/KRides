@@ -6,9 +6,14 @@ import WhereTo from "./WhereTo";
 import ActiveButton from "./buttons/ActiveButton";
 import { colors } from "../constants/styling";
 import { RadioButton } from "react-native-paper";
+import { useNavigation } from "@react-navigation/native";
 
-const Passenger = () => {
+const Passenger = ({ riders }) => {
 	const [selected, setSelected] = useState();
+	const navigation = useNavigation();
+	const RiderPage = () => {
+		navigation.navigate("Riders");
+	};
 	return (
 		<BottomSheet
 			snapPoints={["40%"]}
@@ -16,50 +21,47 @@ const Passenger = () => {
 			handleComponent={null}
 		>
 			<View style={styles.sheetCont}>
-            <Text style={styles.where}>Select number of passengers</Text>
+				<Text style={styles.where}>Select number of passengers</Text>
 
 				<View style={styles.RadioContainer}>
 					<RadioButton.Android
 						value="1"
-                        status={selected === "1"? "checked" :"unchecked"}
+						status={selected === "1" ? "checked" : "unchecked"}
 						onPress={() => setSelected("1")}
 						color={colors.primaryBlue}
 					/>
 					<Text>1 Passenger</Text>
 				</View>
-                <View style={styles.RadioContainer}>
+				<View style={styles.RadioContainer}>
 					<RadioButton.Android
 						value="2"
-                        status={selected === "2"? "checked" :"unchecked"}
+						status={selected === "2" ? "checked" : "unchecked"}
 						onPress={() => setSelected("2")}
 						color={colors.primaryBlue}
-                        
 					/>
 					<Text>2 Passengers</Text>
 				</View>
-                <View style={styles.RadioContainer}>
+				<View style={styles.RadioContainer}>
 					<RadioButton.Android
 						value="3"
-                        status={selected === "3"? "checked" :"unchecked"}
+						status={selected === "3" ? "checked" : "unchecked"}
 						onPress={() => setSelected("3")}
 						color={colors.primaryBlue}
-                        
 					/>
 					<Text>3 Passengers</Text>
 				</View>
-                <View style={styles.RadioContainer}>
+				<View style={styles.RadioContainer}>
 					<RadioButton.Android
 						value="4"
-                        status={selected === "4"? "checked" :"unchecked"}
+						status={selected === "4" ? "checked" : "unchecked"}
 						onPress={() => setSelected("4")}
 						color={colors.primaryBlue}
-                        
 					/>
 					<Text>4 Passengers</Text>
 				</View>
 
 				<View style={styles.button}>
-					<ActiveButton title={"Search"} />
+					<ActiveButton title={"Search"} onPress={riders} />
 				</View>
 			</View>
 		</BottomSheet>
@@ -79,28 +81,13 @@ const styles = StyleSheet.create({
 		flexDirection: "row",
 		alignItems: "center",
 	},
-	greet: {
-		fontSize: 16,
-		fontWeight: "regular",
-		color: "black",
-		marginBottom: 4,
-	},
 	where: {
 		fontSize: 24,
 		fontWeight: "bold",
 		color: "black",
-        marginBottom: 20,
+		marginBottom: 20,
 	},
-	dateCont: {
-		flexDirection: "row",
-		marginVertical: "auto",
-		alignItems: "center",
-	},
-	date: {
-		fontSize: 16,
-		fontWeight: "regular",
-		color: "black",
-	},
+
 	button: {
 		marginTop: "auto",
 	},

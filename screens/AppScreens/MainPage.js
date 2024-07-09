@@ -1,34 +1,77 @@
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+	Pressable,
+	StyleSheet,
+	Text,
+	TouchableOpacity,
+	View,
+} from "react-native";
 import React, { useState } from "react";
-import { Octicons } from "@expo/vector-icons";
 import { colors } from "../../constants/styling";
 import { DrawerActions, useNavigation } from "@react-navigation/native";
 import HomeTab from "../../components/HomeTab";
 import Passenger from "../../components/Passenger";
-
+import AvailableRiders from "../../components/AvailableRiders";
+import MapView from "react-native-maps";
+import ConfirmRide from "../../components/ConfirmRide";
+import HomeHeader from "../../components/homeHeader/HomeHeader";
+import PassengerHeader from "../../components/homeHeader/PassengerHeader";
+import ConfirmHeader from "../../components/homeHeader/ConfirmHeader";
+import RiderHeader from "../../components/homeHeader/RiderHeader";
 
 const MainPage = () => {
 	const navigation = useNavigation();
 	const [isPassengers, setIsPassengers] = useState(false);
+	const [isRider, setIsRider] = useState(false);
+	const [confirm, setConfirm] = useState();
+
+	const ToConfirm = () => {
+		setConfirm(true);
+	};
+
+	const Riders = () => {
+		setIsRider(true);
+	};
 	const Passengers = () => {
 		setIsPassengers(true);
 	};
-
-	const OpenDrawer = () => {
-		navigation.dispatch(DrawerActions.openDrawer());
+	const BackToHome = () => {
+		setIsPassengers(false);
+	};
+	const BackToPassengers = () => {
+		setIsRider(false);
+	};
+	const BackToRiders = () => {
+		setConfirm(false);
 	};
 	return (
 		<View style={styles.container}>
-			<TouchableOpacity
-				style={styles.drawerNav}
-				activeOpacity={0.7}
-				onPress={OpenDrawer}
-			>
-				<View>
-					<Octicons name="three-bars" size={24} color="black" />
-				</View>
-			</TouchableOpacity>
-		{isPassengers ? <Passenger/> : <HomeTab Passengers={Passengers}/>}
+			{isPassengers ? (
+				isRider ? (
+					confirm ? (
+						<ConfirmHeader Back={BackToRiders} />
+					) : (
+						<RiderHeader Back={BackToPassengers} />
+					)
+				) : (
+					<PassengerHeader Back={BackToHome} />
+				)
+			) : (
+				<HomeHeader />
+			)}
+
+			{isPassengers ? (
+				isRider ? (
+					confirm ? (
+						<ConfirmRide />
+					) : (
+						<AvailableRiders confirm={ToConfirm} />
+					)
+				) : (
+					<Passenger riders={Riders} />
+				)
+			) : (
+				<HomeTab Passengers={Passengers} />
+			)}
 		</View>
 	);
 };
@@ -38,18 +81,9 @@ export default MainPage;
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		alignItems: "center",
 		backgroundColor: colors.lightGrey2,
 	},
-	drawerNav: {
-		width: 48,
-		height: 48,
-		backgroundColor: colors.secondary,
-		justifyContent: "center",
-		alignItems: "center",
-		borderRadius: 24,
-		position: "absolute",
-		top: 40,
-		left: 16,
+	map: {
+		...StyleSheet.absoluteFillObject,
 	},
 });

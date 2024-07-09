@@ -42,7 +42,6 @@ const styles = StyleSheet.create({
 		borderRadius: 16,
 		flexDirection: "row",
 	},
-
 	destinations: {
 		minWidth: 270,
 		height: "100%",
