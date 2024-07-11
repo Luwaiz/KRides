@@ -1,43 +1,40 @@
 import { StyleSheet, Text, View } from "react-native";
-import React, { useState } from "react";
-import { OtpInput } from "react-native-otp-entry";
-import { SafeAreaView } from "react-native-safe-area-context";
+import React from "react";
 import { colors } from "../../constants/styling";
+import { SafeAreaView } from "react-native-safe-area-context";
 import BackButton from "../../components/buttons/BackButton";
-import ActiveButton from "../../components/buttons/ActiveButton";
 import TextInput1 from "../../components/TextInput1";
+import ActiveButton from "../../components/buttons/ActiveButton";
+import { useNavigation } from "@react-navigation/native";
 
-const Name = ({ navigation }) => {
-	const ToHome = () => {
-		navigation.replace("drawer", {
-			params: "AppStack",
-			params: {
-				params: "Home",
-			},
-		});
-	};
+const Promo = () => {
+    const navigation= useNavigation()
+    const toHome= ()=>{
+        navigation.goBack()
+    }
+
 	return (
 		<SafeAreaView style={styles.container}>
 			<View style={styles.topCont}>
 				<BackButton
-					text={<Text style={styles.headText}>What’s your name?</Text>}
+					text={<Text style={styles.headText}>Enter promo code</Text>}
 				/>
 			</View>
-			<View style={styles.infoCont}>
-				<Text style={styles.infoText}>Let's know you better!</Text>
-			</View>
 			<View style={styles.bottomCont}>
-				<TextInput1 text={"First Name"} placeholder={"e.g John"} />
-				<TextInput1 text={"Last Name"} placeholder={"e.g Dotun"} />
+				<TextInput1
+					placeholder={"e.g PTY204"}
+					text={<Text>Enter the code to claim your voucher</Text>}
+				/>
+
 				<View style={styles.button}>
-					<ActiveButton title={"Submit"} onPress={ToHome} />
+					<ActiveButton title={"Submit"} onPress={toHome}/>
 				</View>
 			</View>
 		</SafeAreaView>
 	);
 };
 
-export default Name;
+export default Promo;
 
 const styles = StyleSheet.create({
 	container: {
@@ -65,6 +62,7 @@ const styles = StyleSheet.create({
 	bottomCont: {
 		flex: 1,
 		paddingHorizontal: 16,
+		paddingTop: 20,
 	},
 	button: {
 		marginTop: "auto",

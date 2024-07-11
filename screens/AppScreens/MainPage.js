@@ -1,51 +1,77 @@
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import React from "react";
-import BottomSheet from "@gorhom/bottom-sheet";
-import { Feather } from "@expo/vector-icons";
-import { Octicons } from "@expo/vector-icons";
+import {
+	Pressable,
+	StyleSheet,
+	Text,
+	TouchableOpacity,
+	View,
+} from "react-native";
+import React, { useState } from "react";
 import { colors } from "../../constants/styling";
-import ActiveButton from "../../components/buttons/ActiveButton";
 import { DrawerActions, useNavigation } from "@react-navigation/native";
-import WhereTo from "../../components/WhereTo";
-import { useAuthStore } from "../../constants/Store";
+import HomeTab from "../../components/HomeTab";
+import Passenger from "../../components/Passenger";
+import AvailableRiders from "../../components/AvailableRiders";
+import MapView from "react-native-maps";
+import ConfirmRide from "../../components/ConfirmRide";
+import HomeHeader from "../../components/homeHeader/HomeHeader";
+import PassengerHeader from "../../components/homeHeader/PassengerHeader";
+import ConfirmHeader from "../../components/homeHeader/ConfirmHeader";
+import RiderHeader from "../../components/homeHeader/RiderHeader";
+
 const MainPage = () => {
 	const navigation = useNavigation();
-	const OpenDrawer = () => {
-		navigation.dispatch(DrawerActions.openDrawer());
+	const [isPassengers, setIsPassengers] = useState(false);
+	const [isRider, setIsRider] = useState(false);
+	const [confirm, setConfirm] = useState();
+
+	const ToConfirm = () => {
+		setConfirm(true);
+	};
+
+	const Riders = () => {
+		setIsRider(true);
+	};
+	const Passengers = () => {
+		setIsPassengers(true);
+	};
+	const BackToHome = () => {
+		setIsPassengers(false);
+	};
+	const BackToPassengers = () => {
+		setIsRider(false);
+	};
+	const BackToRiders = () => {
+		setConfirm(false);
 	};
 	return (
 		<View style={styles.container}>
-			<TouchableOpacity
-				style={styles.drawerNav}
-				activeOpacity={0.7}
-				onPress={OpenDrawer}
-			>
-				<View>
-					<Octicons name="three-bars" size={24} color="black" />
-				</View>
-			</TouchableOpacity>
-			<BottomSheet
-				snapPoints={["46%"]}
-				backgroundStyle={{ borderRadius: 30 }}
-				handleComponent={null}
-			>
-				<View style={styles.sheetCont}>
-					<View style={styles.topText}>
-						<Text style={styles.greet}>
-							Hello, <Text style={{ color: colors.primaryBlue }}>Tobi</Text>
-						</Text>
-						<Text style={styles.where}>Where are you going?</Text>
-					</View>
-					<WhereTo />
-					<View style={styles.dateCont}>
-						<Feather name="calendar" size={24} color={colors.primaryBlue} />
-						<Text style={styles.date}>14/7/2023</Text>
-					</View>
-					<View style={styles.button}>
-						<ActiveButton title={"Continue"} />
-					</View>
-				</View>
-			</BottomSheet>
+			{isPassengers ? (
+				isRider ? (
+					confirm ? (
+						<ConfirmHeader Back={BackToRiders} />
+					) : (
+						<RiderHeader Back={BackToPassengers} />
+					)
+				) : (
+					<PassengerHeader Back={BackToHome} />
+				)
+			) : (
+				<HomeHeader />
+			)}
+
+			{isPassengers ? (
+				isRider ? (
+					confirm ? (
+						<ConfirmRide />
+					) : (
+						<AvailableRiders confirm={ToConfirm} />
+					)
+				) : (
+					<Passenger riders={Riders} />
+				)
+			) : (
+				<HomeTab Passengers={Passengers} />
+			)}
 		</View>
 	);
 };
@@ -55,51 +81,9 @@ export default MainPage;
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		alignItems: "center",
 		backgroundColor: colors.lightGrey2,
 	},
-	sheetCont: {
-		flex: 1,
-		paddingBottom: 16,
-		paddingTop: 30,
-		paddingHorizontal: 16,
-	},
-	topText: {
-		marginBottom: 10,
-	},
-	greet: {
-		fontSize: 16,
-		fontWeight: "regular",
-		color: "black",
-		marginBottom: 4,
-	},
-	where: {
-		fontSize: 24,
-		fontWeight: "bold",
-		color: "black",
-	},
-	dateCont: {
-		flexDirection: "row",
-		marginVertical: "auto",
-		alignItems: "center",
-	},
-	date: {
-		fontSize: 16,
-		fontWeight: "regular",
-		color: "black",
-	},
-	button: {
-		marginTop: "auto",
-	},
-	drawerNav: {
-		width: 48,
-		height: 48,
-		backgroundColor: colors.secondary,
-		justifyContent: "center",
-		alignItems: "center",
-		borderRadius: 24,
-		position: "absolute",
-		top: 40,
-		left: 16,
+	map: {
+		...StyleSheet.absoluteFillObject,
 	},
 });

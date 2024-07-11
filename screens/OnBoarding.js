@@ -35,10 +35,9 @@ const OnBoarding = ({navigation}) => {
 	};
 	// Skip button function
 	const SkipPage = () => {
-		const lastSlide = OnBoard.length - 1;
-		const offset = lastSlide * width;
-		slideRef?.current?.scrollToOffset({ offset });
-		setCurrentIndex(lastSlide);
+        navigation.replace("AuthStack",{
+			params: "AuthScreen"
+		});
 	};
 
 	// function to navigate to home screen
