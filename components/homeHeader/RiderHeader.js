@@ -3,14 +3,18 @@ import React from "react";
 import { AntDesign } from "@expo/vector-icons";
 import { colors } from "../../constants/styling";
 import { TextInput } from "react-native-paper";
+import { useBottomTabStore } from "../../constants/Store";
 
-const RiderHeader = ({Back}) => {
+const RiderHeader = () => {
+	const Back = useBottomTabStore((state)=>state.setRiderPage)
+
 	return (
 		<View style={styles.container}>
 			<Pressable onPress={Back} style={styles.backButton}>
 				<AntDesign name="arrowleft" size={24} color="black" />
 			</Pressable>
 			<View style={styles.searchBox}>
+			<AntDesign name="search1" size={20} color="black" />
                 <Text>BUSA House</Text>
             </View>
 		</View>
@@ -43,10 +47,9 @@ const styles = StyleSheet.create({
         height: 40,
         backgroundColor: colors.lightGrey2,
         borderRadius: 8,
-        justifyContent: "center",
         paddingHorizontal: 16,
-        // marginLeft:16,
         flexDirection: "row",
         alignItems: "center",
+		gap:10
     }
 });

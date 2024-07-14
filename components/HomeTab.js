@@ -5,9 +5,11 @@ import React, { useState } from "react";
 import WhereTo from "./WhereTo";
 import ActiveButton from "./buttons/ActiveButton";
 import { colors } from "../constants/styling";
+import { useBottomTabStore } from "../constants/Store";
 
-const HomeTab = ({Passengers}) => {
-
+const HomeTab = () => {
+	const Passengers = useBottomTabStore((state)=>state.PassengerPage)
+	
 	return (
 		<BottomSheet
 			snapPoints={["46%"]}

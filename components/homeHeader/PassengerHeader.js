@@ -2,16 +2,20 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import React from "react";
 import { AntDesign } from "@expo/vector-icons";
 import { colors } from "../../constants/styling";
+import { useBottomTabStore } from "../../constants/Store";
 
-const PassengerHeader = ({Back}) => {
+const PassengerHeader = () => {
+	const Back = useBottomTabStore((state)=>state.PassengerPage)
+	
 	return (
 		<View style={styles.container}>
 			<Pressable onPress={Back} style={styles.backButton}>
 				<AntDesign name="arrowleft" size={24} color="black" />
 			</Pressable>
 			<View style={styles.searchBox}>
-                <Text>BUSA House</Text>
-            </View>
+				<AntDesign name="search1" size={20} color="black" />
+				<Text>BUSA House</Text>
+			</View>
 		</View>
 	);
 };
@@ -31,21 +35,20 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 		paddingHorizontal: 8,
 	},
-    backButton: {
-        width: 40,
-        height: 40,
-        justifyContent: "center",
-        alignItems: "center",
-    },
-    searchBox: {
-        width: "88%",
-        height: 40,
-        backgroundColor: colors.lightGrey2,
-        borderRadius: 8,
-        justifyContent: "center",
-        paddingHorizontal: 16,
-        // marginLeft:16,
-        flexDirection: "row",
-        alignItems: "center",
-    }
+	backButton: {
+		width: 40,
+		height: 40,
+		justifyContent: "center",
+		alignItems: "center",
+	},
+	searchBox: {
+		width: "88%",
+		height: 40,
+		backgroundColor: colors.lightGrey2,
+		borderRadius: 8,
+		paddingHorizontal: 16,
+		flexDirection: "row",
+		alignItems: "center",
+		gap: 10,
+	},
 });

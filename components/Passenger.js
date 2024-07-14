@@ -7,10 +7,13 @@ import ActiveButton from "./buttons/ActiveButton";
 import { colors } from "../constants/styling";
 import { RadioButton } from "react-native-paper";
 import { useNavigation } from "@react-navigation/native";
+import { useBottomTabStore } from "../constants/Store";
 
-const Passenger = ({ riders }) => {
+const Passenger = () => {
 	const [selected, setSelected] = useState();
 	const navigation = useNavigation();
+	const riders = useBottomTabStore((state)=>state.setRiderPage)
+
 	const RiderPage = () => {
 		navigation.navigate("Riders");
 	};

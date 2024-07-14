@@ -5,7 +5,7 @@ import {
 	TouchableOpacity,
 	View,
 } from "react-native";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { colors } from "../../constants/styling";
 import { DrawerActions, useNavigation } from "@react-navigation/native";
 import HomeTab from "../../components/HomeTab";
@@ -17,43 +17,33 @@ import HomeHeader from "../../components/homeHeader/HomeHeader";
 import PassengerHeader from "../../components/homeHeader/PassengerHeader";
 import ConfirmHeader from "../../components/homeHeader/ConfirmHeader";
 import RiderHeader from "../../components/homeHeader/RiderHeader";
+import { useBottomTabStore } from "../../constants/Store";
 
 const MainPage = () => {
+	const isPassengers = useBottomTabStore((state) => state.passengerPage);
+	const isRider = useBottomTabStore((state) => state.riderPage);
+	const confirm = useBottomTabStore((state) => state.confirmPage);
+	const ToHome = useBottomTabStore((state) => state.setHomePage);
 	const navigation = useNavigation();
-	const [isPassengers, setIsPassengers] = useState(false);
-	const [isRider, setIsRider] = useState(false);
-	const [confirm, setConfirm] = useState();
 
-	const ToConfirm = () => {
-		setConfirm(true);
-	};
+	useEffect(() => {
+		const unSubscribe = navigation.addListener("focus", () => {
+			ToHome();
+		});
+		return unSubscribe;
+	}, [navigation]);
 
-	const Riders = () => {
-		setIsRider(true);
-	};
-	const Passengers = () => {
-		setIsPassengers(true);
-	};
-	const BackToHome = () => {
-		setIsPassengers(false);
-	};
-	const BackToPassengers = () => {
-		setIsRider(false);
-	};
-	const BackToRiders = () => {
-		setConfirm(false);
-	};
 	return (
 		<View style={styles.container}>
 			{isPassengers ? (
 				isRider ? (
 					confirm ? (
-						<ConfirmHeader Back={BackToRiders} />
+						<ConfirmHeader />
 					) : (
-						<RiderHeader Back={BackToPassengers} />
+						<RiderHeader />
 					)
 				) : (
-					<PassengerHeader Back={BackToHome} />
+					<PassengerHeader />
 				)
 			) : (
 				<HomeHeader />
@@ -64,13 +54,13 @@ const MainPage = () => {
 					confirm ? (
 						<ConfirmRide />
 					) : (
-						<AvailableRiders confirm={ToConfirm} />
+						<AvailableRiders />
 					)
 				) : (
-					<Passenger riders={Riders} />
+					<Passenger />
 				)
 			) : (
-				<HomeTab Passengers={Passengers} />
+				<HomeTab />
 			)}
 		</View>
 	);
