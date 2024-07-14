@@ -1,5 +1,5 @@
 import { Dimensions, StyleSheet, Text, View } from "react-native";
-import React from "react";
+import React, { useState } from "react";
 import BottomSheet from "@gorhom/bottom-sheet";
 import { colors } from "../../constants/styling";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -8,12 +8,24 @@ import ActiveButton from "../../components/buttons/ActiveButton";
 import GoogleButton from "../../components/buttons/GoogleButton";
 import Terms from "../../components/Terms";
 import BackButton from "../../components/buttons/BackButton";
+import { createUserWithEmailAndPassword } from "firebase/auth";
 const { width, height } = Dimensions.get("screen");
 
 const Signup = ({ navigation }) => {
-	const ToVerifyNumber = () => {
-		navigation.navigate("VerifyNo");
+	const [email, setEmail] = useState("");
+	const [password, setPassword] = useState("");
+	const register = async (email, password) => {
+		console.log("hello");
+		console.log("garri", email, password);
+		createUserWithEmailAndPassword(email, password)
+			.then((userCredentials) => {
+				console.log("User logged in successfully", userCredentials);
+			})
+			.catch((error) => {
+				console.error(error);
+			});
 	};
+
 	return (
 		<SafeAreaView style={styles.container}>
 			<View style={styles.topCont}>
@@ -29,19 +41,24 @@ const Signup = ({ navigation }) => {
 						<TextInput1
 							text={"Email Address"}
 							placeholder={"johndoe22@gmail.com"}
+							onChangeText={setEmail}
 						/>
 						<TextInput1 text={"Phone Number"} placeholder={"08123456789"} />
 						<TextInput1
 							text={"Password"}
 							placeholder={"*************"}
 							password
+							onChangeText={setPassword}
 						/>
 						<TextInput1
 							text={"Confirm Password"}
 							placeholder={"*************"}
 							password
 						/>
-						<ActiveButton title={"Sign up"} onPress={ToVerifyNumber} />
+						<ActiveButton
+							title={"Sign up"}
+							onPress={() => register(email, password)}
+						/>
 						<View style={styles.OrContainer}>
 							<View style={styles.dash} />
 							<Text style={styles.OrText}>OR</Text>
