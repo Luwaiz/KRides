@@ -3,8 +3,10 @@ import React from "react";
 import { TouchableOpacity } from "react-native-gesture-handler";
 import { colors } from "../../constants/styling";
 import { AntDesign } from "@expo/vector-icons";
+import { useBottomTabStore } from "../../constants/Store";
 
-const HomeHeader = ({ Back }) => {
+const HomeHeader = () => {
+	const Back = useBottomTabStore((state)=>state.setConfirmPage)
 	return (
 		<TouchableOpacity
 			style={styles.drawerNav}

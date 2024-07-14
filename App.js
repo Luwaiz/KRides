@@ -6,6 +6,8 @@ import Navigation from "./navigation/Navigation";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import FontResources from "./react-native-config";
 import { PaperProvider } from "react-native-paper";
+import Toast from "react-native-toast-message";
+import ToastConfig from "./components/ToastConfig";
 
 export default function App() {
 	const fontLoaded = FontResources();
@@ -18,6 +20,7 @@ export default function App() {
 					<PaperProvider>
 						<Navigation />
 						<StatusBar style="auto" />
+						<Toast config={ToastConfig}/>
 					</PaperProvider>
 				</SafeAreaProvider>
 			</GestureHandlerRootView>

@@ -7,9 +7,12 @@ import ActiveButton from "./buttons/ActiveButton";
 import { colors } from "../constants/styling";
 import Avatar from "../assets/svg/Frame 77avatar.svg";
 import Person from "../assets/svg/Person.svg";
+import { useBottomTabStore } from "../constants/Store";
 
-const AvailableRiders = ({confirm}) => {
+const AvailableRiders = () => {
 	const [selectedRider, setSelectedRider] = useState(null);
+	const confirm = useBottomTabStore((state)=>state.setConfirmPage)
+	
 
 
 	const Selected = (id) => {

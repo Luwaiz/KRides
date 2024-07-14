@@ -12,7 +12,7 @@ import Direction from "../assets/svg/Frame 34direction.svg";
 import Naira from "../assets/svg/Naira.svg";
 import RideConfirm from "./modals/RideConfirm";
 
-const ConfirmRide = ({}) => {
+const ConfirmRide = () => {
 	const navigation = useNavigation();
     const [selectRider, setSelectRider] = useState(false);
 
@@ -71,7 +71,7 @@ const ConfirmRide = ({}) => {
 				</View>
 			</View>
 		</BottomSheet>
-        {selectRider && <RideConfirm modal={selectRider} setModal={setSelectRider}/>}
+        <RideConfirm modal={selectRider} setModal={setSelectRider}/>
         </>
 	);
 };
