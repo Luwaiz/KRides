@@ -26,42 +26,42 @@ const MainPage = () => {
 	const ToHome = useBottomTabStore((state) => state.setHomePage);
 	const navigation = useNavigation();
 
-	useEffect(() => {
-		const unSubscribe = navigation.addListener("focus", () => {
-			ToHome();
-		});
-		return unSubscribe;
-	}, [navigation]);
+	const HeaderComponents = () => {
+		if (isPassengers) {
+			if (isRider) {
+				if (confirm) {
+					return <ConfirmHeader />;
+				} else {
+					return <RiderHeader />;
+				}
+			} else {
+				return <PassengerHeader />;
+			}
+		} else {
+			return <HomeHeader />;
+		}
+	};
+
+	const BottomSheetComponents = () => {
+		if (isPassengers) {
+			if (isRider) {
+				if (confirm) {
+					return <ConfirmRide />;
+				} else {
+					return <AvailableRiders />;
+				}
+			} else {
+				return <Passenger />;
+			}
+		} else {
+			return <HomeTab />;
+		}
+	};
 
 	return (
 		<View style={styles.container}>
-			{isPassengers ? (
-				isRider ? (
-					confirm ? (
-						<ConfirmHeader />
-					) : (
-						<RiderHeader />
-					)
-				) : (
-					<PassengerHeader />
-				)
-			) : (
-				<HomeHeader />
-			)}
-
-			{isPassengers ? (
-				isRider ? (
-					confirm ? (
-						<ConfirmRide />
-					) : (
-						<AvailableRiders />
-					)
-				) : (
-					<Passenger />
-				)
-			) : (
-				<HomeTab />
-			)}
+			<HeaderComponents />
+			<BottomSheetComponents />
 		</View>
 	);
 };
@@ -74,6 +74,6 @@ const styles = StyleSheet.create({
 		backgroundColor: colors.lightGrey2,
 	},
 	map: {
-		...StyleSheet.absoluteFillObject,
+		...StyleSheet.absoluteFill,
 	},
 });

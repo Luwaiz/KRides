@@ -16,20 +16,20 @@ const RideConfirm = ({ modal, setModal }) => {
 	const [cancel, setCancel] = useState(false);
 
 	const cancelRide = () => {
-        setCancel(true);
-    };
+		setCancel(true);
+	};
 	const showToast = () => {
 		setModal(false);
-        Toast.show({
-            text1: "Tobi, Your rider will be here in",
-			text1Style:styles.toastText1,
-            type: "tomatoToast",
-			text2:"2 minutes",
-			text2Style:styles.toastText2,
-			autoHide:false,
-			onHide:()=>cancelRide()
-        })
-    }
+		Toast.show({
+			text1: "Tobi, Your rider will be here in",
+			text1Style: styles.toastText1,
+			type: "tomatoToast",
+			text2: "2 minutes",
+			text2Style: styles.toastText2,
+			autoHide: false,
+			onHide: () => cancelRide(),
+		});
+	};
 	return (
 		<>
 			<Modal
@@ -37,13 +37,13 @@ const RideConfirm = ({ modal, setModal }) => {
 				style={styles.modalCont}
 				transparent
 				statusBarTranslucent
+				onRequestClose={() => setModal(false)}
 			>
 				<View style={styles.modal}>
 					<View style={styles.container}>
 						<Keke />
 						<Text style={styles.text1}>Ride has been accepted</Text>
 						<Text style={styles.text2}>Henry Ade</Text>
-
 						<View style={styles.button}>
 							<ActiveButton title={"Proceed"} onPress={showToast} />
 							<LoginButton title={"Cancel Ride"} onPress={cancelRide} />
@@ -51,7 +51,7 @@ const RideConfirm = ({ modal, setModal }) => {
 					</View>
 				</View>
 			</Modal>
-			<Confirmation2 modal={cancel} setModal={setCancel}/>
+			<Confirmation2 modal={cancel} setModal={setCancel} />
 		</>
 	);
 };
@@ -91,10 +91,4 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		marginBottom: 10,
 	},
-	toastText1:{
-
-	},
-	toastText2:{
-
-	}
 });

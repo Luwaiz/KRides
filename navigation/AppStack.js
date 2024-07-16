@@ -10,6 +10,7 @@ import ProfilePage from '../screens/AppScreens/ProfilePage'
 import AvailableRiders from '../components/AvailableRiders'
 import Passenger from '../components/Passenger'
 import Promo from '../screens/AppScreens/Promo'
+import Ratings from '../screens/AppScreens/Rating'
 
 const Stack = createNativeStackNavigator()
 const AppStack = () => {
@@ -25,10 +26,10 @@ const AppStack = () => {
       <Stack.Screen name="Passenger" component={Passenger}  />
       <Stack.Screen name="Riders" component={AvailableRiders}  />
       <Stack.Screen name="Promo" component={Promo}  />
+      <Stack.Screen name="Rating" component={Ratings}  />
+
     </Stack.Navigator>
   )
 }
 
 export default AppStack
-
-const styles = StyleSheet.create({})

@@ -18,6 +18,7 @@ const Confirmation2 = ({ modal, setModal }) => {
 			style={StyleSheet.absoluteFill}
 			transparent
 			statusBarTranslucent
+			onRequestClose={()=>setModal(false)}
 		>
 			<View style={styles.modal}>
 				<View style={styles.container}>
