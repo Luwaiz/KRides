@@ -4,26 +4,23 @@ import {
 	Image,
 	StyleSheet,
 	Text,
-	TouchableOpacity,
 	View,
 } from "react-native";
 import React, { useRef, useState } from "react";
 import { OnBoard } from "../constants/OnBoardData";
-import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
+import BottomSheet from "@gorhom/bottom-sheet";
 import Footer from "../components/Footer";
 const { width, height } = Dimensions.get("screen");
 
-const OnBoarding = ({navigation}) => {
+const OnBoarding = ({ navigation }) => {
 	const [currentIndex, setCurrentIndex] = useState(0);
 	const slideRef = useRef(null);
-
-	// function for dectecting the current page and updating indicator Bar
+	// function for detecting the current page and updating indicator Bar
 	const scrollFunction = (e) => {
 		// console.log(e.nativeEvent.contentOffset.x);
 		const contentOffsetX = e.nativeEvent.contentOffset.x;
 		setCurrentIndex(Math.round(contentOffsetX / width));
 	};
-
 	//Next button function
 	const NextPage = () => {
 		const nextSlide = currentIndex + 1;
@@ -35,17 +32,17 @@ const OnBoarding = ({navigation}) => {
 	};
 	// Skip button function
 	const SkipPage = () => {
-        navigation.replace("AuthStack",{
-			params: "AuthScreen"
+		navigation.replace("AuthStack", {
+			params: "AuthScreen",
 		});
 	};
 
 	// function to navigate to home screen
 	const navigateToHome = () => {
-        navigation.replace("AuthStack",{
-			params: "AuthScreen"
+		navigation.replace("AuthStack", {
+			params: "AuthScreen",
 		});
-    };
+	};
 
 	return (
 		<View style={styles.container}>
@@ -53,6 +50,7 @@ const OnBoarding = ({navigation}) => {
 				ref={slideRef}
 				data={OnBoard}
 				horizontal
+				scrollEnabled
 				onMomentumScrollEnd={scrollFunction}
 				pagingEnabled
 				style={{ flex: 0.65 }}
@@ -67,7 +65,7 @@ const OnBoarding = ({navigation}) => {
 						<BottomSheet
 							style={styles.Sheet}
 							handleComponent={null}
-							backgroundStyle={{borderRadius:30,}}
+							backgroundStyle={{ borderRadius: 30 }}
 							snapPoints={["35%"]}
 						>
 							<View style={styles.contain}>
@@ -78,7 +76,13 @@ const OnBoarding = ({navigation}) => {
 					</>
 				)}
 			/>
-			<Footer currentIndex={currentIndex} setCurrentIndex={setCurrentIndex} NextPage={NextPage} SkipPage={SkipPage} navigateToHome={navigateToHome}/>
+			<Footer
+				currentIndex={currentIndex}
+				setCurrentIndex={setCurrentIndex}
+				NextPage={NextPage}
+				SkipPage={SkipPage}
+				navigateToHome={navigateToHome}
+			/>
 		</View>
 	);
 };
@@ -100,10 +104,9 @@ const styles = StyleSheet.create({
 	},
 	title: {
 		fontSize: 24,
-		// fontWeight: "bold",
 		textAlign: "center",
 		marginBottom: 30,
-		fontFamily:"Albert-SemiBold"
+		fontFamily: "Albert-SemiBold",
 	},
 	subTitle: {
 		fontSize: 16,
@@ -111,7 +114,6 @@ const styles = StyleSheet.create({
 		flexWrap: "wrap",
 		maxWidth: width - 120,
 		lineHeight: 20,
-		// fontFamily:"AlbertSans-ExtraBold"
 	},
 	Sheet: {
 		shadowColor: "#000",

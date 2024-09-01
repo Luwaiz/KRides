@@ -1,23 +1,20 @@
-import { Dimensions, Image, Modal, StyleSheet, Text, View } from "react-native";
+import { Dimensions, Modal, StyleSheet, Text, View } from "react-native";
 import React, { useState } from "react";
 import ActiveButton from "../buttons/ActiveButton";
 import Keke from "../../assets/svg/Keke.svg";
-
-import InActiveButton from "../buttons/InActiveButton";
-
-import { useNavigation } from "@react-navigation/native";
 import LoginButton from "../buttons/LoginButton";
 import Confirmation2 from "./Confirmation2";
 import Toast from "react-native-toast-message";
-const { width, height } = Dimensions.get("screen");
+const { width } = Dimensions.get("screen");
 
 const RideConfirm = ({ modal, setModal }) => {
-	const navigation = useNavigation();
+
 	const [cancel, setCancel] = useState(false);
 
 	const cancelRide = () => {
 		setCancel(true);
 	};
+
 	const showToast = () => {
 		setModal(false);
 		Toast.show({
@@ -30,6 +27,7 @@ const RideConfirm = ({ modal, setModal }) => {
 			onHide: () => cancelRide(),
 		});
 	};
+
 	return (
 		<>
 			<Modal
@@ -40,7 +38,9 @@ const RideConfirm = ({ modal, setModal }) => {
 				onRequestClose={() => setModal(false)}
 			>
 				<View style={styles.modal}>
+
 					<View style={styles.container}>
+
 						<Keke />
 						<Text style={styles.text1}>Ride has been accepted</Text>
 						<Text style={styles.text2}>Henry Ade</Text>
@@ -49,7 +49,9 @@ const RideConfirm = ({ modal, setModal }) => {
 							<LoginButton title={"Cancel Ride"} onPress={cancelRide} />
 						</View>
 					</View>
+					
 				</View>
+
 			</Modal>
 			<Confirmation2 modal={cancel} setModal={setCancel} />
 		</>
