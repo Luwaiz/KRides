@@ -7,38 +7,45 @@ import ActiveButton from "../buttons/ActiveButton";
 import { colors } from "../../constants/styling";
 import { useBottomTabStore } from "../../constants/Store";
 import Avatar from "../../assets/svg/Frame 77avatar.svg";
+import Arrival from "../modals/Arrival";
 
 const AcceptTab = () => {
-	const Passengers = useBottomTabStore((state) => state.PassengerPage);
+	const [endRide, setEndRide] = useState(false);
 
+	const RideEnded = () => {
+		setEndRide(true);
+	};
 	return (
-		<BottomSheet
-			snapPoints={["26%"]}
-			backgroundStyle={{ borderRadius: 30 }}
-			handleComponent={null}
-		>
-			<View style={styles.sheetCont}>
-				<View style={styles.topText}>
-					<Text style={styles.where}>Ride request</Text>
-					<Text style={styles.time}>2 mins away</Text>
-				</View>
-				<View style={styles.details}>
-					<View style={styles.detailCont}>
-						<Avatar width={50} height={50} />
-						<View>
-							<Text style={styles.name}>Henry</Text>
-							<Text style={styles.time}>Cash payment</Text>
-							<Text style={styles.time}>N150</Text>
-						</View>
+		<>
+			<BottomSheet
+				snapPoints={["26%"]}
+				backgroundStyle={{ borderRadius: 30 }}
+				handleComponent={null}
+			>
+				<View style={styles.sheetCont}>
+					<View style={styles.topText}>
+						<Text style={styles.where}>Ride request</Text>
+						<Text style={styles.time}>2 mins away</Text>
 					</View>
-					<Phone width={24} height={24} />
-				</View>
+					<View style={styles.details}>
+						<View style={styles.detailCont}>
+							<Avatar width={50} height={50} />
+							<View>
+								<Text style={styles.name}>Henry</Text>
+								<Text style={styles.time}>Cash payment</Text>
+								<Text style={styles.time}>N150</Text>
+							</View>
+						</View>
+						<Phone width={24} height={24} />
+					</View>
 
-				<View style={styles.button}>
-					<ActiveButton title={"continue"} />
+					<View style={styles.button}>
+						<ActiveButton title={"continue"} onPress={RideEnded} />
+					</View>
 				</View>
-			</View>
-		</BottomSheet>
+			</BottomSheet>
+			<Arrival modal={endRide} setModal={setEndRide} />
+		</>
 	);
 };
 
@@ -66,13 +73,13 @@ const styles = StyleSheet.create({
 		marginBottom: 16,
 		flexDirection: "row",
 		gap: 10,
-        justifyContent: "space-between",
+		justifyContent: "space-between",
 	},
-    detailCont: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 10,
-    },
+	detailCont: {
+		flexDirection: "row",
+		alignItems: "center",
+		gap: 10,
+	},
 	where: {
 		fontSize: 24,
 		fontWeight: "bold",

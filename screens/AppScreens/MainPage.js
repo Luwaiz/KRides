@@ -24,7 +24,6 @@ const MainPage = () => {
 	const isRider = useBottomTabStore((state) => state.riderPage);
 	const confirm = useBottomTabStore((state) => state.confirmPage);
 	const ToHome = useBottomTabStore((state) => state.setHomePage);
-	const navigation = useNavigation();
 
 	const HeaderComponents = () => {
 		if (isPassengers) {

@@ -1,42 +1,31 @@
 import { Dimensions, Image, Modal, StyleSheet, Text, View } from "react-native";
 import React from "react";
 import ActiveButton from "../buttons/ActiveButton";
-import { useNavigation } from "@react-navigation/native";
-import LoginButton from "../buttons/LoginButton";
+import Keke from "../../assets/svg/Keke.svg";
+import { useBottomTabStore } from "../../constants/Store";
 const { width, height } = Dimensions.get("screen");
 
-const Confirmation1 = ({ modal, setModal, title }) => {
-	const navigation = useNavigation();
-	const ToAuthScreen = () => {
-		setModal(false);
-		navigation.navigate("AuthStack", {
-			params: title === "Logout" ? "Login" : "Signup",
-		});
-	};
-	const ToName = () => {
+const Arrival = ({ modal, setModal }) => {
+    const ToHome = useBottomTabStore((state) => state.setDriverHome);
+
+	const Cancel = () => {
 		setModal(false);
 	};
+
 	return (
 		<Modal
 			visible={modal}
 			style={StyleSheet.absoluteFill}
 			transparent
 			statusBarTranslucent
+			onRequestClose={() => setModal(false)}
 		>
 			<View style={styles.modal}>
 				<View style={styles.container}>
-					{title === "Logout" ? (
-						<Text style={styles.text}>Are you sure you want to logout</Text>
-					) : (
-						<Text style={styles.text}>
-							Are you sure you want to permanently{"\n"} delete your Kampus
-							Riders account?
-						</Text>
-					)}
-
+					<Keke />
+					<Text style={styles.text}>Arrived at customers location</Text>
 					<View style={styles.button}>
-						<ActiveButton title={"Yes"} onPress={ToAuthScreen} />
-						<LoginButton title={"Cancel"} onPress={ToName} />
+						<ActiveButton title={"OK"} onPress={ToHome} />
 					</View>
 				</View>
 			</View>
@@ -44,7 +33,7 @@ const Confirmation1 = ({ modal, setModal, title }) => {
 	);
 };
 
-export default Confirmation1;
+export default Arrival;
 
 const styles = StyleSheet.create({
 	modal: {
@@ -58,7 +47,7 @@ const styles = StyleSheet.create({
 		textAlign: "center",
 		fontSize: 16,
 		color: "black",
-		marginBottom: 10,
+		marginVertical: 10,
 	},
 	container: {
 		backgroundColor: "white",

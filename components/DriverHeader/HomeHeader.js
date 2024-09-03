@@ -24,25 +24,17 @@ const HomeHeader = () => {
 				</View>
 			</TouchableOpacity>
 			<View style={styles.box}>
-				<Calendar height={25} width={25} />
+				<Calendar height={28} width={28} />
 				<View style={styles.texts}>
-					<Text style={styles.text}>
-                        Completed Trips
-                    </Text>
-					<Text style={styles.text2}>
-                        10
-                    </Text>
+					<Text style={styles.text}>Completed Trips</Text>
+					<Text style={styles.text2}>10</Text>
 				</View>
 			</View>
 			<View style={styles.box}>
-				<Cash height={25} width={25} />
+				<Cash height={28} width={28} />
 				<View style={styles.texts}>
-				<Text style={styles.text}>
-                        Earned today
-                    </Text>
-					<Text style={styles.text2}>
-                        N1000
-                    </Text>
+					<Text style={styles.text}>Earned today</Text>
+					<Text style={styles.text2}>N1000</Text>
 				</View>
 			</View>
 		</View>
@@ -58,9 +50,8 @@ const styles = StyleSheet.create({
 		backgroundColor: colors.primary,
 		paddingTop: StatusBar.currentHeight + 12,
 		flexDirection: "row",
-		justifyContent: "center",
+		paddingHorizontal:16
 	},
-
 	drawerNav: {
 		width: 48,
 		height: 48,
@@ -77,18 +68,19 @@ const styles = StyleSheet.create({
 		marginHorizontal: 5,
 		borderRadius: 10,
 		alignItems: "center",
-		padding:5,
-		flexDirection:"row"
+		padding: 5,
+		flexDirection: "row",
 	},
-	texts:{
-		marginLeft:5,
+	texts: {
+		marginLeft: 5,
 	},
-	text:{
-		fontSize:12,
-		color:colors.lightGrey3,
+	text: {
+		fontSize: 13,
+		color: colors.lightGrey3,
 	},
-    text2:{
-		fontFamily:"Albert-SemiBold",
-		fontSize:14,
-		marginTop:5    }
+	text2: {
+		fontFamily: "Albert-SemiBold",
+		fontSize: 14,
+		marginTop: 5,
+	},
 });
