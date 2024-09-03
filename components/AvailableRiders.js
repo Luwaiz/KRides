@@ -1,8 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import BottomSheet, { BottomSheetFlatList } from "@gorhom/bottom-sheet";
-import { Feather } from "@expo/vector-icons";
 import React, { useState } from "react";
-import WhereTo from "./WhereTo";
 import ActiveButton from "./buttons/ActiveButton";
 import { colors } from "../constants/styling";
 import Avatar from "../assets/svg/Frame 77avatar.svg";
