@@ -18,6 +18,7 @@ import ConfirmHeader from "../../components/homeHeader/ConfirmHeader";
 import RiderHeader from "../../components/homeHeader/RiderHeader";
 import { useBottomTabStore } from "../../constants/Store";
 import AcceptTab from "../../components/DriversModal/AcceptTab";
+import AcceptHeader from "../../components/DriverHeader/AcceptHeader";
 
 const HomePage = () => {
 	const Accept = useBottomTabStore((state) => state.AcceptRidePage);
@@ -26,7 +27,7 @@ const HomePage = () => {
 
 	const HeaderComponents = () => {
 		if (Accept) {
-			return <PassengerHeader />;
+			return <AcceptHeader />;
 		} else {
 			return <HomeHeader />;
 		}

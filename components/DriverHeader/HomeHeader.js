@@ -4,6 +4,8 @@ import { Octicons } from "@expo/vector-icons";
 import { DrawerActions, useNavigation } from "@react-navigation/native";
 import { TouchableOpacity } from "react-native-gesture-handler";
 import { colors } from "../../constants/styling";
+import Cash from "../../assets/svg/Cash.svg";
+import Calendar from "../../assets/svg/Calendar.svg";
 
 const HomeHeader = () => {
 	const navigation = useNavigation();
@@ -21,8 +23,28 @@ const HomeHeader = () => {
 					<Octicons name="three-bars" size={24} color="black" />
 				</View>
 			</TouchableOpacity>
-			<View style={styles.box}></View>
-			<View style={styles.box}></View>
+			<View style={styles.box}>
+				<Calendar height={25} width={25} />
+				<View style={styles.texts}>
+					<Text style={styles.text}>
+                        Completed Trips
+                    </Text>
+					<Text style={styles.text2}>
+                        10
+                    </Text>
+				</View>
+			</View>
+			<View style={styles.box}>
+				<Cash height={25} width={25} />
+				<View style={styles.texts}>
+				<Text style={styles.text}>
+                        Earned today
+                    </Text>
+					<Text style={styles.text2}>
+                        N1000
+                    </Text>
+				</View>
+			</View>
 		</View>
 	);
 };
@@ -34,7 +56,7 @@ const styles = StyleSheet.create({
 		width: "100%",
 		height: 100,
 		backgroundColor: colors.primary,
-		paddingTop: StatusBar.currentHeight + 10,
+		paddingTop: StatusBar.currentHeight + 12,
 		flexDirection: "row",
 		justifyContent: "center",
 	},
@@ -50,11 +72,23 @@ const styles = StyleSheet.create({
 	},
 	box: {
 		width: 140,
-		height: 80,
+		height: 70,
 		backgroundColor: colors.secondary,
 		marginHorizontal: 5,
 		borderRadius: 10,
-		justifyContent: "center",
 		alignItems: "center",
+		padding:5,
+		flexDirection:"row"
 	},
+	texts:{
+		marginLeft:5,
+	},
+	text:{
+		fontSize:12,
+		color:colors.lightGrey3,
+	},
+    text2:{
+		fontFamily:"Albert-SemiBold",
+		fontSize:14,
+		marginTop:5    }
 });
