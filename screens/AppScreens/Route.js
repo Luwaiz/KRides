@@ -44,7 +44,7 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 	},
 	headText: {
-		fontSize: 24,
+		fontSize: 20  ,
 		fontWeight: "600",
 		color: "black",
 	},

@@ -3,9 +3,9 @@ import React from "react";
 import { colors } from "../../constants/styling";
 
 //active button component
-const ActiveButton = ({title,onPress}) => {
+const ActiveButton = ({title,onPress,disabled}) => {
 	return (
-        <TouchableOpacity onPress={onPress} activeOpacity={0.5}>
+        <TouchableOpacity disabled={disabled} onPress={onPress} activeOpacity={0.5}>
         <View style={styles.button}>
             <Text style={styles.buttonText}>{title}</Text>
         </View>

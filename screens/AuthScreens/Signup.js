@@ -27,8 +27,8 @@ const Signup = ({ navigation }) => {
 				<View style={styles.sheetCont}>
 					<View style={styles.textInputCont}>
 						<TextInput1
-							text={"Email Address"}
-							placeholder={"johndoe22@gmail.com"}
+							text={"School Email Address"}
+							placeholder={"john2022@student.babcock.edu.ng"}
 						/>
 						<TextInput1 text={"Phone Number"} placeholder={"08123456789"} />
 						<TextInput1

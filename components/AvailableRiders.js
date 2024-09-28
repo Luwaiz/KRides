@@ -42,7 +42,7 @@ const AvailableRiders = () => {
 					showsVerticalScrollIndicator={false}
 				/>
 				<View style={styles.button}>
-					<ActiveButton title={"Select Rider"} onPress={confirm}/>
+					<ActiveButton disabled={selectedRider === null} title={"Select Rider"} onPress={confirm}/>
 				</View>
 			</View>
 		</BottomSheet>
