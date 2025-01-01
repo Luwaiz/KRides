@@ -8,9 +8,9 @@ import FontResources from "./react-native-config";
 import { PaperProvider } from "react-native-paper";
 import Toast from "react-native-toast-message";
 import ToastConfig from "./components/ToastConfig";
-
 export default function App() {
 	const fontLoaded = FontResources();
+
 	if (!fontLoaded) {
 		return null;
 	} else {

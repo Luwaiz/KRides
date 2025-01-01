@@ -71,7 +71,7 @@ const styles = StyleSheet.create({
 	headText: {
 		color: colors.secondary,
 		fontSize: 24,
-		fontWeight: "700",
+		fontFamily: "Albert-SemiBold",
 	},
 	sheetCont: {
 		flex: 1,

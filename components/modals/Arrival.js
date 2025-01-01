@@ -15,7 +15,7 @@ const Arrival = ({ modal, setModal }) => {
 	return (
 		<Modal
 			visible={modal}
-			style={StyleSheet.absoluteFill}
+			style={styles.cont}
 			transparent
 			statusBarTranslucent
 			onRequestClose={() => setModal(false)}
@@ -36,11 +36,19 @@ const Arrival = ({ modal, setModal }) => {
 export default Arrival;
 
 const styles = StyleSheet.create({
+	cont:{
+		flex: 1,
+		backgroundColor: "white",
+        width: width / 1.4,
+        borderRadius: 5,
+        alignItems: "center",
+        paddingVertical: 64,
+	},
 	modal: {
 		justifyContent: "center",
 		alignItems: "center",
 		backgroundColor: "rgba(0, 0, 0, 0.5)",
-		flex: 1,
+		height
 	},
 	text: {
 		fontWeight: "regular",
@@ -56,6 +64,7 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 		paddingVertical: 64,
 		justifyContent: "center",
+		
 	},
 	button: {
 		marginTop: "auto",

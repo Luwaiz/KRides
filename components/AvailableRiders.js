@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Dimensions, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import BottomSheet, { BottomSheetFlatList } from "@gorhom/bottom-sheet";
 import React, { useState } from "react";
 import ActiveButton from "./buttons/ActiveButton";
@@ -6,12 +6,11 @@ import { colors } from "../constants/styling";
 import Avatar from "../assets/svg/Frame 77avatar.svg";
 import Person from "../assets/svg/Person.svg";
 import { useBottomTabStore } from "../constants/Store";
+const {width, height} = Dimensions.get("window")
 
 const AvailableRiders = () => {
 	const [selectedRider, setSelectedRider] = useState(null);
-	const confirm = useBottomTabStore((state)=>state.setConfirmPage)
-	
-
+	const confirm = useBottomTabStore((state) => state.setConfirmPage);
 
 	const Selected = (id) => {
 		setSelectedRider(id);
@@ -27,13 +26,10 @@ const AvailableRiders = () => {
 		{ name: "Rider 7", distance: "3.0 km", time: "50 min", price: "#40" },
 	];
 	return (
-		<BottomSheet
-			snapPoints={["46%"]}
-			backgroundStyle={{ borderRadius: 30 }}
-			handleComponent={null}
-		>
+		<View style={styles.bottomSheet}>
+
 			<View style={styles.sheetCont}>
-				<BottomSheetFlatList
+				<FlatList
 					data={data}
 					keyExtractor={(item, index) => index.toString()}
 					renderItem={({ item, index }) =>
@@ -42,10 +38,14 @@ const AvailableRiders = () => {
 					showsVerticalScrollIndicator={false}
 				/>
 				<View style={styles.button}>
-					<ActiveButton disabled={selectedRider === null} title={"Select Rider"} onPress={confirm}/>
+					<ActiveButton
+						disabled={selectedRider === null}
+						title={"Select Rider"}
+						onPress={confirm}
+					/>
 				</View>
 			</View>
-		</BottomSheet>
+		</View>
 	);
 };
 
@@ -79,6 +79,16 @@ const renderItems = (item, index, Selected, selectedRider) => {
 export default AvailableRiders;
 
 const styles = StyleSheet.create({
+	bottomSheet: {
+		backgroundColor: colors.secondary2,
+        borderTopLeftRadius: 30,
+		borderTopRightRadius: 30,
+		height: height/2,
+		position:"absolute",
+		bottom: 0,
+        left: 0,
+        right: 0,
+	},
 	sheetCont: {
 		flex: 1,
 		paddingBottom: 16,
@@ -86,7 +96,7 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 16,
 	},
 	button: {
-		marginTop: "auto",
+		paddingTop: 10,
 	},
 	container: {
 		width: "100%",

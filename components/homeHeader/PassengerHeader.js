@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import React from "react";
 import { AntDesign } from "@expo/vector-icons";
 import { colors } from "../../constants/styling";
@@ -14,7 +14,7 @@ const PassengerHeader = () => {
 			</Pressable>
 			<View style={styles.searchBox}>
 				<AntDesign name="search1" size={20} color="black" />
-				<Text>BUSA House</Text>
+				<TextInput style={styles.search} placeholder="BUSA HOUSE" cursorColor={"black"}></TextInput>
 			</View>
 		</View>
 	);
@@ -51,4 +51,8 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 		gap: 10,
 	},
+	search:{
+		width: "90%",
+        height: "100%",
+	}
 });

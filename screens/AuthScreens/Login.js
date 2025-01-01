@@ -8,9 +8,18 @@ import ActiveButton from "../../components/buttons/ActiveButton";
 import GoogleButton from "../../components/buttons/GoogleButton";
 import Terms from "../../components/Terms";
 import BackButton from "../../components/buttons/BackButton";
+import BiometricButton from "../../components/buttons/BiometricButton";
 const { width, height } = Dimensions.get("screen");
 
-const Login = () => {
+const Login = ({navigation}) => {
+		const ToHome = () => {
+			navigation.replace("drawer", {
+				params: "AppStack",
+				params: {
+					params: "Home",
+				},
+			});
+		};
 	return (
 		<SafeAreaView style={styles.container}>
 			<View style={styles.topCont}>
@@ -33,7 +42,12 @@ const Login = () => {
 							password
 						/>
 						<Text style={styles.forgot}>Forgot password?</Text>
-						<ActiveButton title={"Login"} />
+						<View style={styles.buttons}>
+							<View style={styles.logInButton}>
+								<ActiveButton title={"Login"} />
+							</View>
+							<BiometricButton navigate={()=>ToHome()}/>
+						</View>
 						<View style={styles.OrContainer}>
 							<View style={styles.dash} />
 							<Text style={styles.OrText}>OR</Text>
@@ -63,7 +77,7 @@ const styles = StyleSheet.create({
 	headText: {
 		color: colors.secondary,
 		fontSize: 24,
-		fontWeight: "700",
+		fontFamily: "Albert-SemiBold",
 	},
 	sheetCont: {
 		flex: 1,
@@ -96,5 +110,12 @@ const styles = StyleSheet.create({
 		color: "black",
 		fontSize: 16,
 		fontWeight: "700",
+	},
+	logInButton: {
+		width: "85%",
+	},
+	buttons: {
+		flexDirection: "row",
+		justifyContent: "space-between",
 	},
 });

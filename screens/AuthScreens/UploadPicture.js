@@ -49,7 +49,7 @@ const styles = StyleSheet.create({
 	headText: {
 		color: "black",
 		fontSize: 24,
-		fontWeight: "700",
+		fontFamily: "Albert-SemiBold",
 	},
 	infoCont: {
 		marginVertical: 16,

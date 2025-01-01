@@ -1,7 +1,7 @@
 import { View, Text } from "react-native";
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import HomePage from "../screens/DriverScreens.js/HomePage";
+import HomePage from "../screens/DriverScreens/HomePage";
 import Support from "../screens/AppScreens/Support";
 import About from "../screens/AppScreens/About";
 import History from "../screens/AppScreens/History";
