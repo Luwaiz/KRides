@@ -1,22 +1,18 @@
 import {
-	Button,
-	Pressable,
 	StyleSheet,
-	Text,
-	TouchableOpacity,
 	View,
 } from "react-native";
 import React, { useEffect, useState } from "react";
 import HomeTab from "../../components/HomeTab";
 import Passenger from "../../components/Passenger";
 import AvailableRiders from "../../components/AvailableRiders";
-import MapView from "react-native-maps";
 import ConfirmRide from "../../components/ConfirmRide";
 import HomeHeader from "../../components/homeHeader/HomeHeader";
 import PassengerHeader from "../../components/homeHeader/PassengerHeader";
 import ConfirmHeader from "../../components/homeHeader/ConfirmHeader";
 import RiderHeader from "../../components/homeHeader/RiderHeader";
 import { useBottomTabStore } from "../../constants/Store";
+import {Map_Public} from "@env"
 import Mapbox from "@rnmapbox/maps";
 
 const MainPage = () => {
@@ -25,14 +21,12 @@ const MainPage = () => {
 	const confirm = useBottomTabStore((state) => state.confirmPage);
 	const ToHome = useBottomTabStore((state) => state.setHomePage);
 
-	const Map_Secret = "sk.eyJ1IjoiZWx1d2FpeiIsImEiOiJjbTVibXJsNWk0ZXE4MmpwN2FvNjJ2cmJ3In0.ITvpOypF_zViRDy3hHU8OA"
-    const Map_Public = "pk.eyJ1IjoiZWx1d2FpeiIsImEiOiJjbTUzd3IyN2gyOTlkMnFzZmh5MTU3bTdoIn0.wGO4HMCpwQq7vVrnCWkF2w"
 	const BABCOCK_COORDINATES = {
 		latitude: 6.8935, // Replace with Babcock's central latitude
 		longitude: 3.723, // Replace with Babcock's central longitude
 		zoom: 17, // Adjust zoom level to focus only on the campus
 	};
-	Mapbox.setAccessToken("pk.eyJ1IjoiZWx1d2FpeiIsImEiOiJjbTUzd3IyN2gyOTlkMnFzZmh5MTU3bTdoIn0.wGO4HMCpwQq7vVrnCWkF2w")
+	Mapbox.setAccessToken(Map_Public)
 
 	const HeaderComponents = () => {
 		if (isPassengers) {

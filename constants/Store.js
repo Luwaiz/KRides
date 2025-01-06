@@ -18,3 +18,19 @@ export const useBottomTabStore = create((set) => ({
 
 }));
 
+export const useUserDetails= create ((set)=>({
+	firstName:"",
+	lastName:"",
+	phone:"",
+    email:"",
+    password:"",
+	UserId:"",
+	accessToken:"",
+	setAccessToken: (accessToken) => set({ accessToken}),
+	setFirstName: (firstName) => set({ firstName }),
+    setLastName: (lastName) => set({ lastName}),
+    setPhone: (phone) => set({phone }),
+    setEmail: (email) => set({email }),
+    setPassword: (password) => set({password }),
+	setUserId: (UserId) => set({UserId }),
+}))

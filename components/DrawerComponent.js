@@ -14,17 +14,17 @@ const details = [
 	{
 		icon: <AntDesign name="clockcircle" size={25} color={colors.IconGrey} />,
 		title: "Ride history",
-		navgateTo: "History",
+		navigateTo: "History",
 	},
 	{
 		icon: <AntDesign name="questioncircle" size={24} color={colors.IconGrey} />,
 		title: "Support",
-		navgateTo: "Support",
+		navigateTo: "Support",
 	},
 	{
 		icon: <Foundation name="info" size={30} color={colors.IconGrey} />,
 		title: "About",
-		navgateTo: "About",
+		navigateTo: "About",
 	},
 	{
 		icon: <Ionicons name="log-out-sharp" size={24} color={colors.IconGrey} />,
@@ -35,7 +35,7 @@ const details = [
 		title: "Delete Account",
 	},
 ];
-const DrawerLayout = ({ icon, title, navgateTo }) => {
+const DrawerLayout = ({ icon, title, navigateTo }) => {
 	const navigation = useNavigation();
 	const [modal, setModal] = useState(false);
 	return (
@@ -48,7 +48,7 @@ const DrawerLayout = ({ icon, title, navgateTo }) => {
 				onPress={
 					title === "Logout" || title === "Delete Account"
 						? () => setModal(true)
-						: () => navigation.navigate(navgateTo)
+						: () => navigation.navigate(navigateTo)
 				}
 			/>
 			<Confirmation1 modal={modal} setModal={setModal} title={title} />
@@ -62,7 +62,7 @@ const DrawerContent = (props) => {
 			<DrawerLayout
 				key={i}
 				title={item.title}
-				navgateTo={item.navgateTo}
+				navigateTo={item.navigateTo}
 				icon={item.icon}
 			/>
 		);

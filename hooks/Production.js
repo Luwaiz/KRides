@@ -1,3 +1,3 @@
 export default {
-	product: true,
+	production: true,
 };

@@ -5,6 +5,8 @@ import { colors } from "../../constants/styling";
 import ActiveButton from "../../components/buttons/ActiveButton";
 import LoginButton from "../../components/buttons/LoginButton";
 import Terms from "../../components/Terms";
+import KRideLogo from "../../assets/svg/WhiteLogo.svg";
+
 
 const AuthScreen = ({ navigation }) => {
 	const ToLogin = () => {
@@ -16,7 +18,7 @@ const AuthScreen = ({ navigation }) => {
 	return (
 		<View style={styles.container}>
 			<View style={styles.topContainer}>
-				<Image source={require("../../assets/images/Logoswhite.png")} />
+				<KRideLogo />
 			</View>
 			<BottomSheet
 				backgroundStyle={{ borderRadius: 30 }}

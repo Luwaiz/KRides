@@ -9,7 +9,7 @@ const Confirmation1 = ({ modal, setModal, title }) => {
 	const navigation = useNavigation();
 	const ToAuthScreen = () => {
 		setModal(false);
-		navigation.navigate("AuthStack", {
+		navigation("AuthStack", {
 			params: title === "Logout" ? "Login" : "Signup",
 		});
 	};

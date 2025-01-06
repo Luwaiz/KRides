@@ -7,6 +7,7 @@ import BackButton from "../../components/buttons/BackButton";
 import ActiveButton from "../../components/buttons/ActiveButton";
 import UnSuccessNo from "../../components/modals/UnSuccessNo";
 import SuccessNo from "../../components/modals/SuccessNo";
+import { useUserDetails } from "../../constants/Store";
 
 const VerifyNo = () => {
 	const [modal, setModal] = useState(false);
@@ -14,6 +15,11 @@ const VerifyNo = () => {
 		setModal(true);
 	};
 
+	const { phone , UserId} = useUserDetails((state) => ({
+		phone: state.phone,
+		UserId: state.UserId,
+	}));
+	console.log(phone, UserId);
 	return (
 		<SafeAreaView style={styles.container}>
 			<View style={styles.topCont}>
@@ -21,7 +27,7 @@ const VerifyNo = () => {
 			</View>
 			<View style={styles.infoCont}>
 				<Text style={styles.infoText1}>A code was sent to</Text>
-				<Text style={styles.infoText2}>08123456789</Text>
+				<Text style={styles.infoText2}>{phone}</Text>
 				<Text style={styles.infoText3}>Edit phone number</Text>
 			</View>
 			<View style={styles.bottomCont}>

@@ -6,6 +6,7 @@ import { colors } from "../../constants/styling";
 import BackButton from "../../components/buttons/BackButton";
 import ActiveButton from "../../components/buttons/ActiveButton";
 import TextInput1 from "../../components/TextInput1";
+import { useUserDetails } from "../../constants/Store";
 
 const Name = ({ navigation }) => {
 	const ToHome = () => {
@@ -17,6 +18,11 @@ const Name = ({ navigation }) => {
 		});
 	};
 
+	const { email, password, phone } = useUserDetails((state) => ({
+		email: state.email,
+		password: state.password,
+		phone: state.phone,
+	}));
 	const ToUpload = () => {
 		navigation.navigate("UploadPicture");
 	};
