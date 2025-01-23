@@ -8,32 +8,27 @@ import ActiveButton from "../../components/buttons/ActiveButton";
 import GoogleButton from "../../components/buttons/GoogleButton";
 import Terms from "../../components/Terms";
 import BackButton from "../../components/buttons/BackButton";
-import { useUserDetails } from "../../constants/Store";
+import { useDriverDetails } from "../../constants/Store";
 import axios from "axios";
 import API from "../../hooks/API";
 const { width, height } = Dimensions.get("screen");
 
-const Signup = ({ navigation }) => {
-	const [email,setMail] = useState("")
+const DriverSignup = ({ navigation }) => {
+	const [vehicle_id,setVehicle_id] = useState("")
 	const [password, setPass] = useState("")
 	const [phone, setPhoneNumber] = useState("")
-	const [firstName, setFirst] = useState("")
-	const [lastName, setLast] = useState("")
+	const [fullName, setFull] = useState("")
 	const [confirmPassword, setConfirmPassword] = useState("");
 	const [loading, setLoading] = useState(false);
 
 	const {
-		setEmail,
+		setVehicleId,
 		setPhone,
-		setFirstName,
-		setLastName,
-		setUserId,
-	} = useUserDetails((state) => ({
-		setEmail: state.setEmail,
+		setFullName,
+	} = useDriverDetails((state) => ({
+		setVehicleId: state.setVehicleId,
 		setPhone: state.setPhone,
-		setFirstName: state.setFirstName,
-		setLastName: state.setLastName,
-		setUserId: state.setUserId,
+		setFullName: state.setFullName,
 	}));
 
 	const passwordCheck = (password) => {
@@ -66,34 +61,31 @@ const Signup = ({ navigation }) => {
 		}
 
 		const request = {
-			email,
+			vehicle_id,
 			password,
 			phone,
-			firstName,
-			lastName,
+			fullname: fullName,
 		};
 		try {
-			const response = await axios.post(API.Register, request);
+			const response = await axios.post(API.RegisterDriver, request);
 			console.log(response?.data);
-			setUserId(response?.data?.user?.id);
-			setFirstName(response?.data?.user?.firstName)
-			setLastName(response?.data?.user?.lastName)
-			setEmail(response?.data?.user?.email)
+			setFullName(response?.data?.user?.fullName)
+			setVehicleId(response?.data?.user?.vehicle_id)
 			setPhone(response?.data?.user?.phone)
-			navigation.navigate("VerifyNo");
 			setLoading(false);
 		} catch (error) {
+            console.error("Error registering driver:", error?.response?.data);
+        
 			setLoading(false);
 			try {
 				// Check if error response exists
 				const errorData = error?.response?.data;
-				const parsedData =
-					typeof errorData === "string" ? JSON.parse(errorData) : errorData;
-				const emailErrors = parsedData?.email || [];
-				if (emailErrors.length > 0) {
-					alert(emailErrors[0]); // Show error message to the user
+				const parsedData =typeof errorData === "string" ? JSON.parse(errorData) : errorData;
+				const vehicle_idErrors = parsedData?.vehicle_id || [];
+				if (vehicle_idErrors.length > 0) {
+					alert(vehicle_idErrors[0]); // Show error message to the user
 				} else {
-					console.log("No email errors found.");
+					console.log("No vehicle_id errors found.");
 				}
 			} catch (parseError) {
 				console.error("Error parsing response data:", parseError);
@@ -112,19 +104,14 @@ const Signup = ({ navigation }) => {
 					<View style={styles.sheetCont}>
 						<View style={styles.textInputCont}>
 							<TextInput1
-								text={"First Name"}
-								placeholder={"John"}
-								onChangeText={(text) => setFirst(text)}
+								text={"Full Name"}
+								placeholder={"John Doe"}
+								onChangeText={(text) => setFull(text)}
 							/>
 							<TextInput1
-								text={"Last Name"}
-								placeholder={"Doe"}
-								onChangeText={(text) => setLast(text)}
-							/>
-							<TextInput1
-								text={"School Email Address"}
-								placeholder={"john2022@student.babcock.edu.ng"}
-								onChangeText={(text) => setMail(text)}
+								text={"Vehicle Id"}
+								placeholder={"e.g Z9"}
+								onChangeText={(text) => setVehicle_id(text)}
 							/>
 							<TextInput1
 								text={"Phone Number"}
@@ -148,7 +135,7 @@ const Signup = ({ navigation }) => {
 								onPress={() => handleSignUp(password, confirmPassword)}
 								disabled={
 									phone === "" ||
-									email === "" ||
+									vehicle_id === "" ||
 									password === "" ||
 									confirmPassword === "" ||
 									loading
@@ -170,7 +157,7 @@ const Signup = ({ navigation }) => {
 	);
 };
 
-export default Signup;
+export default DriverSignup;
 
 const styles = StyleSheet.create({
 	container: {

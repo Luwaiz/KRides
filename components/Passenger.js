@@ -7,12 +7,19 @@ import ActiveButton from "./buttons/ActiveButton";
 import { colors } from "../constants/styling";
 import { RadioButton } from "react-native-paper";
 import { useNavigation } from "@react-navigation/native";
-import { useBottomTabStore } from "../constants/Store";
+import { useBottomTabStore, useRideStore } from "../constants/Store";
 
 const Passenger = () => {
 	const [selected, setSelected] = useState(null);
-	const navigation = useNavigation();
-	const riders = useBottomTabStore((state)=>state.setRiderPage)
+	const riders = useBottomTabStore((state) => state.setRiderPage);
+	const { setNumberOfPassenger } = useRideStore((state) => ({
+		setNumberOfPassenger: state.setNumberOfPassenger,
+	}));
+	console.log(selected);
+	const collectRides = () => {
+		setNumberOfPassenger(selected);
+		riders();
+	};
 
 	return (
 		<BottomSheet
@@ -61,7 +68,11 @@ const Passenger = () => {
 				</View>
 
 				<View style={styles.button}>
-					<ActiveButton disabled={selected === null} title={"Search"} onPress={riders} />
+					<ActiveButton
+						disabled={selected === null}
+						title={"Search"}
+						onPress={() => collectRides()}
+					/>
 				</View>
 			</View>
 		</BottomSheet>

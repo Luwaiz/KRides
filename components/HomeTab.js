@@ -5,10 +5,13 @@ import React, { useState } from "react";
 import WhereTo from "./WhereTo";
 import ActiveButton from "./buttons/ActiveButton";
 import { colors } from "../constants/styling";
-import { useBottomTabStore } from "../constants/Store";
+import { useBottomTabStore, useUserDetails } from "../constants/Store";
 
 const HomeTab = () => {
 	const Passengers = useBottomTabStore((state)=>state.PassengerPage)
+	const {firstName}=useUserDetails((state)=>({
+		firstName: state.firstName
+	}))
 	
 	return (
 		<BottomSheet
@@ -19,7 +22,7 @@ const HomeTab = () => {
 			<View style={styles.sheetCont}>
 				<View style={styles.topText}>
 					<Text style={styles.greet}>
-						Hello, <Text style={{ color: colors.primaryBlue }}>Tobi</Text>
+						Hello, <Text style={{ color: colors.primaryBlue }}>{firstName}</Text>
 					</Text>
 					<Text style={styles.where}>Where are you going?</Text>
 				</View>

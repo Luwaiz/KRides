@@ -5,12 +5,16 @@ import ActiveButton from "./buttons/ActiveButton";
 import { colors } from "../constants/styling";
 import Avatar from "../assets/svg/Frame 77avatar.svg";
 import Person from "../assets/svg/Person.svg";
-import { useBottomTabStore } from "../constants/Store";
+import { useBottomTabStore, useRideStore } from "../constants/Store";
 const {width, height} = Dimensions.get("window")
 
 const AvailableRiders = () => {
 	const [selectedRider, setSelectedRider] = useState(null);
 	const confirm = useBottomTabStore((state) => state.setConfirmPage);
+		const { numberOfPassenger } = useRideStore((state) => ({
+			numberOfPassenger: state.numberOfPassenger,
+		}));
+		console.log(numberOfPassenger)
 
 	const Selected = (id) => {
 		setSelectedRider(id);

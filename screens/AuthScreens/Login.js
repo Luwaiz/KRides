@@ -15,6 +15,9 @@ import API from "../../hooks/API";
 const { width, height } = Dimensions.get("screen");
 
 const Login = ({ navigation }) => {
+	const [email, set_email] = useState();
+	const [password, set_password] = useState();
+
 	const ToHome = () => {
 		navigation.replace("drawer", {
 			params: "AppStack",
@@ -24,46 +27,67 @@ const Login = ({ navigation }) => {
 		});
 	};
 
-	const {
-		email,
-		setEmail,
-		password,
-		setPassword,
-		setFirstName,
-		setAccessToken,
-		accessToken,
-	} = useUserDetails((state) => ({
-		email: state.email,
-		setEmail: state.setEmail,
-		password: state.password,
-		setPassword: state.setPassword,
-		setFirstName: state.setFirstName,
-		accessToken: state.accessToken,
-		setAccessToken: state.setAccessToken,
-	}));
+	const { setEmail, setFirstName, setAccessToken, setLastName, setPhone } =
+		useUserDetails((state) => ({
+			setEmail: state.setEmail,
+			setFirstName: state.setFirstName,
+			setAccessToken: state.setAccessToken,
+			setLastName: state.setLastName,
+			setPhone: state.setPhone,
+		}));
 	const [loading, setLoading] = useState(false);
-	const handleLogin = async () => {
-		setLoading(true);
-		const request = { email, password };
-		const header = {
-			headers: { Authorization: `Bearer ${accessToken}` },
-		};
+
+	const loginUser = async (request) => {
 		try {
 			const response = await axios.post(API.Login, request);
-			console.log(response?.data?.access_token);
+			console.log("Access Token:", response?.data?.access_token);
+
 			if (response?.data?.access_token) {
-				setAccessToken(response?.data?.access_token);
-				const userResponse = await axios.get(API.UserProfile, header);
-				console.log("user response", userResponse?.data);
-				setFirstName(userResponse?.data?.name);
+				setAccessToken(response.data.access_token);
+				fetchUserProfile(response.data.access_token); // Call the next function
+			} else {
+				console.error("Access token not found.");
 			}
 		} catch (error) {
 			setLoading(false);
-			console.log(error?.response);
-		} finally {
-			setLoading(false);
+			console.log("Login Error:", error?.response?.data || error?.message);
+			alert("Login failed. Please check your credentials and try again.");
 		}
 	};
+
+	const fetchUserProfile = async (accessToken) => {
+		try {
+			const userResponse = await axios.get(API.UserProfile, {
+				headers: { Authorization: `Bearer ${accessToken}` },
+			});
+
+			console.log("User Response:", userResponse?.data?.data?.firstName);
+			setFirstName(userResponse?.data?.data?.firstName);
+			setLastName(userResponse?.data?.data?.lastName);
+			setEmail(userResponse?.data?.data?.email);
+			setPhone(userResponse?.data?.data?.phone);
+			setLoading(false);
+			ToHome();
+		} catch (error) {
+			setLoading(false);
+			console.error(
+				"User Profile Error:",
+				error.response?.data || error.message
+			);
+			alert("Failed to fetch user profile. Please try again.");
+		}
+	};
+
+	// Example usage
+	const handleLogin = () => {
+		setLoading(true);
+		const request = {
+			email,
+			password,
+		};
+		loginUser(request);
+	};
+
 	return (
 		<SafeAreaView style={styles.container}>
 			<View style={styles.topCont}>
@@ -75,13 +99,13 @@ const Login = ({ navigation }) => {
 						<TextInput1
 							text={"Email Address"}
 							placeholder={"johndoe22@gmail.com"}
-							onChangeText={(text) => setEmail(text)}
+							onChangeText={(text) => set_email(text)}
 						/>
 						<TextInput1
 							text={"Password"}
 							placeholder={"*************"}
 							password
-							onChangeText={(text) => setPassword(text)}
+							onChangeText={(text) => set_password(text)}
 						/>
 						<Text style={styles.forgot}>Forgot password?</Text>
 						<View style={styles.buttons}>

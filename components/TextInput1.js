@@ -1,10 +1,10 @@
 import { Keyboard, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import React, { useEffect, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
-import { BottomSheetTextInput } from "@gorhom/bottom-sheet";
+
 import { colors } from "../constants/styling";
 
-const TextInput1 = ({ text, placeholder, password,onChangeText,value}) => {
+const TextInput1 = ({ text, placeholder, password,onChangeText,value, editable}) => {
 	const [passwordVisible, setPasswordVisible] = useState(false);
 	const [focus, setFocus] = useState(false);
 	const toggleFocus = () => {
@@ -32,6 +32,8 @@ const TextInput1 = ({ text, placeholder, password,onChangeText,value}) => {
 					onChangeText={onChangeText}
 					style={styles.input}
 					value={value}
+					editable={editable}
+					
 				/>
 				{password &&
 					(passwordVisible ? (

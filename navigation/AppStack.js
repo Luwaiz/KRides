@@ -11,12 +11,14 @@ import AvailableRiders from '../components/AvailableRiders'
 import Passenger from '../components/Passenger'
 import Promo from '../screens/AppScreens/Promo'
 import Ratings from '../screens/AppScreens/Rating'
+import HomePageNav from './HomePageNav'
 
 const Stack = createNativeStackNavigator()
 const AppStack = () => {
   return (
 
     <Stack.Navigator screenOptions={{headerShown:false}}>
+      {/* <Stack.Screen name="HomePageNav" component={HomePageNav} /> */}
       <Stack.Screen name="Home" component={MainPage} />
       <Stack.Screen name="Support" component={Support}/>
       <Stack.Screen name="About" component={About}/>
