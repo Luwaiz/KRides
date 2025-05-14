@@ -5,11 +5,17 @@ import React, { useState } from "react";
 import WhereTo from "./WhereTo";
 import ActiveButton from "./buttons/ActiveButton";
 import { colors } from "../constants/styling";
-import { useBottomTabStore } from "../constants/Store";
+import { useBottomTabStore, useUserDetails } from "../constants/Store";
+import { formatDate, parseISO } from "date-fns";
 
 const HomeTab = () => {
-	const Passengers = useBottomTabStore((state)=>state.PassengerPage)
-	
+	const Passengers = useBottomTabStore((state) => state.PassengerPage);
+	const { firstName } = useUserDetails((state) => ({
+		firstName: state.firstName,
+	}));
+	const date = new Date();
+	const dateFormat = formatDate(date, "dd/MM/yyyy");
+
 	return (
 		<BottomSheet
 			snapPoints={["46%"]}
@@ -19,14 +25,15 @@ const HomeTab = () => {
 			<View style={styles.sheetCont}>
 				<View style={styles.topText}>
 					<Text style={styles.greet}>
-						Hello, <Text style={{ color: colors.primaryBlue }}>Tobi</Text>
+						Hello,{" "}
+						<Text style={{ color: colors.primaryBlue }}>{firstName}</Text>
 					</Text>
 					<Text style={styles.where}>Where are you going?</Text>
 				</View>
 				<WhereTo />
 				<View style={styles.dateCont}>
 					<Feather name="calendar" size={24} color={colors.primaryBlue} />
-					<Text style={styles.date}>14/7/2023</Text>
+					<Text style={styles.date}>{dateFormat}</Text>
 				</View>
 				<View style={styles.button}>
 					<ActiveButton title={"Continue"} onPress={Passengers} />

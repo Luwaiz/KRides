@@ -8,9 +8,11 @@ import ActiveButton from "../../components/buttons/ActiveButton";
 
 const UploadPicture = ({ navigation }) => {
 	const ToHome = () => {
-		navigation.replace("DriverStack", {
-			params: "HomePage",
-		});
+		navigation.replace("DriverDrawer", {
+			screen: "DriverStack",
+			screen: {
+				screen: "DriverHome",
+			}});
 	};
 	return (
 		<SafeAreaView style={styles.container}>
@@ -47,7 +49,7 @@ const styles = StyleSheet.create({
 	headText: {
 		color: "black",
 		fontSize: 24,
-		fontWeight: "700",
+		fontFamily: "Albert-SemiBold",
 	},
 	infoCont: {
 		marginVertical: 16,

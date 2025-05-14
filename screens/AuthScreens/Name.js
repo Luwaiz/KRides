@@ -6,17 +6,22 @@ import { colors } from "../../constants/styling";
 import BackButton from "../../components/buttons/BackButton";
 import ActiveButton from "../../components/buttons/ActiveButton";
 import TextInput1 from "../../components/TextInput1";
+import { useUserDetails } from "../../constants/Store";
 
 const Name = ({ navigation }) => {
 	const ToHome = () => {
-		navigation.replace("drawer", {
-			params: "AppStack",
+		navigation.replace("AppStack", {
 			params: {
 				params: "Home",
 			},
 		});
 	};
 
+	const { email, password, phone } = useUserDetails((state) => ({
+		email: state.email,
+		password: state.password,
+		phone: state.phone,
+	}));
 	const ToUpload = () => {
 		navigation.navigate("UploadPicture");
 	};
@@ -34,7 +39,7 @@ const Name = ({ navigation }) => {
 				<TextInput1 text={"First Name"} placeholder={"e.g John"} />
 				<TextInput1 text={"Last Name"} placeholder={"e.g Dotun"} />
 				<View style={styles.button}>
-				<ActiveButton title={"Submit1"} onPress={ToHome} />
+					<ActiveButton title={"Submit1"} onPress={ToHome} />
 					<ActiveButton title={"Submit2"} onPress={ToUpload} />
 				</View>
 			</View>
@@ -55,7 +60,7 @@ const styles = StyleSheet.create({
 	headText: {
 		color: "black",
 		fontSize: 24,
-		fontWeight: "700",
+		fontFamily: "Albert-SemiBold",
 	},
 	infoCont: {
 		marginVertical: 16,

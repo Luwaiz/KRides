@@ -5,6 +5,8 @@ import { colors } from "../../constants/styling";
 import ActiveButton from "../../components/buttons/ActiveButton";
 import LoginButton from "../../components/buttons/LoginButton";
 import Terms from "../../components/Terms";
+import KRideLogo from "../../assets/svg/WhiteLogo.svg";
+
 
 const AuthScreen = ({ navigation }) => {
 	const ToLogin = () => {
@@ -13,20 +15,30 @@ const AuthScreen = ({ navigation }) => {
 	const ToSignup = () => {
 		navigation.navigate("Signup");
 	};
+
+	const ToDriverSignUp = () => {
+		navigation.navigate("DriverSignup");
+	}
+	const ToDriverLogin = () => {
+        navigation.navigate("DriverLogin");
+    }
 	return (
 		<View style={styles.container}>
 			<View style={styles.topContainer}>
-				<Image source={require("../../assets/images/Logoswhite.png")} />
+				<KRideLogo />
 			</View>
 			<BottomSheet
 				backgroundStyle={{ borderRadius: 30 }}
 				handleComponent={null}
-				snapPoints={["40%"]}
+				snapPoints={["50%"]}
 			>
 				<View style={styles.sheet}>
 					<Text style={styles.welcome}>Welcome!</Text>
 					<ActiveButton title={"Sign up"} onPress={ToSignup} />
 					<LoginButton title={"Log in"} onPress={ToLogin} />
+					<LoginButton title={"Driver Sign up"} onPress={ToDriverSignUp} />
+					<LoginButton title={"Driver Log in"} onPress={ToDriverLogin} />
+
 				</View>
 				<Terms/>
 			</BottomSheet>

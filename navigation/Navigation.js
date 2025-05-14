@@ -7,6 +7,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import AuthStack from "./AuthStack";
 import DrawerNavigator from "./DrawerNavigator";
 import DriverStack from "./DriverStack";
+import DriverDrawer from "./DriverDrawer";
+import AppStack from "./AppStack";
 
 const Stack = createNativeStackNavigator();
 const Navigation = () => {
@@ -33,8 +35,8 @@ const Navigation = () => {
 				<Stack.Navigator screenOptions={{ headerShown: false }}>
 					<Stack.Screen component={OnBoarding} name="OnBoarding" />
 					<Stack.Screen component={AuthStack} name="AuthStack" />
-					<Stack.Screen component={DriverStack} name="DriverStack" />
-					<Stack.Screen component={DrawerNavigator} name="drawer" />
+					<Stack.Screen component={AppStack} name="AppStack" />
+					<Stack.Screen component={DriverDrawer} name="DriverDrawer" />
 				</Stack.Navigator>
 			</NavigationContainer>
 		)
@@ -42,4 +44,3 @@ const Navigation = () => {
 };
 
 export default Navigation;
-

@@ -3,8 +3,14 @@ import React from "react";
 import { colors } from "../constants/styling";
 import { useNavigation } from "@react-navigation/native";
 import Direction from "../assets/svg/Frame 34direction.svg";
+import { useRideStore } from "../constants/Store";
 
 const WhereTo = () => {
+	const { destination, location } = useRideStore((state) => ({
+		destination: state.destination,
+		location: state.location,
+	}));
+
 	const navigation = useNavigation();
 	const ToPickDestination = () => {
 		navigation.navigate("Destinations");
@@ -18,12 +24,14 @@ const WhereTo = () => {
 			<View style={styles.destinations}>
 				<TouchableOpacity activeOpacity={0.7} onPress={ToPickDestination}>
 					<View style={styles.destination}>
-						<Text style={styles.destinationText}>Choose Pickup Location</Text>
+						<Text style={styles.destinationText}>{location !== "" ? location : "Choose Pickup Location"}</Text>
 					</View>
 				</TouchableOpacity>
 				<TouchableOpacity activeOpacity={0.7} onPress={ToPickDestination}>
 					<View style={styles.destination}>
-						<Text style={styles.destinationText}>Choose Destination</Text>
+						<Text style={styles.destinationText}>
+							{destination!== ""? destination : "Choose Destination"}
+						</Text>
 					</View>
 				</TouchableOpacity>
 			</View>

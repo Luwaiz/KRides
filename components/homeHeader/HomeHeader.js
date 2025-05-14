@@ -7,14 +7,14 @@ import { colors } from "../../constants/styling";
 
 const HomeHeader = () => {
 	const navigation = useNavigation();
-	const OpenDrawer = () => {
-		navigation.dispatch(DrawerActions.openDrawer());
+	const OpenSettings = () => {
+		navigation.navigate("Settings");
 	};
 	return (
 		<TouchableOpacity
 			style={styles.drawerNav}
 			activeOpacity={0.7}
-			onPress={OpenDrawer}
+			onPress={OpenSettings}
 		>
 			<View>
 				<Octicons name="three-bars" size={24} color="black" />

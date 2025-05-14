@@ -7,16 +7,20 @@ import ActiveButton from "./buttons/ActiveButton";
 import { colors } from "../constants/styling";
 import { RadioButton } from "react-native-paper";
 import { useNavigation } from "@react-navigation/native";
-import { useBottomTabStore } from "../constants/Store";
+import { useBottomTabStore, useRideStore } from "../constants/Store";
 
 const Passenger = () => {
-	const [selected, setSelected] = useState();
-	const navigation = useNavigation();
-	const riders = useBottomTabStore((state)=>state.setRiderPage)
-
-	const RiderPage = () => {
-		navigation.navigate("Riders");
+	const [selected, setSelected] = useState(null);
+	const riders = useBottomTabStore((state) => state.setRiderPage);
+	const { setNumberOfPassenger } = useRideStore((state) => ({
+		setNumberOfPassenger: state.setNumberOfPassenger,
+	}));
+	console.log(selected);
+	const collectRides = () => {
+		setNumberOfPassenger(selected);
+		riders();
 	};
+
 	return (
 		<BottomSheet
 			snapPoints={["40%"]}
@@ -53,18 +57,12 @@ const Passenger = () => {
 					/>
 					<Text>3 Passengers</Text>
 				</View>
-				<View style={styles.RadioContainer}>
-					<RadioButton.Android
-						value="4"
-						status={selected === "4" ? "checked" : "unchecked"}
-						onPress={() => setSelected("4")}
-						color={colors.primaryBlue}
-					/>
-					<Text>4 Passengers</Text>
-				</View>
-
 				<View style={styles.button}>
-					<ActiveButton title={"Search"} onPress={riders} />
+					<ActiveButton
+						disabled={selected === null}
+						title={"Search"}
+						onPress={() => collectRides()}
+					/>
 				</View>
 			</View>
 		</BottomSheet>
@@ -83,6 +81,7 @@ const styles = StyleSheet.create({
 	RadioContainer: {
 		flexDirection: "row",
 		alignItems: "center",
+        marginBottom: 20,
 	},
 	where: {
 		fontSize: 24,

@@ -9,8 +9,19 @@ import { PaperProvider } from "react-native-paper";
 import Toast from "react-native-toast-message";
 import ToastConfig from "./components/ToastConfig";
 
+import {
+	configureReanimatedLogger,
+	ReanimatedLogLevel,
+} from "react-native-reanimated";
+
+// This is the default configuration
+configureReanimatedLogger({
+	level: ReanimatedLogLevel.warn,
+	strict: false, // Reanimated runs in strict mode by default
+});
 export default function App() {
 	const fontLoaded = FontResources();
+
 	if (!fontLoaded) {
 		return null;
 	} else {
@@ -20,7 +31,7 @@ export default function App() {
 					<PaperProvider>
 						<Navigation />
 						<StatusBar style="auto" />
-						<Toast config={ToastConfig}/>
+						<Toast config={ToastConfig} />
 					</PaperProvider>
 				</SafeAreaProvider>
 			</GestureHandlerRootView>

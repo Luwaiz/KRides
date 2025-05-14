@@ -1,22 +1,78 @@
 import { Dimensions, Image, Modal, StyleSheet, Text, View } from "react-native";
-import React from "react";
+import React, { useState } from "react";
 import ActiveButton from "../buttons/ActiveButton";
-import InActiveButton from "../buttons/InActiveButton";
-
-import { useNavigation } from "@react-navigation/native";
+import { CommonActions, useNavigation } from "@react-navigation/native";
 import LoginButton from "../buttons/LoginButton";
+import { useUserDetails } from "../../constants/Store";
+import axios from "axios";
+import API from "../../hooks/API";
 const { width, height } = Dimensions.get("screen");
 
 const Confirmation1 = ({ modal, setModal, title }) => {
 	const navigation = useNavigation();
+	const { accessToken, email, setAccessToken } = useUserDetails((state) => ({
+		accessToken: state.accessToken,
+		email: state.email,
+		setAccessToken: state.setAccessToken,
+	}));
+	const [loading, setLoading] = useState(false);
+
 	const ToAuthScreen = () => {
 		setModal(false);
-		navigation.navigate("AuthStack", {
-			params: title === "Logout" ? "Login" : "Signup",
-		});
+		if (title === "Logout") {
+			logOut();
+		} else {
+			deleteUser();
+		}
+		navigation.dispatch(
+			CommonActions.reset({
+				index: 0,
+				routes: [{ name: "AuthStack" }],
+			})
+		);
 	};
-	const ToName = () => {
+	const Close = () => {
 		setModal(false);
+	};
+
+	const deleteUser = async () => {
+		setLoading(true);
+		const header = {
+			headers: {
+				Authorization: `Bearer ${accessToken}`,
+			},
+		};
+		try {
+			const response = await axios.delete(
+				`${API.DeleteProfile}/${email}`,
+				header
+			);
+			console.log(response?.data);
+			setLoading(false);
+		} catch (e) {
+			setLoading(false);
+			console.error("Error deleting user:", e);
+			alert("An unknown error occurred.");
+		}
+	};
+	const logOut = async () => {
+		console.log("Log Out", accessToken);
+		setLoading(true);
+		const header = {
+			headers: {
+				Authorization: `Bearer ${accessToken}`,
+			},
+		};
+		try {
+			const response = await axios.post(API.LogOut, header);
+			console.log(response?.data);
+			setAccessToken("");
+			setLoading(false);
+		} catch (e) {
+			setLoading(false);
+			console.error("Error deleting token:", e?.response?.data);
+			alert("An unknown error occurred.");
+		}
 	};
 	return (
 		<Modal
@@ -32,13 +88,17 @@ const Confirmation1 = ({ modal, setModal, title }) => {
 					) : (
 						<Text style={styles.text}>
 							Are you sure you want to permanently{"\n"} delete your Kampus
-							Riders account?
+							Ride's account?
 						</Text>
 					)}
 
 					<View style={styles.button}>
-						<ActiveButton title={"Yes"} onPress={ToAuthScreen} />
-						<LoginButton title={"Cancel"} onPress={ToName} />
+						<ActiveButton
+							title={"Yes"}
+							onPress={ToAuthScreen}
+							loading={loading}
+						/>
+						<LoginButton title={"Cancel"} onPress={Close} />
 					</View>
 				</View>
 			</View>
@@ -69,6 +129,7 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 		paddingVertical: 64,
 		justifyContent: "center",
+		paddingHorizontal: 10,
 	},
 	button: {
 		marginTop: "auto",

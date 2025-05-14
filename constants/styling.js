@@ -7,6 +7,4 @@ export const colors={
     lightGrey3:"#8F8F8F",
     lightGrey4:"#5C5C5C",
     IconGrey:"#586F8F",
-
-
 }

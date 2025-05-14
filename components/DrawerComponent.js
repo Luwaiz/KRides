@@ -9,22 +9,23 @@ import { useNavigation } from "@react-navigation/native";
 import { TouchableOpacity } from "react-native-gesture-handler";
 import Confirmation1 from "./modals/Confirmation1";
 import Avatar from "../assets/svg/Frame 77avatar.svg";
+import { useUserDetails } from "../constants/Store";
 
 const details = [
 	{
 		icon: <AntDesign name="clockcircle" size={25} color={colors.IconGrey} />,
 		title: "Ride history",
-		navgateTo: "History",
+		navigateTo: "History",
 	},
 	{
 		icon: <AntDesign name="questioncircle" size={24} color={colors.IconGrey} />,
 		title: "Support",
-		navgateTo: "Support",
+		navigateTo: "Support",
 	},
 	{
 		icon: <Foundation name="info" size={30} color={colors.IconGrey} />,
 		title: "About",
-		navgateTo: "About",
+		navigateTo: "About",
 	},
 	{
 		icon: <Ionicons name="log-out-sharp" size={24} color={colors.IconGrey} />,
@@ -35,7 +36,7 @@ const details = [
 		title: "Delete Account",
 	},
 ];
-const DrawerLayout = ({ icon, title, navgateTo }) => {
+const DrawerLayout = ({ icon, title, navigateTo }) => {
 	const navigation = useNavigation();
 	const [modal, setModal] = useState(false);
 	return (
@@ -48,7 +49,7 @@ const DrawerLayout = ({ icon, title, navgateTo }) => {
 				onPress={
 					title === "Logout" || title === "Delete Account"
 						? () => setModal(true)
-						: () => navigation.navigate(navgateTo)
+						: () => navigation.navigate(navigateTo)
 				}
 			/>
 			<Confirmation1 modal={modal} setModal={setModal} title={title} />
@@ -62,7 +63,7 @@ const DrawerContent = (props) => {
 			<DrawerLayout
 				key={i}
 				title={item.title}
-				navgateTo={item.navgateTo}
+				navigateTo={item.navigateTo}
 				icon={item.icon}
 			/>
 		);
@@ -71,7 +72,10 @@ const DrawerContent = (props) => {
 
 const DrawerComponent = (props) => {
 	const navigation = useNavigation();
-
+	const {firstName} = useUserDetails((state)=>({
+		firstName: state.firstName
+	}))
+ 
 	return (
 		<View style={{ flex: 1 }}>
 			<DrawerContentScrollView {...props}>
@@ -81,7 +85,7 @@ const DrawerComponent = (props) => {
 							<Avatar />
 						</View>
 						<View style={styles.container}>
-							<Text style={styles.title}>Tobi</Text>
+							<Text style={styles.title}>{firstName}</Text>
 							<Text style={styles.subTitle}>Edit Profile</Text>
 						</View>
 					</View>
@@ -97,7 +101,7 @@ const DrawerComponent = (props) => {
 export default DrawerComponent;
 
 const styles = StyleSheet.create({
-	container: {},
+
 	topCont: {
 		flexDirection: "row",
 		marginHorizontal: 15,
@@ -109,12 +113,13 @@ const styles = StyleSheet.create({
 	},
 	title: {
 		fontFamily: "Albert-SemiBold",
-		fontSize: 16,
+		fontSize: 18,
+		marginBottom:5
 	},
 	subTitle: {
 		fontFamily: "Albert-Light",
 		color: colors.primaryBlue,
-		fontSize: 16,
+		fontSize: 14,
 	},
 	items: {
 		margin: 0,

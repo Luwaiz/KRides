@@ -11,6 +11,15 @@ import { OnBoard } from "../constants/OnBoardData";
 import BottomSheet from "@gorhom/bottom-sheet";
 import Footer from "../components/Footer";
 const { width, height } = Dimensions.get("screen");
+import {
+	configureReanimatedLogger,
+	ReanimatedLogLevel,
+  } from 'react-native-reanimated';
+  
+  configureReanimatedLogger({
+	level: ReanimatedLogLevel.warn,
+	strict: true, // Reanimated runs in strict mode by default
+  });
 
 const OnBoarding = ({ navigation }) => {
 	const [currentIndex, setCurrentIndex] = useState(0);
@@ -57,11 +66,12 @@ const OnBoarding = ({ navigation }) => {
 				showsHorizontalScrollIndicator={false}
 				renderItem={({ item }) => (
 					<>
-						<Image
-							source={item.image}
+						{/* <Image
+							source={item?.image}
 							style={styles.image}
 							resizeMode="cover"
-						/>
+						/> */}
+						<View style={styles.indicator}>{item?.image}</View>
 						<BottomSheet
 							style={styles.Sheet}
 							handleComponent={null}

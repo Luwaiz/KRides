@@ -1,5 +1,5 @@
 import { Dimensions, StyleSheet, Text, View } from "react-native";
-import React from "react";
+import React, { useState } from "react";
 import BottomSheet from "@gorhom/bottom-sheet";
 import { colors } from "../../constants/styling";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -8,32 +8,116 @@ import ActiveButton from "../../components/buttons/ActiveButton";
 import GoogleButton from "../../components/buttons/GoogleButton";
 import Terms from "../../components/Terms";
 import BackButton from "../../components/buttons/BackButton";
+import BiometricButton from "../../components/buttons/BiometricButton";
+import { useUserDetails } from "../../constants/Store";
+import axios from "axios";
+import API from "../../hooks/API";
 const { width, height } = Dimensions.get("screen");
 
-const Login = () => {
+const Login = ({ navigation }) => {
+	const [email, set_email] = useState();
+	const [password, set_password] = useState();
+
+	const ToHome = () => {
+		navigation.replace("AppStack", {
+			params: {
+				params: "Home",
+			},
+		});
+	};
+
+	const { setEmail, setFirstName, setAccessToken, setLastName, setPhone } =
+		useUserDetails((state) => ({
+			setEmail: state.setEmail,
+			setFirstName: state.setFirstName,
+			setAccessToken: state.setAccessToken,
+			setLastName: state.setLastName,
+			setPhone: state.setPhone,
+		}));
+	const [loading, setLoading] = useState(false);
+
+	const loginUser = async (request) => {
+		try {
+			console.log(API.Login);
+			const response = await axios.post(API.Login, request);
+			console.log("Access Token:", response?.data?.access_token);
+
+			if (response?.data?.access_token) {
+				setAccessToken(response.data.access_token);
+				fetchUserProfile(response.data.access_token); // Call the next function
+			} else {
+				console.error("Access token not found.");
+			}
+		} catch (error) {
+			setLoading(false);
+			console.log("Login Error:", error?.response?.data || error?.message);
+			alert("Login failed. Please check your credentials and try again.");
+		}
+	};
+
+	const fetchUserProfile = async (accessToken) => {
+		try {
+			const userResponse = await axios.get(API.UserProfile, {
+				headers: { Authorization: `Bearer ${accessToken}` },
+			});
+
+			console.log("User Response:", userResponse?.data?.data?.firstName);
+			setFirstName(userResponse?.data?.data?.firstName);
+			setLastName(userResponse?.data?.data?.lastName);
+			setEmail(userResponse?.data?.data?.email);
+			setPhone(userResponse?.data?.data?.phone);
+			setLoading(false);
+			ToHome();
+		} catch (error) {
+			setLoading(false);
+			console.error(
+				"User Profile Error:",
+				error.response?.data || error.message
+			);
+			alert("Failed to fetch user profile. Please try again.");
+		}
+	};
+
+	// Example usage
+	const handleLogin = () => {
+		setLoading(true);
+		const request = {
+			email,
+			password,
+		};
+		loginUser(request);
+	};
+
 	return (
 		<SafeAreaView style={styles.container}>
 			<View style={styles.topCont}>
 				<BackButton text={<Text style={styles.headText}>Login</Text>} />
 			</View>
-			<BottomSheet
-				snapPoints={["85%"]}
-				handleComponent={null}
-				backgroundStyle={{ borderRadius: 30 }}
-			>
+			<View style={styles.bottomCont}>
 				<View style={styles.sheetCont}>
 					<View style={styles.textInputCont}>
 						<TextInput1
 							text={"Email Address"}
 							placeholder={"johndoe22@gmail.com"}
+							onChangeText={(text) => set_email(text)}
 						/>
 						<TextInput1
 							text={"Password"}
 							placeholder={"*************"}
 							password
+							onChangeText={(text) => set_password(text)}
 						/>
 						<Text style={styles.forgot}>Forgot password?</Text>
-						<ActiveButton title={"Login"} />
+						<View style={styles.buttons}>
+							<View style={styles.logInButton}>
+								<ActiveButton
+									title={"Login"}
+									loading={loading}
+									onPress={() => handleLogin()}
+								/>
+							</View>
+							<BiometricButton navigate={() => ToHome()} />
+						</View>
 						<View style={styles.OrContainer}>
 							<View style={styles.dash} />
 							<Text style={styles.OrText}>OR</Text>
@@ -43,7 +127,7 @@ const Login = () => {
 					</View>
 				</View>
 				<Terms />
-			</BottomSheet>
+			</View>
 		</SafeAreaView>
 	);
 };
@@ -60,10 +144,18 @@ const styles = StyleSheet.create({
 		backgroundColor: colors.primaryBlue,
 		paddingTop: 26,
 	},
+	bottomCont: {
+		backgroundColor: colors.secondary,
+		width: width,
+		marginTop: 20,
+		borderTopLeftRadius: 30,
+		borderTopRightRadius: 30,
+		height: height - 140,
+	},
 	headText: {
 		color: colors.secondary,
 		fontSize: 24,
-		fontWeight: "700",
+		fontFamily: "Albert-SemiBold",
 	},
 	sheetCont: {
 		flex: 1,
@@ -96,5 +188,12 @@ const styles = StyleSheet.create({
 		color: "black",
 		fontSize: 16,
 		fontWeight: "700",
+	},
+	logInButton: {
+		width: "85%",
+	},
+	buttons: {
+		flexDirection: "row",
+		justifyContent: "space-between",
 	},
 });
