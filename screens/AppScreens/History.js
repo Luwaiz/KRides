@@ -1,52 +1,68 @@
-import {
-	Dimensions,
-	SafeAreaViewBase,
-	StyleSheet,
-	Text,
-	View,
-} from "react-native";
-import React, { useState } from "react";
+import { Dimensions, FlatList, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useState } from "react";
 import { colors } from "../../constants/styling";
 import { SafeAreaView } from "react-native-safe-area-context";
 import BackButton from "../../components/buttons/BackButton";
-import Direction from "../../assets/svg/Frame 34direction.svg";
-import { Shadow } from "react-native-shadow-2";
+import HistoryCard from "../../components/HistoryCard";
+import axios from "axios";
+import API from "../../hooks/API";
+import { useUserDetails } from "../../constants/Store";
+import { ActivityIndicator } from "react-native-paper";
 const { width, height } = Dimensions.get("screen");
 
 const History = () => {
-	const [status, setStatus] = useState(true);
+	const [loading, setLoading] = useState(false);
+	const [history, setHistory] = useState();
+	const accessToken = useUserDetails((state) => state?.accessToken);
+	const currentMonth = new Date();
+	const currentMonthName = currentMonth.toLocaleString("default", {
+		month: "long",
+		year: "numeric",
+	});
+
+	const getHistory = async () => {
+		setLoading(true);
+		const header = {
+			headers: { Authorization: `Bearer ${accessToken}` },
+		};
+		try {
+			const response = await axios.get(API.RideHistory, header);
+			console.log("history",response?.data)
+			setHistory(response?.data?.data);
+			setLoading(false);
+		} catch (error) {
+			console.log(error.response.data.message);
+			if(error.response.data.message === "No trips found for the authenticated user."){
+				
+			}
+			setLoading(false);
+		}
+	};
+	useEffect(() => {
+		getHistory();
+	}, []);
 	return (
 		<SafeAreaView style={styles.container}>
 			<BackButton text={<Text style={styles.headText}>Ride history</Text>} />
-			<View style={styles.bottomContainer}>
-				<Text style={styles.monthDate}>July 2023</Text>
-				<View>
-				<Shadow distance={15} offset={[3,2]}>
-					<View style={styles.historyContainer}>
-					<Text style={styles.dayDate}>16 july 2023</Text>
-						<View style={styles.locationCont}>
-							<Direction width={40} height={80} />
-							<View style={styles.places}>
-								<View style={styles.location}>
-									<Text style={styles.locationText}>Winslow Hall</Text>
-								</View>
-								<View style={styles.location}>
-									<Text style={styles.locationText}>BUSA House</Text>
-								</View>
-							</View>
-						</View>
-						<View style={styles.status}>
-							<Text style={styles.statusText}>#200</Text>
-							{status ? (
-								<Text style={styles.complete}>Completed</Text>
-							) : (
-								<Text style={styles.cancelled}>Cancelled</Text>
-							)}
-						</View>
-					</View>
-				</Shadow>
-				</View>
-			</View>
+			{loading ? (
+				<ActivityIndicator
+					size={30}
+					color={colors.primaryBlue}
+					style={{ marginTop: 20 }}
+				/>
+			) : (
+				<FlatList
+					data={history ? history.reverse() : []}
+					keyExtractor={(item, index) => index.toString()}
+					renderItem={({ item, index }) => <HistoryCard history={item} />}
+					//using footer component because the flat_list has been inverted
+					ListHeaderComponent={
+						<Text style={styles.monthDate}>{currentMonthName}</Text>
+					}
+					contentContainerStyle={styles.contentContainer}
+					style={{ width }}
+				/>
+			)}
 		</SafeAreaView>
 	);
 };
@@ -57,73 +73,19 @@ const styles = StyleSheet.create({
 	container: {
 		backgroundColor: colors.secondary2,
 		flex: 1,
+		alignItems: "center",
 	},
 	headText: {
 		color: "black",
 		fontSize: 24,
 		fontFamily: "Albert-SemiBold",
 	},
-	bottomContainer: {
-		paddingHorizontal: 16,
-	},
 	monthDate: {
-		marginBottom: 18,
-		marginTop: 16,
+		marginTop: 20,
 		fontSize: 20,
 		fontFamily: "Albert-SemiBold",
 	},
-	historyContainer: {
-		height: 200,
-		backgroundColor: "white",
-		alignSelf: "center",
-		borderRadius: 16,
-		padding: 16,
-	},
-	dayDate: {
-		fontSize: 18,
-		fontFamily: "Albert-Regular",
-
-	},
-	locationCont: {
-		alignItems: "center",
-		flexDirection: "row",
-		marginTop:10
-	},
-	places: {
-		justifyContent: "center",
-		marginLeft: 16,
-	},
-	location: {
-		width: "100%",
-		paddingVertical: 10,
-	},
-	locationText: {
-		fontFamily: "Albert-Regular",
-		fontSize: 16,
-	},
-	status: {
-		width: "100%",
-		height: 38,
-		backgroundColor: colors.lightGrey2,
-		borderRadius: 8,
-		marginTop: "auto",
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "space-between",
-		paddingHorizontal: 8,
-	},
-	statusText: {
-		fontSize: 16,
-		fontFamily: "Albert-SemiBold",
-	},
-	complete: {
-		color: colors.primaryBlue,
-		fontSize: 16,
-		fontFamily: "Albert-SemiBold",
-	},
-	cancelled: {
-		color: colors.lightGrey3,
-		fontSize: 16,
-		fontFamily: "Albert-Regular",
+	contentContainer: {
+		paddingHorizontal: 16,
 	},
 });

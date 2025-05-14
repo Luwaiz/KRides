@@ -17,7 +17,7 @@ export const OnBoard=[
         id: 2,
         title:"Choose your destination",
         subTitle:"Choosing your destination enables the rider to take you safely.",
-        image: <ManMap width={width}/>
+        image: <ManMap width={width} height={height-320}/>
 
     },
     {

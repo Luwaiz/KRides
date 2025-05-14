@@ -1,78 +1,140 @@
-import { Dimensions, Pressable, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+	Dimensions,
+	Pressable,
+	StyleSheet,
+	Text,
+	TouchableOpacity,
+	View,
+} from "react-native";
 import BottomSheet from "@gorhom/bottom-sheet";
 import React, { useState } from "react";
 import ActiveButton from "./buttons/ActiveButton";
 import { colors } from "../constants/styling";
 import { useNavigation } from "@react-navigation/native";
-import { Entypo } from '@expo/vector-icons';
+import { Entypo } from "@expo/vector-icons";
 import Avatar from "../assets/svg/Frame 77avatar.svg";
 import Phone from "../assets/svg/Call.svg";
 import Star from "../assets/svg/Rating.svg";
 import Direction from "../assets/svg/Frame 34direction.svg";
 import Naira from "../assets/svg/Naira.svg";
 import RideConfirm from "./modals/RideConfirm";
+import { useRideStore, useUserDetails } from "../constants/Store";
+import axios from "axios";
+import API from "../hooks/API";
 
 const ConfirmRide = () => {
 	const navigation = useNavigation();
-    const [selectRider, setSelectRider] = useState(false);
+	const [selectRider, createRide] = useState(false);
+	const [loading, setLoading] = useState(false);
+	const accessToken = useUserDetails((state) => state?.accessToken);
+	const currentTime = new Date();
+	console.log("timeeee ",currentTime.toLocaleString())
 
-    const ToPromo=()=>{
-        navigation.navigate("Promo")
-    }
-	const RiderSelected = () => {
-		setSelectRider(true)
+
+	const { destination, location, rider, numberOfPassenger } = useRideStore(
+		(state) => ({
+			destination: state.destination,
+			location: state.location,
+			rider: state.rider,
+			numberOfPassenger: state.numberOfPassenger,
+		})
+	);
+	const ToPromo = () => {
+		navigation.navigate("Promo");
+	};
+	const BookRide = async () => {
+		setLoading(true);
+
+		const request = {
+			destination: destination,
+			rider_name: rider,
+			number_of_passengers: numberOfPassenger,
+			start_time: currentTime.toLocaleString(),
+			location: location,
+			amount: (numberOfPassenger * 200).toString(),
+		};
+
+		const header = {
+			headers: { Authorization: `Bearer ${accessToken}` },
+		};
+		try {
+			const response = await axios.post(API.CreateRide, request, header);
+			console.log(response.data);
+			setLoading(false);
+			createRide(true)
+		} catch (e) {
+			console.log("error getting this", e?.response?.data);
+			setLoading(false);
+		}
 	};
 	return (
-        <>
-
-		<BottomSheet
-			snapPoints={["40%"]}
-			backgroundStyle={{ borderRadius: 30 }}
-			handleComponent={null}
-		>
-			<View style={styles.bottomCont}>
-				<View style={styles.callDriver}>
-					<Avatar width={50} height={50} />
-					<View style={styles.driverDetails}>
-						<Text style={styles.driverName}>Henry</Text>
-						<View style={styles.info}>
-							<View style={{ flexDirection: "row", alignItems: "center" }}>
-								<Star />
-								<Text>4.7</Text>
+		<>
+			<BottomSheet
+				snapPoints={["40%"]}
+				backgroundStyle={{ borderRadius: 30 }}
+				handleComponent={null}
+			>
+				<View style={styles.bottomCont}>
+					<View style={styles.callDriver}>
+						<Avatar width={50} height={50} />
+						<View style={styles.driverDetails}>
+							<Text style={styles.driverName}>
+								{rider ? rider : "not found"}
+							</Text>
+							<View style={styles.info}>
+								<View style={{ flexDirection: "row", alignItems: "center" }}>
+									<Star />
+									<Text>4.7</Text>
+								</View>
+							</View>
+						</View>
+						<View style={styles.phoneCont}>
+							<Phone width={25} height={25} />
+						</View>
+					</View>
+					<View style={styles.locationCont}>
+						<Direction width={40} height={80} />
+						<View style={styles.places}>
+							<View style={styles.location}>
+								<Text style={styles.locationText}>
+									{location ? location : "not found"}
+								</Text>
+							</View>
+							<View style={styles.location}>
+								<Text style={styles.locationText}>
+									{destination ? destination : "not found"}
+								</Text>
 							</View>
 						</View>
 					</View>
-					<View style={styles.phoneCont}>
-						<Phone width={25} height={25} />
+					<View style={styles.payment}>
+						<Naira />
+						<Text style={styles.PaymentText}>Cash/Transfer</Text>
+						<Text style={styles.price}># {numberOfPassenger * 200}</Text>
+					</View>
+					<TouchableOpacity
+						onPress={ToPromo}
+						activeOpacity={0.6}
+						style={styles.promo}
+					>
+						<Text style={styles.promoText}>Enter promo code</Text>
+						<Entypo
+							name="chevron-small-right"
+							size={24}
+							color={colors.primaryBlue}
+						/>
+					</TouchableOpacity>
+					<View style={styles.button}>
+						<ActiveButton
+							title={"Confirm Rider"}
+							onPress={BookRide}
+							loading={loading}
+						/>
 					</View>
 				</View>
-				<View style={styles.locationCont}>
-					<Direction width={40} height={80} />
-					<View style={styles.places}>
-						<View style={styles.location}>
-							<Text style={styles.locationText}>Winslow Hall</Text>
-						</View>
-						<View style={styles.location}>
-							<Text style={styles.locationText}>BUSA House</Text>
-						</View>
-					</View>
-				</View>
-				<View style={styles.payment}>
-					<Naira />
-					<Text style={styles.PaymentText}>Cash/Transfer</Text>
-					<Text style={styles.price}># 200</Text>
-				</View>
-				<TouchableOpacity onPress={ToPromo} activeOpacity={0.6} style={styles.promo}>
-					<Text style={styles.promoText}>Enter promo code</Text>
-					<Entypo name="chevron-small-right" size={24} color={colors.primaryBlue} />
-				</TouchableOpacity>
-				<View style={styles.button}>
-					<ActiveButton title={"Confirm Rider"} onPress={RiderSelected} />
-				</View>
-			</View>
-		</BottomSheet>
-        <RideConfirm modal={selectRider} setModal={setSelectRider}/>
-        </>
+			</BottomSheet>
+			{selectRider && <RideConfirm modal={selectRider} setModal={createRide} />}
+		</>
 	);
 };
 
@@ -161,18 +223,18 @@ const styles = StyleSheet.create({
 		marginLeft: 10,
 		marginRight: "auto",
 	},
-    promo:{
-        flexDirection: "row",
-        alignItems: "center",
-        paddingHorizontal: 16,
-        width: "100%",
-        justifyContent:"flex-end",
-        gap :5,
-        marginVertical:16
-    },
-    promoText:{
-        fontFamily: "Albert-SemiBold",
-        fontSize: 16,
-        color: colors.primaryBlue,
-    }
+	promo: {
+		flexDirection: "row",
+		alignItems: "center",
+		paddingHorizontal: 16,
+		width: "100%",
+		justifyContent: "flex-end",
+		gap: 5,
+		marginVertical: 16,
+	},
+	promoText: {
+		fontFamily: "Albert-SemiBold",
+		fontSize: 16,
+		color: colors.primaryBlue,
+	},
 });

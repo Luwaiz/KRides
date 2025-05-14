@@ -10,8 +10,7 @@ import { useUserDetails } from "../../constants/Store";
 
 const Name = ({ navigation }) => {
 	const ToHome = () => {
-		navigation.replace("drawer", {
-			params: "AppStack",
+		navigation.replace("AppStack", {
 			params: {
 				params: "Home",
 			},
@@ -40,7 +39,7 @@ const Name = ({ navigation }) => {
 				<TextInput1 text={"First Name"} placeholder={"e.g John"} />
 				<TextInput1 text={"Last Name"} placeholder={"e.g Dotun"} />
 				<View style={styles.button}>
-				<ActiveButton title={"Submit1"} onPress={ToHome} />
+					<ActiveButton title={"Submit1"} onPress={ToHome} />
 					<ActiveButton title={"Submit2"} onPress={ToUpload} />
 				</View>
 			</View>

@@ -57,16 +57,6 @@ const Passenger = () => {
 					/>
 					<Text>3 Passengers</Text>
 				</View>
-				<View style={styles.RadioContainer}>
-					<RadioButton.Android
-						value="4"
-						status={selected === "4" ? "checked" : "unchecked"}
-						onPress={() => setSelected("4")}
-						color={colors.primaryBlue}
-					/>
-					<Text>4 Passengers</Text>
-				</View>
-
 				<View style={styles.button}>
 					<ActiveButton
 						disabled={selected === null}
@@ -91,6 +81,7 @@ const styles = StyleSheet.create({
 	RadioContainer: {
 		flexDirection: "row",
 		alignItems: "center",
+        marginBottom: 20,
 	},
 	where: {
 		fontSize: 24,

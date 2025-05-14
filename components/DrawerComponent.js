@@ -75,7 +75,7 @@ const DrawerComponent = (props) => {
 	const {firstName} = useUserDetails((state)=>({
 		firstName: state.firstName
 	}))
-
+ 
 	return (
 		<View style={{ flex: 1 }}>
 			<DrawerContentScrollView {...props}>

@@ -85,6 +85,7 @@ const Signup = ({ navigation }) => {
 		} catch (error) {
 			setLoading(false);
 			try {
+				console.log(error?.response?.data.message)
 				// Check if error response exists
 				const errorData = error?.response?.data;
 				const parsedData =

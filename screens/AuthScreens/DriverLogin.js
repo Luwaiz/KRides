@@ -9,38 +9,37 @@ import GoogleButton from "../../components/buttons/GoogleButton";
 import Terms from "../../components/Terms";
 import BackButton from "../../components/buttons/BackButton";
 import BiometricButton from "../../components/buttons/BiometricButton";
-import { useUserDetails } from "../../constants/Store";
+import { useDriverDetails, useUserDetails } from "../../constants/Store";
 import axios from "axios";
 import API from "../../hooks/API";
 const { width, height } = Dimensions.get("screen");
 
-const Login = ({ navigation }) => {
-	const [email, set_email] = useState();
+const DriverLogin = ({ navigation }) => {
+	const [phone, set_phone] = useState();
 	const [password, set_password] = useState();
 
 	const ToHome = () => {
-		navigation.replace("AppStack", {
+		navigation.replace("DriverDrawer", {
+			params: "DriverStack",
 			params: {
-				params: "Home",
+				params: "DriverHome",
 			},
 		});
 	};
 
-	const { setEmail, setFirstName, setAccessToken, setLastName, setPhone } =
-		useUserDetails((state) => ({
-			setEmail: state.setEmail,
-			setFirstName: state.setFirstName,
+	const { setAccessToken, setPhone, setFullName, setVehicleId } =
+		useDriverDetails((state) => ({
 			setAccessToken: state.setAccessToken,
-			setLastName: state.setLastName,
 			setPhone: state.setPhone,
+			setFullName: state.setFullName,
+			setVehicleId: state.setVehicleId,
 		}));
 	const [loading, setLoading] = useState(false);
 
 	const loginUser = async (request) => {
 		try {
-			console.log(API.Login);
-			const response = await axios.post(API.Login, request);
-			console.log("Access Token:", response?.data?.access_token);
+			const response = await axios.post(API.DriverLogin, request);
+			console.log("loggeed in Access Token:", response?.data?.access_token);
 
 			if (response?.data?.access_token) {
 				setAccessToken(response.data.access_token);
@@ -57,15 +56,14 @@ const Login = ({ navigation }) => {
 
 	const fetchUserProfile = async (accessToken) => {
 		try {
-			const userResponse = await axios.get(API.UserProfile, {
+			const userResponse = await axios.get(API.DriverProfile, {
 				headers: { Authorization: `Bearer ${accessToken}` },
 			});
 
-			console.log("User Response:", userResponse?.data?.data?.firstName);
-			setFirstName(userResponse?.data?.data?.firstName);
-			setLastName(userResponse?.data?.data?.lastName);
-			setEmail(userResponse?.data?.data?.email);
+			console.log("User Response:", userResponse?.data?.data);
 			setPhone(userResponse?.data?.data?.phone);
+			setFullName(userResponse?.data?.data?.fullName);
+			setVehicleId(userResponse?.data?.data?.vehicle_id);
 			setLoading(false);
 			ToHome();
 		} catch (error) {
@@ -78,11 +76,10 @@ const Login = ({ navigation }) => {
 		}
 	};
 
-	// Example usage
 	const handleLogin = () => {
 		setLoading(true);
 		const request = {
-			email,
+			phone,
 			password,
 		};
 		loginUser(request);
@@ -97,9 +94,9 @@ const Login = ({ navigation }) => {
 				<View style={styles.sheetCont}>
 					<View style={styles.textInputCont}>
 						<TextInput1
-							text={"Email Address"}
-							placeholder={"johndoe22@gmail.com"}
-							onChangeText={(text) => set_email(text)}
+							text={"Phone number"}
+							placeholder={"09182828281"}
+							onChangeText={(text) => set_phone(text)}
 						/>
 						<TextInput1
 							text={"Password"}
@@ -132,7 +129,7 @@ const Login = ({ navigation }) => {
 	);
 };
 
-export default Login;
+export default DriverLogin;
 
 const styles = StyleSheet.create({
 	container: {

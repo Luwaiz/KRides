@@ -19,6 +19,7 @@
     "@react-navigation/native-stack": "^6.9.26",
     "@rnmapbox/maps": "^10.1.33",
     "axios": "^1.7.9",
+    "date-fns": "^4.1.0",
     "dotenv": "^16.4.7",
     "expo": "^52.0.23",
     "expo-dev-client": "~5.0.8",

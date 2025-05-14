@@ -22,7 +22,13 @@ const MainPage = () => {
 	// const ToHome = useBottomTabStore((state) => state.setHomePage);
 	Mapbox.setAccessToken(Map_Public);
 
-	const BABCOCK_COORDINATES = {
+	const BABCOCK_COORDINATES = location?{
+		latitude: location?.coord?.latitude, // Replace with Babcock's central latitude
+		longitude: location?.coord?.longitude, // Replace with Babcock's central longitude
+		zoom: 17
+
+	}: {
+		
 		latitude: 6.8935, // Replace with Babcock's central latitude
 		longitude: 3.723, // Replace with Babcock's central longitude
 		zoom: 17, // Adjust zoom level to focus only on the campus

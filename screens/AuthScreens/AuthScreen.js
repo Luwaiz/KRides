@@ -19,6 +19,9 @@ const AuthScreen = ({ navigation }) => {
 	const ToDriverSignUp = () => {
 		navigation.navigate("DriverSignup");
 	}
+	const ToDriverLogin = () => {
+        navigation.navigate("DriverLogin");
+    }
 	return (
 		<View style={styles.container}>
 			<View style={styles.topContainer}>
@@ -27,13 +30,15 @@ const AuthScreen = ({ navigation }) => {
 			<BottomSheet
 				backgroundStyle={{ borderRadius: 30 }}
 				handleComponent={null}
-				snapPoints={["40%"]}
+				snapPoints={["50%"]}
 			>
 				<View style={styles.sheet}>
 					<Text style={styles.welcome}>Welcome!</Text>
 					<ActiveButton title={"Sign up"} onPress={ToSignup} />
 					<LoginButton title={"Log in"} onPress={ToLogin} />
 					<LoginButton title={"Driver Sign up"} onPress={ToDriverSignUp} />
+					<LoginButton title={"Driver Log in"} onPress={ToDriverLogin} />
+
 				</View>
 				<Terms/>
 			</BottomSheet>

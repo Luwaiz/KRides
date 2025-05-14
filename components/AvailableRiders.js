@@ -1,46 +1,79 @@
-import { Dimensions, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
-import BottomSheet, { BottomSheetFlatList } from "@gorhom/bottom-sheet";
-import React, { useState } from "react";
+import {
+	ActivityIndicator,
+	Dimensions,
+	FlatList,
+	Pressable,
+	StyleSheet,
+	Text,
+	View,
+} from "react-native";
+import React, { useEffect, useState } from "react";
 import ActiveButton from "./buttons/ActiveButton";
 import { colors } from "../constants/styling";
 import Avatar from "../assets/svg/Frame 77avatar.svg";
-import Person from "../assets/svg/Person.svg";
-import { useBottomTabStore, useRideStore } from "../constants/Store";
-const {width, height} = Dimensions.get("window")
+import {
+	useBottomTabStore,
+	useRideStore,
+	useUserDetails,
+} from "../constants/Store";
+import axios from "axios";
+import API from "../hooks/API";
+const { width, height } = Dimensions.get("window");
 
 const AvailableRiders = () => {
 	const [selectedRider, setSelectedRider] = useState(null);
+	const [loading, setLoading] = useState(false);
+	const [riders, setRiders] = useState(null);
+	const accessToken = useUserDetails((state) => state?.accessToken);
 	const confirm = useBottomTabStore((state) => state.setConfirmPage);
-		const { numberOfPassenger } = useRideStore((state) => ({
-			numberOfPassenger: state.numberOfPassenger,
-		}));
-		console.log(numberOfPassenger)
+	const { setRider } = useRideStore((state) => ({
+		setRider: state.setRider,
+	}));
 
-	const Selected = (id) => {
-		setSelectedRider(id);
-		console.log("Selected Rider: ", id);
+	const GetRiders = async () => {
+		setLoading(true);
+		const header = {
+			headers: {
+				Authorization: `Bearer ${accessToken}`,
+			},
+		};
+		try {
+			const response = await axios.get(API.ListOfRiders, header);
+			console.log("available riders", response.data)
+			setRiders(response.data);
+			setLoading(false);
+		} catch (error) {
+			console.log("Error fetching riders: ", error.response.data.response);
+			setLoading(false);
+		}
 	};
-	const data = [
-		{ name: "Rider 1", distance: "1.2 km", time: "20 min", price: "#10" },
-		{ name: "Rider 2", distance: "1.5 km", time: "25 min", price: "#15" },
-		{ name: "Rider 3", distance: "1.8 km", time: "30 min", price: "#20" },
-		{ name: "Rider 4", distance: "2.1 km", time: "35 min", price: "#25" },
-		{ name: "Rider 5", distance: "2.4 km", time: "40 min", price: "#30" },
-		{ name: "Rider 6", distance: "2.7 km", time: "45 min", price: "#35" },
-		{ name: "Rider 7", distance: "3.0 km", time: "50 min", price: "#40" },
-	];
+
+	useEffect(() => {
+		GetRiders();
+	}, []);
+
+	const Selected = (id, name) => {
+		
+		setSelectedRider(id);
+		console.log("Selected Rider: ", id, name);
+		setRider(name);
+	};
+
 	return (
 		<View style={styles.bottomSheet}>
-
 			<View style={styles.sheetCont}>
-				<FlatList
-					data={data}
-					keyExtractor={(item, index) => index.toString()}
-					renderItem={({ item, index }) =>
-						renderItems(item, index, Selected, selectedRider)
-					}
-					showsVerticalScrollIndicator={false}
-				/>
+				{loading ? (
+					<ActivityIndicator color={colors.primaryBlue} size={30} />
+				) : (
+					<FlatList
+						data={riders || null}
+						keyExtractor={(item, index) => index.toString()}
+						renderItem={({ item, index }) =>
+							renderItems(item, index, Selected, selectedRider)
+						}
+						showsVerticalScrollIndicator={false}
+					/>
+				)}
 				<View style={styles.button}>
 					<ActiveButton
 						disabled={selectedRider === null}
@@ -56,7 +89,7 @@ const AvailableRiders = () => {
 const renderItems = (item, index, Selected, selectedRider) => {
 	return (
 		<Pressable
-			onPress={() => Selected(index)}
+			onPress={() => Selected(index, item?.name)}
 			style={[
 				styles.container,
 				{
@@ -68,14 +101,9 @@ const renderItems = (item, index, Selected, selectedRider) => {
 			<View style={styles.driverDetails}>
 				<Text style={styles.driverName}>{item?.name}</Text>
 				<View style={styles.info}>
-					<Text>{item.distance}</Text>
-					<View style={{ flexDirection: "row", alignItems: "center" }}>
-						<Person width={16} height={16} />
-						<Text>1</Text>
-					</View>
+					<Text>{item?.vehicle_id}</Text>
 				</View>
 			</View>
-			<Text style={styles.price}>{item?.price}</Text>
 		</Pressable>
 	);
 };
@@ -85,13 +113,13 @@ export default AvailableRiders;
 const styles = StyleSheet.create({
 	bottomSheet: {
 		backgroundColor: colors.secondary2,
-        borderTopLeftRadius: 30,
+		borderTopLeftRadius: 30,
 		borderTopRightRadius: 30,
-		height: height/2,
-		position:"absolute",
+		height: height / 2,
+		position: "absolute",
 		bottom: 0,
-        left: 0,
-        right: 0,
+		left: 0,
+		right: 0,
 	},
 	sheetCont: {
 		flex: 1,

@@ -56,6 +56,7 @@ const Confirmation1 = ({ modal, setModal, title }) => {
 		}
 	};
 	const logOut = async () => {
+		console.log("Log Out", accessToken);
 		setLoading(true);
 		const header = {
 			headers: {
@@ -65,7 +66,6 @@ const Confirmation1 = ({ modal, setModal, title }) => {
 		try {
 			const response = await axios.post(API.LogOut, header);
 			console.log(response?.data);
-
 			setAccessToken("");
 			setLoading(false);
 		} catch (e) {
@@ -88,7 +88,7 @@ const Confirmation1 = ({ modal, setModal, title }) => {
 					) : (
 						<Text style={styles.text}>
 							Are you sure you want to permanently{"\n"} delete your Kampus
-							Riders account?
+							Ride's account?
 						</Text>
 					)}
 
