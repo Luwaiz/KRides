@@ -19,8 +19,7 @@ const DriverLogin = ({ navigation }) => {
 	const [password, set_password] = useState();
 
 	const ToHome = () => {
-		navigation.replace("DriverDrawer", {
-			params: "DriverStack",
+		navigation.replace("DriverStack", {
 			params: {
 				params: "DriverHome",
 			},

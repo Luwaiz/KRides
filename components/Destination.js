@@ -4,7 +4,7 @@ import { colors } from "../constants/styling";
 import { useNavigation } from "@react-navigation/native";
 import Direction from "../assets/svg/Frame 34direction.svg";
 
-const Destination = () => {
+const Destination = ({location,destination}) => {
 	const navigation = useNavigation();
 	const ToPickDestination = () => {
 	};
@@ -17,12 +17,12 @@ const Destination = () => {
 			<View style={styles.destinations}>
 				<TouchableOpacity activeOpacity={0.7} onPress={ToPickDestination}>
 					<View style={styles.destination}>
-						<Text style={styles.destinationText}>SAT</Text>
+						<Text style={styles.destinationText}>{location}</Text>
 					</View>
 				</TouchableOpacity>
 				<TouchableOpacity activeOpacity={0.7} onPress={ToPickDestination}>
 					<View style={styles.destination}>
-						<Text style={styles.destinationText}>Welch</Text>
+						<Text style={styles.destinationText}>{destination}</Text>
 					</View>
 				</TouchableOpacity>
 			</View>
@@ -61,6 +61,6 @@ const styles = StyleSheet.create({
 		color: "black",
 	},
 	pointer: {
-		marginTop:5
+		marginTop:5,
 	}
 });

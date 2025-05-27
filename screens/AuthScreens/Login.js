@@ -37,10 +37,17 @@ const Login = ({ navigation }) => {
 	const [loading, setLoading] = useState(false);
 
 	const loginUser = async (request) => {
+		const headers = {
+			headers: {
+				"Content-Type": "application/json",
+				Accept: "application/json, text/plain, */*",
+				"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+			},
+		};
 		try {
-			console.log(API.Login);
 			const response = await axios.post(API.Login, request);
-			console.log("Access Token:", response?.data?.access_token);
+			console.log("Login Response:", response?.data);
+			console.log("Access Token:", response);
 
 			if (response?.data?.access_token) {
 				setAccessToken(response.data.access_token);
@@ -48,6 +55,7 @@ const Login = ({ navigation }) => {
 			} else {
 				console.error("Access token not found.");
 			}
+			setLoading(false);
 		} catch (error) {
 			setLoading(false);
 			console.log("Login Error:", error?.response?.data || error?.message);
@@ -60,7 +68,6 @@ const Login = ({ navigation }) => {
 			const userResponse = await axios.get(API.UserProfile, {
 				headers: { Authorization: `Bearer ${accessToken}` },
 			});
-
 			console.log("User Response:", userResponse?.data?.data?.firstName);
 			setFirstName(userResponse?.data?.data?.firstName);
 			setLastName(userResponse?.data?.data?.lastName);

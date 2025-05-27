@@ -22,6 +22,9 @@ const AuthScreen = ({ navigation }) => {
 	const ToDriverLogin = () => {
         navigation.navigate("DriverLogin");
     }
+	const ToPayment = () => {
+		navigation.navigate("Payment");
+	}
 	return (
 		<View style={styles.container}>
 			<View style={styles.topContainer}>
@@ -38,7 +41,7 @@ const AuthScreen = ({ navigation }) => {
 					<LoginButton title={"Log in"} onPress={ToLogin} />
 					<LoginButton title={"Driver Sign up"} onPress={ToDriverSignUp} />
 					<LoginButton title={"Driver Log in"} onPress={ToDriverLogin} />
-
+					<LoginButton title={"Payment"} onPress={ToPayment} />
 				</View>
 				<Terms/>
 			</BottomSheet>

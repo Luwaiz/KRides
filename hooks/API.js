@@ -2,7 +2,7 @@ import Production from "./Production";
 import { API_URL } from "@env";
 
 const url = Production ? API_URL : "";
-
+console.log("API URL: ", url);
 export default {
 	//authentication API's
 	Register: `${url}/auth/register`,
@@ -19,5 +19,8 @@ export default {
 	//ride booking API's
 	ListOfRiders: `${url}/auth/driver-list`,
 	CreateRide: `${url}/auth/trips/create`,
-    RideHistory : `${url}/auth/trips/user_history`
+	RideHistory: `${url}/auth/trips/user_history`,
+
+	PendingRides: `${url}/auth/driver/trips`,
+	
 };

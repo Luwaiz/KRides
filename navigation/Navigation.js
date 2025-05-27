@@ -36,7 +36,7 @@ const Navigation = () => {
 					<Stack.Screen component={OnBoarding} name="OnBoarding" />
 					<Stack.Screen component={AuthStack} name="AuthStack" />
 					<Stack.Screen component={AppStack} name="AppStack" />
-					<Stack.Screen component={DriverDrawer} name="DriverDrawer" />
+					<Stack.Screen component={DriverStack} name="DriverStack" />
 				</Stack.Navigator>
 			</NavigationContainer>
 		)
