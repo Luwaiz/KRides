@@ -7,7 +7,7 @@ import {
 	View,
 } from "react-native";
 import BottomSheet from "@gorhom/bottom-sheet";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import ActiveButton from "./buttons/ActiveButton";
 import { colors } from "../constants/styling";
 import { useNavigation } from "@react-navigation/native";
@@ -21,15 +21,23 @@ import RideConfirm from "./modals/RideConfirm";
 import { useRideStore, useUserDetails } from "../constants/Store";
 import axios from "axios";
 import API from "../hooks/API";
+import socket from "../hooks/Socket";
+import InActiveButton from "./buttons/InActiveButton";
+import DangerButton from "./buttons/DangerButton";
 
 const ConfirmRide = () => {
 	const navigation = useNavigation();
 	const [selectRider, createRide] = useState(false);
 	const [loading, setLoading] = useState(false);
+	const [pending, setPending] = useState(false);
 	const accessToken = useUserDetails((state) => state?.accessToken);
 	const currentTime = new Date();
-	console.log("timeeee ",currentTime.toLocaleString())
-
+	useEffect(() => {
+		if (!socket.connected) {
+			console.log("🔌 Connecting to socket server...");
+			socket.connect();
+		}
+	}, []);
 
 	const { destination, location, rider, numberOfPassenger } = useRideStore(
 		(state) => ({
@@ -42,31 +50,86 @@ const ConfirmRide = () => {
 	const ToPromo = () => {
 		navigation.navigate("Promo");
 	};
+
 	const BookRide = async () => {
 		setLoading(true);
 
 		const request = {
-			destination: destination,
+			destination,
 			rider_name: rider,
 			number_of_passengers: numberOfPassenger,
 			start_time: currentTime.toLocaleString(),
-			location: location,
+			location,
 			amount: (numberOfPassenger * 200).toString(),
 		};
 
 		const header = {
 			headers: { Authorization: `Bearer ${accessToken}` },
 		};
+
 		try {
 			const response = await axios.post(API.CreateRide, request, header);
-			console.log(response.data);
+			console.log("✅ Ride created:", response?.data?.data);
+
+			const rideId = response.data?.data?.id;
+			const UserId = response.data?.data?.user_id; // Assuming user_id is returned in the response
+
+			const emitRide = () => {
+				console.log("📤 Emitting join and ride_booked...");
+				console.log("Ride ID:", rideId);
+				console.log("userId:", UserId);
+				socket.emit("join", {
+					role: "customer",
+					userId: UserId, // Replace with user ID if available
+				});
+				socket.emit("book_ride", {
+					rideId,
+					rider,
+					location,
+					destination,
+					numberOfPassengers: numberOfPassenger,
+					amount: numberOfPassenger * 200,
+				});
+			};
+
+			console.log("🔌 Is socket connected?", socket.connected);
+			if (socket.connected) {
+				console.log("🔥 Socket already connected. Emitting ride...");
+				emitRide();
+			} else {
+				console.log("⏳ Waiting for socket to connect...");
+				socket.once("connect", () => {
+					console.log("✅ user Connected to socket server:", socket.id);
+					emitRide();
+				});
+			}
+
+			socket.on("connect_error", (err) => {
+				// console.log("❌ user Connection error:", err.message);
+			});
+
 			setLoading(false);
-			createRide(true)
+			setPending(true);
 		} catch (e) {
-			console.log("error getting this", e?.response?.data);
+			console.log("❌ Error creating ride:", e?.response?.data);
 			setLoading(false);
 		}
 	};
+
+	useEffect(() => {
+		socket.on("ride_accepted", ({ rideId, driverId }) => {
+			console.log("✅ Your ride has been accepted by driver:", driverId);
+			setPending(false);
+			createRide(true);
+
+			// You can now navigate or show a success message
+		});
+
+		return () => {
+			socket.off("ride_accepted");
+		};
+	}, []);
+
 	return (
 		<>
 			<BottomSheet
@@ -125,15 +188,28 @@ const ConfirmRide = () => {
 						/>
 					</TouchableOpacity>
 					<View style={styles.button}>
-						<ActiveButton
-							title={"Confirm Rider"}
-							onPress={BookRide}
-							loading={loading}
-						/>
+						{pending ? (
+							<View
+								style={{
+									alignItems: "center",
+									flexDirection: "row",
+									justifyContent: "space-between",
+								}}
+							>
+								<DangerButton title={"Cancel"} />
+								<ActiveButton title={"Ride Pending..."} disabled={true}/>
+							</View>
+						) : (
+							<ActiveButton
+								title={"Confirm Rider"}
+								onPress={BookRide}
+								loading={loading}
+							/>
+						)}
 					</View>
 				</View>
 			</BottomSheet>
-			{selectRider && <RideConfirm modal={selectRider} setModal={createRide} />}
+			{selectRider && <RideConfirm modal={selectRider} setModal={createRide} driverName={rider}/>}
 		</>
 	);
 };

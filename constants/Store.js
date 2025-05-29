@@ -37,7 +37,7 @@ export const useDriverDetails = create((set) => ({
 	fullName: "",
 	phone: "",
 	password: "",
-	VehicleId: "",
+	vehicle_id: "",
 	accessToken: "",
 	setAccessToken: (accessToken) => set({ accessToken }),
 	setFullName: (fullName) => set({ fullName }),

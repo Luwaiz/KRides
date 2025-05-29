@@ -10,7 +10,7 @@ import Calendar from "../../assets/svg/Calendar.svg";
 const HomeHeader = () => {
 	const navigation = useNavigation();
 	const OpenDrawer = () => {
-		navigation.dispatch(DrawerActions.openDrawer());
+		navigation.navigate("DriverSettings");
 	};
 	return (
 		<View style={styles.container}>
@@ -50,7 +50,7 @@ const styles = StyleSheet.create({
 		backgroundColor: colors.primary,
 		paddingTop: StatusBar.currentHeight + 12,
 		flexDirection: "row",
-		paddingHorizontal:16
+		paddingHorizontal: 16,
 	},
 	drawerNav: {
 		width: 48,

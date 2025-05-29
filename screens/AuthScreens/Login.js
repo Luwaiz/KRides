@@ -47,7 +47,6 @@ const Login = ({ navigation }) => {
 		try {
 			const response = await axios.post(API.Login, request);
 			console.log("Login Response:", response?.data);
-			console.log("Access Token:", response);
 
 			if (response?.data?.access_token) {
 				setAccessToken(response.data.access_token);

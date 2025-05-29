@@ -7,6 +7,7 @@ import About from "../screens/AppScreens/About";
 import History from "../screens/AppScreens/History";
 import ProfilePage from "../screens/AppScreens/ProfilePage";
 import AcceptTab from "../components/DriversModal/AcceptTab";
+import DriverSettings from "../screens/DriverScreens/DriverSetting";
 
 const Stack = createNativeStackNavigator();
 
@@ -19,6 +20,7 @@ const DriverStack = () => {
 			<Stack.Screen name="History" component={History} />
 			<Stack.Screen name="Profile" component={ProfilePage} />
 			<Stack.Screen name="Destinations" component={AcceptTab} />
+			<Stack.Screen component={DriverSettings} name="DriverSettings" />
 		</Stack.Navigator>
 	);
 };

@@ -38,7 +38,7 @@ const DriverLogin = ({ navigation }) => {
 	const loginUser = async (request) => {
 		try {
 			const response = await axios.post(API.DriverLogin, request);
-			console.log("loggeed in Access Token:", response?.data?.access_token);
+			console.log("loggeed in Access Token:", response?.data);
 
 			if (response?.data?.access_token) {
 				setAccessToken(response.data.access_token);

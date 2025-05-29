@@ -22,5 +22,6 @@ export default {
 	RideHistory: `${url}/auth/trips/user_history`,
 
 	PendingRides: `${url}/auth/driver/trips`,
+	AcceptRide: `${url}/auth/trips`,
 	
 };
