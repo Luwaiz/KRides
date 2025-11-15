@@ -1,54 +1,103 @@
-import { Dimensions, StyleSheet, Text, View } from "react-native";
+import {
+	Pressable,
+	StyleSheet,
+	Text,
+	TouchableOpacity,
+	View,
+} from "react-native";
 import React, { useState } from "react";
 import { colors } from "../constants/styling";
 import Direction from "../assets/svg/Frame 34direction.svg";
-import { Shadow } from "react-native-shadow-2";
-import { formatDate, parseISO } from "date-fns";
-const { width, height } = Dimensions.get("screen");
+import AntDesign from "@expo/vector-icons/AntDesign";
+import { format } from "date-fns";
 
 const HistoryCard = ({ history }) => {
-	const [status, setStatus] = useState(true);
-	console.log(history?.created_at)
-	const date =   "000000" ;
-	const DateFormat = history ?  formatDate(date, "dd MMMM yyyy"): "000000";
-	const time = history ? formatDate(date, "hh:mm a") : "000000";
+	const [selected, setSelected] = useState(null);
 
+	if (!history) {
+		return null;
+	}
 
-	return (
-		
-		<View style={styles.historyContainer}>
-		{history !== undefined && <>
+	// Get the timestamp (completedAt or cancelledAt or createdAt as fallback)
+	const timestamp =
+		history?.completedAt || history?.cancelledAt || history?.createdAt;
 
-			<View style={styles.dateContainer}>
-				<Text style={styles.dayDate}>{DateFormat}</Text>
-				<Text style={styles.time}>{time}</Text>
-			</View>
+	let date;
+	try {
+		date = timestamp?.toDate ? timestamp.toDate() : new Date();
+	} catch (error) {
+		console.error("Error parsing date:", error);
+		date = new Date();
+	}
 
-			<View style={styles.locationCont}>
-				<Direction width={40} height={80} />
-				<View style={styles.places}>
-					<View style={styles.location}>
-						<Text style={styles.locationText}>{history?.location}</Text>
-					</View>
-					<View style={styles.location}>
-						<Text style={styles.locationText}>{history?.destination}</Text>
-					</View>
-				</View>
-			</View>
-			<View style={styles.dateContainer}>
-				<Text style={styles.dayDate}>Rider</Text>
-				<Text style={styles.time}>{history?.rider_name}</Text>
-			</View>
-			<View style={styles.status}>
-				<Text style={styles.statusText}># {history?.amount}</Text>
-				{status ? (
-					<Text style={styles.complete}>Completed</Text>
-				) : (
-					<Text style={styles.cancelled}>Cancelled</Text>
-				)}
-			</View>
-		</>
+	// Format date and time
+	let dateFormat = "N/A";
+	let time = "N/A";
+
+	try {
+		dateFormat = format(date, "dd MMMM yyyy");
+		time = format(date, "hh:mm a");
+	} catch (error) {
+		console.error("Error formatting date:", error);
+	}
+
+	// Determine if ride was completed or cancelled
+	const isCompleted = history?.status === "completed";
+
+	const onhold = (id) => {
+		if (selected === id) {
+			setSelected(null);
+		} else {
+			setSelected(id);
 		}
+	};
+	return (
+		<View style={styles.historyContainer}>
+			{history !== undefined && (
+				<Pressable onLongPress={() => onhold(history?.rideId)}>
+					<View style={styles.dateContainer}>
+						<Text style={styles.dayDate}>{dateFormat}</Text>
+						<Text style={styles.time}>{time}</Text>
+					</View>
+
+					<View style={styles.locationCont}>
+						<Direction width={40} height={80} />
+						<View style={styles.places}>
+							<View style={styles.location}>
+								<Text style={styles.locationText}>
+									{history?.pickupLocation || "Pickup location"}
+								</Text>
+							</View>
+							<View style={styles.location}>
+								<Text style={styles.locationText}>
+									{history?.destination || "Destination"}
+								</Text>
+							</View>
+						</View>
+					</View>
+
+					<View style={styles.dateContainer}>
+						<Text style={styles.dayDate}>Driver</Text>
+						<Text style={styles.time}>
+							{history?.driverName || "No driver assigned"}
+						</Text>
+					</View>
+
+					<View style={styles.dateContainer}>
+						<Text style={styles.dayDate}>Passengers</Text>
+						<Text style={styles.time}>{history?.numberOfPassengers || 1}</Text>
+					</View>
+
+					<View style={styles.status}>
+						<Text style={styles.statusText}>₦ {history?.amount || 0}</Text>
+						{isCompleted ? (
+							<Text style={styles.complete}>Completed</Text>
+						) : (
+							<Text style={styles.cancelled}>Cancelled</Text>
+						)}
+					</View>
+				</Pressable>
+			)}
 		</View>
 	);
 };
@@ -68,7 +117,7 @@ const styles = StyleSheet.create({
 		borderRadius: 16,
 		padding: 16,
 		marginVertical: 16,
-		width: width - 32,
+		width: "100%",
 		borderColor: colors.lightGrey2,
 		borderWidth: 2,
 	},
@@ -84,7 +133,7 @@ const styles = StyleSheet.create({
 	places: {
 		justifyContent: "center",
 		marginLeft: 10,
-        marginTop:10
+		marginTop: 10,
 	},
 	location: {
 		width: "100%",
@@ -125,10 +174,5 @@ const styles = StyleSheet.create({
 		color: colors.lightGrey3,
 		marginTop: 4,
 		marginBottom: 4,
-	},
-	rider: {
-		marginVertical: 16,
-		fontSize: 18,
-		fontFamily: "Albert-SemiBold",
 	},
 });

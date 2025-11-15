@@ -1,32 +1,80 @@
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import React from "react";
+import React, { useState } from "react";
 import { colors } from "../constants/styling";
 import { useNavigation } from "@react-navigation/native";
 import Direction from "../assets/svg/Frame 34direction.svg";
+import LocationPicker from "./LocationPicker";
 
-const Destination = () => {
+const Destination = ({
+	location,
+	destination,
+	onPickupSelect,
+	onDestinationSelect,
+}) => {
 	const navigation = useNavigation();
-	const ToPickDestination = () => {
+	const [showPickupPicker, setShowPickupPicker] = useState(false);
+	const [showDestinationPicker, setShowDestinationPicker] = useState(false);
+
+	const handlePickupSelect = (selectedLocation) => {
+		if (onPickupSelect) {
+			onPickupSelect(selectedLocation);
+		}
+	};
+
+	const handleDestinationSelect = (selectedLocation) => {
+		if (onDestinationSelect) {
+			onDestinationSelect(selectedLocation);
+		}
 	};
 
 	return (
-		<View style={styles.locations}>
-			<View style={styles.pointer}>
-				<Direction height={110} />
+		<>
+			<View style={styles.locations}>
+				<View style={styles.pointer}>
+					<Direction height={110} />
+				</View>
+				<View style={styles.destinations}>
+					<TouchableOpacity
+						activeOpacity={0.7}
+						onPress={() => setShowPickupPicker(true)}
+					>
+						<View style={styles.destination}>
+							<Text style={styles.destinationText}>
+								{location || "Select pickup location"}
+							</Text>
+						</View>
+					</TouchableOpacity>
+					<TouchableOpacity
+						activeOpacity={0.7}
+						onPress={() => setShowDestinationPicker(true)}
+					>
+						<View style={styles.destination}>
+							<Text style={styles.destinationText}>
+								{destination || "Select destination"}
+							</Text>
+						</View>
+					</TouchableOpacity>
+				</View>
 			</View>
-			<View style={styles.destinations}>
-				<TouchableOpacity activeOpacity={0.7} onPress={ToPickDestination}>
-					<View style={styles.destination}>
-						<Text style={styles.destinationText}>SAT</Text>
-					</View>
-				</TouchableOpacity>
-				<TouchableOpacity activeOpacity={0.7} onPress={ToPickDestination}>
-					<View style={styles.destination}>
-						<Text style={styles.destinationText}>Welch</Text>
-					</View>
-				</TouchableOpacity>
-			</View>
-		</View>
+
+			{/* Pickup Location Picker */}
+			<LocationPicker
+				visible={showPickupPicker}
+				onClose={() => setShowPickupPicker(false)}
+				onSelectLocation={handlePickupSelect}
+				title="Select Pickup Location"
+				showPopularOnly={true}
+			/>
+
+			{/* Destination Picker */}
+			<LocationPicker
+				visible={showDestinationPicker}
+				onClose={() => setShowDestinationPicker(false)}
+				onSelectLocation={handleDestinationSelect}
+				title="Select Destination"
+				showPopularOnly={false}
+			/>
+		</>
 	);
 };
 
@@ -61,6 +109,6 @@ const styles = StyleSheet.create({
 		color: "black",
 	},
 	pointer: {
-		marginTop:5
-	}
+		marginTop: 5,
+	},
 });

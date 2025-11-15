@@ -4,11 +4,9 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import AuthScreen from "../screens/AuthScreens/AuthScreen";
 import Login from "../screens/AuthScreens/Login";
 import Signup from "../screens/AuthScreens/Signup";
-import VerifyNo from "../screens/AuthScreens/VerifyNo";
-import Name from "../screens/AuthScreens/Name";
-import UploadPicture from "../screens/AuthScreens/UploadPicture";
 import DriverSignup from "../screens/AuthScreens/DriverSignUp";
 import DriverLogin from "../screens/AuthScreens/DriverLogin";
+import ForgetPass from "../screens/AuthScreens/ForgetPass";
 
 const Stack = createNativeStackNavigator();
 
@@ -18,11 +16,9 @@ const AuthStack = () => {
 			<Stack.Screen component={AuthScreen} name="AuthScreen" />
 			<Stack.Screen component={Login} name="Login" />
 			<Stack.Screen component={Signup} name="Signup" />
-			<Stack.Screen component={VerifyNo} name="VerifyNo" />
-			<Stack.Screen component={Name} name="Name" />
-			<Stack.Screen component={UploadPicture} name="UploadPicture" />
 			<Stack.Screen component={DriverSignup} name="DriverSignup" />
 			<Stack.Screen component={DriverLogin} name="DriverLogin" />
+			<Stack.Screen component={ForgetPass} name="ForgetPass" />
 		</Stack.Navigator>
 	);
 };

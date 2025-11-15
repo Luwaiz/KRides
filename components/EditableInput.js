@@ -50,6 +50,7 @@ const EditableInput = ({
 					<>
 						<TextInput
 							secureTextEntry={password && !passwordVisible}
+							value={value}
 							placeholder={value}
 							placeholderTextColor={colors?.lightGrey}
 							onFocus={() => toggleFocus()}

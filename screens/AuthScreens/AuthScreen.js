@@ -7,21 +7,11 @@ import LoginButton from "../../components/buttons/LoginButton";
 import Terms from "../../components/Terms";
 import KRideLogo from "../../assets/svg/WhiteLogo.svg";
 
-
 const AuthScreen = ({ navigation }) => {
-	const ToLogin = () => {
-		navigation.navigate("Login");
-	};
-	const ToSignup = () => {
-		navigation.navigate("Signup");
+	const Navigate = (page) => {
+		navigation.navigate(page);
 	};
 
-	const ToDriverSignUp = () => {
-		navigation.navigate("DriverSignup");
-	}
-	const ToDriverLogin = () => {
-        navigation.navigate("DriverLogin");
-    }
 	return (
 		<View style={styles.container}>
 			<View style={styles.topContainer}>
@@ -34,13 +24,18 @@ const AuthScreen = ({ navigation }) => {
 			>
 				<View style={styles.sheet}>
 					<Text style={styles.welcome}>Welcome!</Text>
-					<ActiveButton title={"Sign up"} onPress={ToSignup} />
-					<LoginButton title={"Log in"} onPress={ToLogin} />
-					<LoginButton title={"Driver Sign up"} onPress={ToDriverSignUp} />
-					<LoginButton title={"Driver Log in"} onPress={ToDriverLogin} />
-
+					<ActiveButton title={"Sign up"} onPress={() => Navigate("Signup")} />
+					<LoginButton title={"Log in"} onPress={() => Navigate("Login")} />
+					<LoginButton
+						title={"Driver Sign up"}
+						onPress={() => Navigate("DriverSignup")}
+					/>
+					<LoginButton
+						title={"Driver Log in"}
+						onPress={() => Navigate("DriverLogin")}
+					/>
 				</View>
-				<Terms/>
+				<Terms />
 			</BottomSheet>
 		</View>
 	);
@@ -72,6 +67,5 @@ const styles = StyleSheet.create({
 		marginBottom: 20,
 		marginTop: 20,
 		textAlign: "center",
-		
 	},
 });

@@ -1,41 +1,100 @@
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import React from "react";
+import React, { useState } from "react";
 import { colors } from "../constants/styling";
+import { sp, fs, br, hp, wp } from "../constants/responsive";
 import { useNavigation } from "@react-navigation/native";
 import Direction from "../assets/svg/Frame 34direction.svg";
-import { useRideStore } from "../constants/Store";
+import { useRideStore, useRideDetailsStore } from "../constants/Store";
+import LocationPicker from "./LocationPicker";
 
 const WhereTo = () => {
-	const { destination, location } = useRideStore((state) => ({
-		destination: state.destination,
-		location: state.location,
-	}));
+	const [showPickupPicker, setShowPickupPicker] = useState(false);
+	const [showDestinationPicker, setShowDestinationPicker] = useState(false);
+
+	const { destination, location, setDestination, setLocation } = useRideStore(
+		(state) => ({
+			destination: state.destination,
+			location: state.location,
+			setDestination: state.setDestination,
+			setLocation: state.setLocation,
+		})
+	);
+
+	const { setPickupLocation, setDestination: setDestinationCoords } =
+		useRideDetailsStore();
 
 	const navigation = useNavigation();
-	const ToPickDestination = () => {
-		navigation.navigate("Destinations");
+
+	const handlePickupSelect = (selectedLocation) => {
+		setLocation(selectedLocation.name);
+		setPickupLocation({
+			latitude: selectedLocation.latitude,
+			longitude: selectedLocation.longitude,
+			name: selectedLocation.name,
+			address: selectedLocation.address,
+		});
+		console.log("Pickup selected:", selectedLocation);
+	};
+
+	const handleDestinationSelect = (selectedLocation) => {
+		setDestination(selectedLocation.name);
+		setDestinationCoords({
+			latitude: selectedLocation.latitude,
+			longitude: selectedLocation.longitude,
+			name: selectedLocation.name,
+			address: selectedLocation.address,
+		});
+		console.log("Destination selected:", selectedLocation);
 	};
 
 	return (
-		<View style={styles.locations}>
-			<View style={styles.pointer}>
-				<Direction height={110} />
+		<>
+			<View style={styles.locations}>
+				<View style={styles.pointer}>
+					<Direction height={110} />
+				</View>
+				<View style={styles.destinations}>
+					<TouchableOpacity
+						activeOpacity={0.7}
+						onPress={() => setShowPickupPicker(true)}
+					>
+						<View style={styles.destination}>
+							<Text style={styles.destinationText}>
+								{location !== "" ? location : "Choose Pickup Location"}
+							</Text>
+						</View>
+					</TouchableOpacity>
+					<TouchableOpacity
+						activeOpacity={0.7}
+						onPress={() => setShowDestinationPicker(true)}
+					>
+						<View style={styles.destination}>
+							<Text style={styles.destinationText}>
+								{destination !== "" ? destination : "Choose Destination"}
+							</Text>
+						</View>
+					</TouchableOpacity>
+				</View>
 			</View>
-			<View style={styles.destinations}>
-				<TouchableOpacity activeOpacity={0.7} onPress={ToPickDestination}>
-					<View style={styles.destination}>
-						<Text style={styles.destinationText}>{location !== "" ? location : "Choose Pickup Location"}</Text>
-					</View>
-				</TouchableOpacity>
-				<TouchableOpacity activeOpacity={0.7} onPress={ToPickDestination}>
-					<View style={styles.destination}>
-						<Text style={styles.destinationText}>
-							{destination!== ""? destination : "Choose Destination"}
-						</Text>
-					</View>
-				</TouchableOpacity>
-			</View>
-		</View>
+
+			{/* Pickup Location Picker */}
+			<LocationPicker
+				visible={showPickupPicker}
+				onClose={() => setShowPickupPicker(false)}
+				onSelectLocation={handlePickupSelect}
+				title="Select Pickup Location"
+				showPopularOnly={false}
+			/>
+
+			{/* Destination Picker */}
+			<LocationPicker
+				visible={showDestinationPicker}
+				onClose={() => setShowDestinationPicker(false)}
+				onSelectLocation={handleDestinationSelect}
+				title="Select Destination"
+				showPopularOnly={false}
+			/>
+		</>
 	);
 };
 
@@ -46,30 +105,31 @@ const styles = StyleSheet.create({
 		alignSelf: "center",
 		backgroundColor: colors.lightGrey2,
 		width: "100%",
-		height: 140,
-		borderRadius: 16,
+		height: hp(140),
+		borderRadius: br(16),
 		flexDirection: "row",
 	},
 	destinations: {
-		minWidth: 270,
+		minWidth: wp(270),
+		flex: 1,
 		height: "100%",
 		justifyContent: "space-between",
-		paddingVertical: 10,
+		paddingVertical: sp(10),
 	},
 	destination: {
-		width: "100%",
-		minHeight: 50,
+		width: "95%",
+		minHeight: sp(50),
 		backgroundColor: colors.secondary,
-		borderRadius: 8,
-		padding: 8,
+		borderRadius: br(8),
+		padding: sp(8),
 		justifyContent: "center",
 	},
 	destinationText: {
-		fontSize: 16,
+		fontSize: fs(16),
 		fontWeight: "regular",
 		color: "black",
 	},
 	pointer: {
-		marginTop:5
-	}
+		marginTop: sp(5),
+	},
 });

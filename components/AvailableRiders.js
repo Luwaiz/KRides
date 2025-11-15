@@ -1,6 +1,5 @@
 import {
 	ActivityIndicator,
-	Dimensions,
 	FlatList,
 	Pressable,
 	StyleSheet,
@@ -11,39 +10,50 @@ import React, { useEffect, useState } from "react";
 import ActiveButton from "./buttons/ActiveButton";
 import { colors } from "../constants/styling";
 import Avatar from "../assets/svg/Frame 77avatar.svg";
-import {
-	useBottomTabStore,
-	useRideStore,
-	useUserDetails,
-} from "../constants/Store";
-import axios from "axios";
-import API from "../hooks/API";
-const { width, height } = Dimensions.get("window");
+import { useBottomTabStore, useRideStore } from "../constants/Store";
+import { collection, getDocs, query, where } from "firebase/firestore";
+import InActiveButton from "./buttons/InActiveButton";
+import { FIREBASE_DB } from "../firebaseConfig";
 
 const AvailableRiders = () => {
 	const [selectedRider, setSelectedRider] = useState(null);
 	const [loading, setLoading] = useState(false);
-	const [riders, setRiders] = useState(null);
-	const accessToken = useUserDetails((state) => state?.accessToken);
+	const [riders, setRiders] = useState([]);
+
 	const confirm = useBottomTabStore((state) => state.setConfirmPage);
 	const { setRider } = useRideStore((state) => ({
 		setRider: state.setRider,
 	}));
 
+	useEffect(() => {
+		(async () => {
+			try {
+				const snapshot = await getDocs(collection(FIREBASE_DB, "drivers"));
+				console.log("Drivers fetched:", snapshot.docs.length);
+			} catch (e) {
+				console.log("Firestore test error:", e);
+			}
+		})();
+	}, []);
 	const GetRiders = async () => {
 		setLoading(true);
-		const header = {
-			headers: {
-				Authorization: `Bearer ${accessToken}`,
-			},
-		};
 		try {
-			const response = await axios.get(API.ListOfRiders, header);
-			console.log("available riders", response.data)
-			setRiders(response.data);
-			setLoading(false);
+			const q = query(
+				collection(FIREBASE_DB, "drivers")
+				// where("status", "==", "available")
+			);
+			const snapshot = await getDocs(q);
+
+			const driverList = snapshot.docs.map((doc) => ({
+				id: doc.id,
+				...doc.data(),
+			}));
+
+			console.log(driverList);
+			setRiders(driverList);
 		} catch (error) {
-			console.log("Error fetching riders: ", error.response.data.response);
+			console.error("Error fetching riders:", error);
+		} finally {
 			setLoading(false);
 		}
 	};
@@ -53,9 +63,7 @@ const AvailableRiders = () => {
 	}, []);
 
 	const Selected = (id, name) => {
-		
 		setSelectedRider(id);
-		console.log("Selected Rider: ", id, name);
 		setRider(name);
 	};
 
@@ -64,44 +72,58 @@ const AvailableRiders = () => {
 			<View style={styles.sheetCont}>
 				{loading ? (
 					<ActivityIndicator color={colors.primaryBlue} size={30} />
+				) : riders?.length === 0 ? (
+					<Text
+						style={{
+							textAlign: "center",
+							color: colors.lightGrey3,
+							fontSize: 16,
+						}}
+					>
+						Sorry, no drivers available.
+					</Text>
 				) : (
 					<FlatList
-						data={riders || null}
-						keyExtractor={(item, index) => index.toString()}
-						renderItem={({ item, index }) =>
-							renderItems(item, index, Selected, selectedRider)
+						data={riders}
+						keyExtractor={(item) => item.id}
+						renderItem={({ item }) =>
+							renderItems(item, Selected, selectedRider)
 						}
 						showsVerticalScrollIndicator={false}
 					/>
 				)}
 				<View style={styles.button}>
-					<ActiveButton
-						disabled={selectedRider === null}
-						title={"Select Rider"}
-						onPress={confirm}
-					/>
+					{riders?.length === 0 ? (
+						<InActiveButton title={"Select Rider"} />
+					) : (
+						<ActiveButton
+							disabled={selectedRider === null}
+							title={"Select Rider"}
+							onPress={confirm}
+						/>
+					)}
 				</View>
 			</View>
 		</View>
 	);
 };
 
-const renderItems = (item, index, Selected, selectedRider) => {
+const renderItems = (item, Selected, selectedRider) => {
 	return (
 		<Pressable
-			onPress={() => Selected(index, item?.name)}
+			onPress={() => Selected(item.id, item.fullname)}
 			style={[
 				styles.container,
 				{
-					borderColor: selectedRider === index ? colors.primaryBlue : "white",
+					borderColor: selectedRider === item.id ? colors.primaryBlue : "white",
 				},
 			]}
 		>
 			<Avatar width={50} height={50} />
 			<View style={styles.driverDetails}>
-				<Text style={styles.driverName}>{item?.name}</Text>
+				<Text style={styles.driverName}>{item.fullname}</Text>
 				<View style={styles.info}>
-					<Text>{item?.vehicle_id}</Text>
+					<Text>{item.vehicle_id}</Text>
 				</View>
 			</View>
 		</Pressable>
@@ -115,7 +137,7 @@ const styles = StyleSheet.create({
 		backgroundColor: colors.secondary2,
 		borderTopLeftRadius: 30,
 		borderTopRightRadius: 30,
-		height: height / 2,
+		height: 400,
 		position: "absolute",
 		bottom: 0,
 		left: 0,
@@ -154,9 +176,5 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 		marginTop: 8,
 		gap: 12,
-	},
-	price: {
-		fontSize: 16,
-		fontFamily: "Albert-SemiBold",
 	},
 });

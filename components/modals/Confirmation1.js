@@ -1,12 +1,16 @@
-import { Dimensions, Image, Modal, StyleSheet, Text, View } from "react-native";
+import { Image, Modal, StyleSheet, Text, View } from "react-native";
 import React, { useState } from "react";
 import ActiveButton from "../buttons/ActiveButton";
 import { CommonActions, useNavigation } from "@react-navigation/native";
 import LoginButton from "../buttons/LoginButton";
-import { useUserDetails } from "../../constants/Store";
+import useAuthStore, {
+	useDriverDetails,
+	useUserDetails,
+} from "../../constants/Store";
 import axios from "axios";
 import API from "../../hooks/API";
-const { width, height } = Dimensions.get("screen");
+import { FIREBASE_AUTH } from "../../firebaseConfig";
+import { signOut } from "firebase/auth";
 
 const Confirmation1 = ({ modal, setModal, title }) => {
 	const navigation = useNavigation();
@@ -24,12 +28,6 @@ const Confirmation1 = ({ modal, setModal, title }) => {
 		} else {
 			deleteUser();
 		}
-		navigation.dispatch(
-			CommonActions.reset({
-				index: 0,
-				routes: [{ name: "AuthStack" }],
-			})
-		);
 	};
 	const Close = () => {
 		setModal(false);
@@ -55,25 +53,35 @@ const Confirmation1 = ({ modal, setModal, title }) => {
 			alert("An unknown error occurred.");
 		}
 	};
+
 	const logOut = async () => {
-		console.log("Log Out", accessToken);
-		setLoading(true);
-		const header = {
-			headers: {
-				Authorization: `Bearer ${accessToken}`,
-			},
-		};
 		try {
-			const response = await axios.post(API.LogOut, header);
-			console.log(response?.data);
-			setAccessToken("");
+			setLoading(true);
+
+			// Sign out from Firebase
+			await signOut(FIREBASE_AUTH);
+
+			// Clear all stores
+			useUserDetails.getState().clearUser();
+			useDriverDetails.getState().clearDriver();
+			useAuthStore.getState().clearAuth();
+
+			// Reset navigation to AuthStack
+			navigation.dispatch(
+				CommonActions.reset({
+					index: 0,
+					routes: [{ name: "AuthStack" }],
+				})
+			);
+
 			setLoading(false);
-		} catch (e) {
+		} catch (error) {
 			setLoading(false);
-			console.error("Error deleting token:", e?.response?.data);
-			alert("An unknown error occurred.");
+			console.error("Logout Error:", error);
+			alert("Logout failed. Please try again.");
 		}
 	};
+
 	return (
 		<Modal
 			visible={modal}
@@ -124,7 +132,7 @@ const styles = StyleSheet.create({
 	},
 	container: {
 		backgroundColor: "white",
-		width: width / 1.4,
+		width: "75%",
 		borderRadius: 5,
 		alignItems: "center",
 		paddingVertical: 64,

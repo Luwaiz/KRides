@@ -1,0 +1,100 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserRole(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data.role;
+    }
+
+    function isDriver() {
+      return isAuthenticated() && getUserRole(request.auth.uid) == 'driver';
+    }
+
+    function isCustomer() {
+      return isAuthenticated() && getUserRole(request.auth.uid) == 'customer';
+    }
+
+    // Users collection: users/{uid}
+    match /users/{uid} {
+      allow read: if isAuthenticated();
+
+      // user can create their own profile when signing up
+      allow create: if request.auth.uid == uid
+        && request.resource.data.keys().hasAll(['name','phone','role'])
+        && request.resource.data.role in ['customer','driver'];
+
+      // user can update limited profile fields on their own document
+      allow update: if request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','phone','fcmTokens','vehicle_id'])
+        && request.resource.data.role == resource.data.role; // don't allow changing role
+
+      // Admins (Cloud Functions) should use service account for privileged updates
+      allow delete: if false; // not allowed from client
+    }
+
+    // Rides collection: rides/{rideId}
+    match /rides/{rideId} {
+      allow read: if isAuthenticated() && (
+        resource.data.customerUid == request.auth.uid ||
+        resource.data.assignedDriverUid == request.auth.uid ||
+        isDriver() // drivers can list rides (optionally restrict by area with a field)
+      );
+
+      // Create: only authenticated customers can create a ride and must be the stated customerUid
+      allow create: if isAuthenticated()
+        && request.auth.uid == request.resource.data.customerUid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.keys().hasAll(['customerUid','origin','destination','status','createdAt']);
+
+      // Update: restricted transitions
+      allow update: if isAuthenticated() && (
+        // Customer can cancel if ride still pending
+        (request.auth.uid == resource.data.customerUid
+          && resource.data.status == 'pending'
+          && request.resource.data.status == 'cancelled'
+          && resource.data.customerUid == request.resource.data.customerUid)
+
+        // Driver acceptance: only a driver can move pending -> accepted and assign themselves
+        || (isDriver()
+          && resource.data.status == 'pending'
+          && request.resource.data.status == 'accepted'
+          && request.resource.data.assignedDriverUid == request.auth.uid
+          && request.resource.data.customerUid == resource.data.customerUid)
+
+        // Driver can update location-related/in-progress transitions if they are assigned driver
+        || (request.auth.uid == resource.data.assignedDriverUid
+          && request.resource.data.assignedDriverUid == resource.data.assignedDriverUid
+          && request.resource.data.status in ['in_progress','completed']
+        )
+      );
+
+      // Prevent client from setting protected fields arbitrarily
+      allow write: if false; // explicit allow rules above control write
+    }
+
+    // Driver locations: driver_locations/{driverUid}
+    match /driver_locations/{driverUid} {
+      // driver can update their own location
+      allow write: if isAuthenticated() && request.auth.uid == driverUid && getUserRole(driverUid) == 'driver';
+      allow read: if isAuthenticated();
+    }
+
+    // Notifications: clients can read their notifications; only server/Cloud Functions should create
+    match /notifications/{userId}/{noteId} {
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow create: if false; // write via Cloud Functions/service account
+      allow update, delete: if false;
+    }
+
+    // default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

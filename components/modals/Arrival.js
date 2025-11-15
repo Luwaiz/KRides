@@ -1,12 +1,11 @@
-import { Dimensions, Image, Modal, StyleSheet, Text, View } from "react-native";
+import { Image, Modal, StyleSheet, Text, View } from "react-native";
 import React from "react";
 import ActiveButton from "../buttons/ActiveButton";
 import Keke from "../../assets/svg/Keke.svg";
 import { useBottomTabStore } from "../../constants/Store";
-const { width, height } = Dimensions.get("screen");
 
 const Arrival = ({ modal, setModal }) => {
-    const ToHome = useBottomTabStore((state) => state.setDriverHome);
+	const ToHome = useBottomTabStore((state) => state.setDriverHome);
 
 	const Cancel = () => {
 		setModal(false);
@@ -36,19 +35,19 @@ const Arrival = ({ modal, setModal }) => {
 export default Arrival;
 
 const styles = StyleSheet.create({
-	cont:{
+	cont: {
 		flex: 1,
 		backgroundColor: "white",
-        width: width / 1.4,
-        borderRadius: 5,
-        alignItems: "center",
-        paddingVertical: 64,
+		width: "75%",
+		borderRadius: 5,
+		alignItems: "center",
+		paddingVertical: 64,
 	},
 	modal: {
 		justifyContent: "center",
 		alignItems: "center",
 		backgroundColor: "rgba(0, 0, 0, 0.5)",
-		height
+		flex: 1,
 	},
 	text: {
 		fontWeight: "regular",
@@ -59,12 +58,11 @@ const styles = StyleSheet.create({
 	},
 	container: {
 		backgroundColor: "white",
-		width: width / 1.4,
+		width: "75%",
 		borderRadius: 5,
 		alignItems: "center",
 		paddingVertical: 64,
 		justifyContent: "center",
-		
 	},
 	button: {
 		marginTop: "auto",

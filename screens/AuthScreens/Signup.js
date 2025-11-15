@@ -1,6 +1,5 @@
-import { Dimensions, ScrollView, StyleSheet, Text, View } from "react-native";
-import React, { use, useState } from "react";
-import BottomSheet from "@gorhom/bottom-sheet";
+import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useState } from "react";
 import { colors } from "../../constants/styling";
 import { SafeAreaView } from "react-native-safe-area-context";
 import TextInput1 from "../../components/TextInput1";
@@ -8,98 +7,90 @@ import ActiveButton from "../../components/buttons/ActiveButton";
 import GoogleButton from "../../components/buttons/GoogleButton";
 import Terms from "../../components/Terms";
 import BackButton from "../../components/buttons/BackButton";
-import { useUserDetails } from "../../constants/Store";
-import axios from "axios";
-import API from "../../hooks/API";
-const { width, height } = Dimensions.get("screen");
+import Firebase from "../../hooks/Firebase";
+import Toast from "react-native-toast-message";
 
 const Signup = ({ navigation }) => {
-	const [email,setMail] = useState("")
-	const [password, setPass] = useState("")
-	const [phone, setPhoneNumber] = useState("")
-	const [firstName, setFirst] = useState("")
-	const [lastName, setLast] = useState("")
+	const [email, setEmail] = useState("");
+	const [password, setPassword] = useState("");
+	const [phone, setPhone] = useState("");
+	const [firstName, setFirstName] = useState("");
+	const [lastName, setLastName] = useState("");
 	const [confirmPassword, setConfirmPassword] = useState("");
 	const [loading, setLoading] = useState(false);
 
-	const {
-		setEmail,
-		setPhone,
-		setFirstName,
-		setLastName,
-		setUserId,
-	} = useUserDetails((state) => ({
-		setEmail: state.setEmail,
-		setPhone: state.setPhone,
-		setFirstName: state.setFirstName,
-		setLastName: state.setLastName,
-		setUserId: state.setUserId,
-	}));
-
-	const passwordCheck = (password) => {
-		if (password?.length < 8) {
-			alert(
-				"Password must contain at least 8 characters, including uppercase and lowercase letters, numbers, and special characters."
-			);
-			return false;
-		}
-		return true;
+	const isPasswordValid = (password) => {
+		return password.length >= 8;
 	};
 
-	const VerifyPassword = (password, confirmPassword) => {
-		if (password !== confirmPassword) {
-			alert("Passwords do not match.");
-			return false;
-		}
-		return true;
+	const isPasswordMatched = (password, confirmPassword) => {
+		return password === confirmPassword;
 	};
 
-	const handleSignUp = async (password, confirmPassword) => {
+	const handleSignUp = async () => {
+		if (
+			!firstName ||
+			!lastName ||
+			!email ||
+			!phone ||
+			!password ||
+			!confirmPassword
+		) {
+			Alert.alert("Missing Fields", "Please fill in all fields");
+			return;
+		}
+
+		if (!isPasswordValid(password)) {
+			Alert.alert("Weak Password", "Password must be at least 8 characters.");
+			return;
+		}
+
+		if (!isPasswordMatched(password, confirmPassword)) {
+			Alert.alert("Password Mismatch", "Passwords do not match.");
+			return;
+		}
+
 		setLoading(true);
-		if (!passwordCheck(password)) {
-			setLoading(false);
-			return;
-		}
-		if (!VerifyPassword(password, confirmPassword)) {
-			setLoading(false);
-			return;
-		}
-
-		const request = {
-			email,
-			password,
-			phone,
-			firstName,
-			lastName,
-		};
 		try {
-			const response = await axios.post(API.Register, request);
-			console.log(response?.data);
-			setUserId(response?.data?.user?.id);
-			setFirstName(response?.data?.user?.firstName)
-			setLastName(response?.data?.user?.lastName)
-			setEmail(response?.data?.user?.email)
-			setPhone(response?.data?.user?.phone)
-			navigation.navigate("VerifyNo");
-			setLoading(false);
+			// Use Firebase Auth to create user and Firestore user doc
+			const user = await Firebase.signUpWithEmail({
+				email,
+				password,
+				name: `${firstName} ${lastName}`.trim(),
+				phone,
+				role: "customer",
+			});
+
+			console.log("✅ Customer signup success:", user.uid);
+
+			// Register FCM token for notifications
+			await Firebase.registerFcmToken(user.uid);
+
+			Toast.show({
+				type: "tomatoToast",
+				text1: "Account Created!",
+				text2: "Welcome to KRides",
+				position: "top",
+				visibilityTime: 2000,
+			});
+
+			// Navigation.js will automatically route to customer home
+			// No need to manually navigate
 		} catch (error) {
 			setLoading(false);
-			try {
-				console.log(error?.response?.data.message)
-				// Check if error response exists
-				const errorData = error?.response?.data;
-				const parsedData =
-					typeof errorData === "string" ? JSON.parse(errorData) : errorData;
-				const emailErrors = parsedData?.email || [];
-				if (emailErrors.length > 0) {
-					alert(emailErrors[0]); // Show error message to the user
-				} else {
-					console.log("No email errors found.");
-				}
-			} catch (parseError) {
-				console.error("Error parsing response data:", parseError);
-				alert("An unknown error occurred.");
+			console.error("❌ Customer signup error:", error);
+
+			let errorMessage = "Sign up failed. Please try again.";
+			if (error.code === "auth/email-already-in-use") {
+				errorMessage =
+					"This email is already registered. Please login instead.";
+			} else if (error.code === "auth/invalid-email") {
+				errorMessage = "Invalid email address";
+			} else if (error.code === "auth/weak-password") {
+				errorMessage = "Password is too weak";
 			}
+
+			Alert.alert("Sign Up Failed", errorMessage);
 		}
 	};
 
@@ -115,43 +106,54 @@ const Signup = ({ navigation }) => {
 							<TextInput1
 								text={"First Name"}
 								placeholder={"John"}
-								onChangeText={(text) => setFirst(text)}
+								onChangeText={(text) => setFirstName(text)}
+								value={firstName}
 							/>
 							<TextInput1
 								text={"Last Name"}
 								placeholder={"Doe"}
-								onChangeText={(text) => setLast(text)}
+								onChangeText={(text) => setLastName(text)}
+								value={lastName}
 							/>
 							<TextInput1
-								text={"School Email Address"}
-								placeholder={"john2022@student.babcock.edu.ng"}
-								onChangeText={(text) => setMail(text)}
+								text={"Email Address"}
+								placeholder={"johndoe22@gmail.com"}
+								onChangeText={(text) => setEmail(text)}
+								value={email}
+								keyboardType="email-address"
+								autoCapitalize="none"
 							/>
 							<TextInput1
 								text={"Phone Number"}
 								placeholder={"08123456789"}
-								onChangeText={(text) => setPhoneNumber(text)}
+								onChangeText={(text) => setPhone(text)}
+								value={phone}
+								keyboardType="phone-pad"
 							/>
 							<TextInput1
 								text={"Password"}
 								placeholder={"*************"}
 								password
-								onChangeText={(text) => setPass(text)}
+								onChangeText={(text) => setPassword(text)}
+								value={password}
 							/>
 							<TextInput1
 								text={"Confirm Password"}
 								placeholder={"*************"}
 								password
 								onChangeText={(text) => setConfirmPassword(text)}
+								value={confirmPassword}
 							/>
 							<ActiveButton
 								title={"Sign up"}
-								onPress={() => handleSignUp(password, confirmPassword)}
+								onPress={handleSignUp}
 								disabled={
-									phone === "" ||
-									email === "" ||
-									password === "" ||
-									confirmPassword === "" ||
+									!email ||
+									!password ||
+									!confirmPassword ||
+									!firstName ||
+									!lastName ||
+									!phone ||
 									loading
 								}
 								loading={loading}
@@ -217,7 +219,7 @@ const styles = StyleSheet.create({
 	},
 	bottomCont: {
 		backgroundColor: colors.secondary,
-		width: width,
+		width: "100%",
 		marginTop: 20,
 		borderTopLeftRadius: 30,
 		borderTopRightRadius: 30,

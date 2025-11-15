@@ -8,19 +8,18 @@ import ActiveButton from "../../components/buttons/ActiveButton";
 import GoogleButton from "../../components/buttons/GoogleButton";
 import Terms from "../../components/Terms";
 import BackButton from "../../components/buttons/BackButton";
-import BiometricButton from "../../components/buttons/BiometricButton";
 import { useDriverDetails, useUserDetails } from "../../constants/Store";
 import axios from "axios";
 import API from "../../hooks/API";
-const { width, height } = Dimensions.get("screen");
+const {height,width} = Dimensions.get('window');
+
 
 const DriverLogin = ({ navigation }) => {
 	const [phone, set_phone] = useState();
 	const [password, set_password] = useState();
 
 	const ToHome = () => {
-		navigation.replace("DriverDrawer", {
-			params: "DriverStack",
+		navigation.replace("DriverStack", {
 			params: {
 				params: "DriverHome",
 			},
@@ -39,7 +38,7 @@ const DriverLogin = ({ navigation }) => {
 	const loginUser = async (request) => {
 		try {
 			const response = await axios.post(API.DriverLogin, request);
-			console.log("loggeed in Access Token:", response?.data?.access_token);
+			console.log("loggeed in Access Token:", response?.data);
 
 			if (response?.data?.access_token) {
 				setAccessToken(response.data.access_token);
@@ -113,7 +112,6 @@ const DriverLogin = ({ navigation }) => {
 									onPress={() => handleLogin()}
 								/>
 							</View>
-							<BiometricButton navigate={() => ToHome()} />
 						</View>
 						<View style={styles.OrContainer}>
 							<View style={styles.dash} />

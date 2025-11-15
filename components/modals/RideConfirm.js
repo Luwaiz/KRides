@@ -1,15 +1,15 @@
-import { Dimensions, Modal, StyleSheet, Text, View } from "react-native";
+import { Modal, StyleSheet, Text, View } from "react-native";
 import React, { useState } from "react";
 import ActiveButton from "../buttons/ActiveButton";
 import Keke from "../../assets/svg/Keke.svg";
-import LoginButton from "../buttons/LoginButton";
-import Confirmation2 from "./Confirmation2";
 import Toast from "react-native-toast-message";
-const { width } = Dimensions.get("screen");
+import { useBottomTabStore, useRideStore } from "../../constants/Store";
 
-const RideConfirm = ({ modal, setModal }) => {
-
+const RideConfirm = ({ modal, setModal, driverName }) => {
 	const [cancel, setCancel] = useState(false);
+	const ToHome = useBottomTabStore((state) => state.setHomePage);
+	const setLocation = useRideStore((state) => state.setLocation);
+	const setDestination = useRideStore((state) => state.setDestination);
 
 	const cancelRide = () => {
 		setCancel(true);
@@ -17,8 +17,11 @@ const RideConfirm = ({ modal, setModal }) => {
 
 	const showToast = () => {
 		setModal(false);
+		setLocation("");
+		setDestination("");
+		ToHome();
 		Toast.show({
-			text1: "Tobi, Your rider will be here in",
+			text1: `${driverName}, Your rider will be here in`,
 			text1Style: styles.toastText1,
 			type: "tomatoToast",
 			text2: "2 minutes",
@@ -38,22 +41,16 @@ const RideConfirm = ({ modal, setModal }) => {
 				onRequestClose={() => setModal(false)}
 			>
 				<View style={styles.modal}>
-
 					<View style={styles.container}>
-
 						<Keke />
-						<Text style={styles.text1}>Ride has been accepted</Text>
-						<Text style={styles.text2}>Henry Ade</Text>
+						<Text style={styles.text1}>Ride has been accepted by </Text>
+						<Text style={styles.text2}>{driverName}</Text>
 						<View style={styles.button}>
 							<ActiveButton title={"Proceed"} onPress={showToast} />
-							<LoginButton title={"Cancel Ride"} onPress={cancelRide} />
 						</View>
 					</View>
-					
 				</View>
-
 			</Modal>
-			<Confirmation2 modal={cancel} setModal={setCancel} />
 		</>
 	);
 };
@@ -78,7 +75,7 @@ const styles = StyleSheet.create({
 	},
 	container: {
 		backgroundColor: "white",
-		width: width / 1.4,
+		width: "75%",
 		borderRadius: 5,
 		alignItems: "center",
 		paddingVertical: 64,

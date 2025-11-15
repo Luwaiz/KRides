@@ -18,15 +18,12 @@ const Stack = createNativeStackNavigator();
 const AppStack = () => {
 	return (
 		<Stack.Navigator screenOptions={{ headerShown: false }}>
-			{/* <Stack.Screen name="HomePageNav" component={HomePageNav} /> */}
+			<Stack.Screen name="Home" component={MainPage} />
 			<Stack.Screen
-				name="Home"
-				component={MainPage}
+				name="Settings"
+				component={Settings}
+				options={{ animation: "slide_from_left" }}
 			/>
-			<Stack.Screen name="Settings" component={Settings} 
-        				options={{ animation: "slide_from_left" }}
-
-      />
 			<Stack.Screen name="Support" component={Support} />
 			<Stack.Screen name="About" component={About} />
 			<Stack.Screen name="History" component={History} />

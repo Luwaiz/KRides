@@ -3,10 +3,10 @@ import React from "react";
 import { colors } from "../../constants/styling";
 
 //active button component
-const DangerButton = ({title,onPress}) => {
+const DangerButton = ({title,onPress,width}) => {
 	return (
         <TouchableOpacity onPress={onPress} activeOpacity={0.5}>
-        <View style={styles.button}>
+        <View style={[styles.button, {width: width ? width : 167}]}>
             <Text style={styles.buttonText}>{title}</Text>
         </View>
     </TouchableOpacity>

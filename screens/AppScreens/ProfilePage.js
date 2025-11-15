@@ -1,108 +1,157 @@
-import { StatusBar, StyleSheet, Text, ToastAndroid, View } from "react-native";
-import React, { useState } from "react";
+import {
+	StatusBar,
+	StyleSheet,
+	Text,
+	ToastAndroid,
+	View,
+	ActivityIndicator,
+} from "react-native";
+import React, { useState, useEffect } from "react";
 import { colors } from "../../constants/styling";
 import BackButton from "../../components/buttons/BackButton";
 import Avatar from "../../assets/svg/Frame 91profile.svg";
-import { useUserDetails } from "../../constants/Store";
 import EditableInput from "../../components/EditableInput";
-import axios from "axios";
-import API from "../../hooks/API";
+import { FIREBASE_AUTH, FIREBASE_DB } from "../../firebaseConfig";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
+import Toast from "react-native-toast-message";
 
 const ProfilePage = () => {
-	const {
-		firstName,
-		lastName,
-		phone,
-		email,
-		accessToken,
-		setFirstName,
-		setLastName,
-		setEmail,
-		setPhone,
-	} = useUserDetails((state) => ({
-		firstName: state.firstName,
-		lastName: state.lastName,
-		phone: state.phone,
-		email: state.email,
-		accessToken: state.accessToken,
-		setFirstName: state.setFirstName,
-		setLastName: state.setLastName,
-		setEmail: state.setEmail,
-		setPhone: state.setPhone,
-	}));
+	const [name, setName] = useState("");
+	const [phone, setPhone] = useState("");
+	const [email, setEmail] = useState("");
+	const [loading, setLoading] = useState(true);
+	const [updating, setUpdating] = useState(false);
+
 	const [editableStates, setEditableStates] = useState({
-		firstName: false,
-		lastName: false,
+		name: false,
 		phone: false,
 		email: false,
 	});
-	const [loading, setLoading] = useState(false);
-	const [mail, set_email] = useState("");
-	const [first_name, set_firstName] = useState("");
-	const [last_name, set_lastName] = useState("");
-	const [phone_number, set_phone] = useState("");
+
+	const [tempValues, setTempValues] = useState({
+		name: "",
+		phone: "",
+		email: "",
+	});
+
+	// Fetch user profile on mount
+	useEffect(() => {
+		fetchUserProfile();
+	}, []);
+
+	const fetchUserProfile = async () => {
+		setLoading(true);
+		try {
+			const user = FIREBASE_AUTH.currentUser;
+			if (!user) {
+				alert("No user logged in");
+				return;
+			}
+
+			// Try to get user from "users" collection first (customers)
+			let userDoc = await getDoc(doc(FIREBASE_DB, "users", user.uid));
+
+			// If not found, try "drivers" collection
+			if (!userDoc.exists()) {
+				userDoc = await getDoc(doc(FIREBASE_DB, "drivers", user.uid));
+			}
+
+			if (userDoc.exists()) {
+				const data = userDoc.data();
+				setName(data.name || data.fullname || "");
+				setPhone(data.phone || "");
+				setEmail(data.email || "");
+				setTempValues({
+					name: data.name || data.fullname || "",
+					phone: data.phone || "",
+					email: data.email || "",
+				});
+				console.log("✅ Profile loaded:", data);
+			}
+		} catch (error) {
+			console.error("❌ Error fetching profile:", error);
+			alert("Failed to load profile");
+		} finally {
+			setLoading(false);
+		}
+	};
+
 	const Edit = async (field, value) => {
 		if (editableStates[field]) {
 			// Field is currently editable, save changes
 			await handleEdit(field, value);
+		} else {
+			// Entering edit mode, sync temp value with current value
+			setTempValues((prev) => ({
+				...prev,
+				[field]: field === "name" ? name : field === "phone" ? phone : email,
+			}));
 		}
 		setEditableStates((prevStates) => ({
 			...prevStates,
 			[field]: !prevStates[field],
 		}));
 	};
-	
-	const successToast = () => {
-		ToastAndroid.show("Updated successfully !", ToastAndroid.SHORT);
-	};
 
 	const handleEdit = async (field, value) => {
-		console.log("handleEdit", field, value);
-		setLoading(true);
-		try {
-			const header = {
-				headers: { Authorization: `Bearer ${accessToken}` },
-			};
-			const request = {
-				[field]: value,
-			};
-			const response = await axios.put(
-				`${API.UpdateProfile}/${email}`,
-				request,
-				header
-			);
-			console.log(response?.data);
-			fetchUserProfile(accessToken); // Fetch updated profile after successful edit
-			setLoading(false);
-		} catch (err) {
-			console.log(err?.response?.data?.message);
-			setLoading(false);
-			alert("Failed to edit profile. Please try again.");
+		if (!value || value.trim() === "") {
+			alert("Field cannot be empty");
+			return;
 		}
-	};
-	
-	const fetchUserProfile = async (accessToken) => {
-		console.log("fetchingUserProfile...");
+
+		setUpdating(true);
 		try {
-			const userResponse = await axios.get(API.UserProfile, {
-				headers: { Authorization: `Bearer ${accessToken}` },
+			const user = FIREBASE_AUTH.currentUser;
+			if (!user) {
+				alert("No user logged in");
+				return;
+			}
+
+			// Determine which collection to update
+			let userDoc = await getDoc(doc(FIREBASE_DB, "users", user.uid));
+			const isDriver = !userDoc.exists();
+			const collection = isDriver ? "drivers" : "users";
+			const fieldName = field === "name" && isDriver ? "fullname" : field;
+
+			await updateDoc(doc(FIREBASE_DB, collection, user.uid), {
+				[fieldName]: value.trim(),
 			});
 
-			console.log("User Response:", userResponse?.data?.data?.firstName);
-			setFirstName(userResponse?.data?.data?.firstName);
-			setLastName(userResponse?.data?.data?.lastName);
-			setEmail(userResponse?.data?.data?.email);
-			setPhone(userResponse?.data?.data?.phone);
-			successToast(); // Show success toast after successful edit
+			// Update local state
+			if (field === "name") setName(value.trim());
+			if (field === "phone") setPhone(value.trim());
+			if (field === "email") setEmail(value.trim());
+
+			Toast.show({
+				type: "tomatoToast",
+				text1: "Success!",
+				text2: "Profile updated successfully",
+				position: "top",
+				visibilityTime: 2000,
+			});
+
+			console.log(`✅ Updated ${fieldName}:`, value);
 		} catch (error) {
-			setLoading(false);
-			console.error(
-				"User Profile Error:",
-				error.response?.data || error.message
-			);
-			alert("Failed to fetch user profile. Please try again.");
+			console.error("❌ Error updating profile:", error);
+			alert("Failed to update profile. Please try again.");
+		} finally {
+			setUpdating(false);
 		}
 	};
+
+	if (loading) {
+		return (
+			<View
+				style={[
+					styles.container,
+					{ justifyContent: "center", alignItems: "center" },
+				]}
+			>
+				<ActivityIndicator size="large" color={colors.primaryBlue} />
+				<Text style={{ marginTop: 10 }}>Loading profile...</Text>
+			</View>
+		);
+	}
 	return (
 		<View style={styles.container}>
 			<BackButton text={<Text style={styles.headText}>Edit Profile</Text>} />
@@ -111,36 +160,28 @@ const ProfilePage = () => {
 			</View>
 			<View style={styles.infoCont}>
 				<EditableInput
-					text={"First Name"}
-					editable={editableStates.firstName}
-					Edit={() => Edit("firstName", first_name)}
-					value={firstName}
-					onChangeText={(text) => set_firstName(text)}
-					loading={loading}
-				/>
-				<EditableInput
-					text={"Last Name"}
-					editable={editableStates.lastName}
-					Edit={() => Edit("lastName", last_name)}
-					value={lastName}
-					onChangeText={(text) => set_lastName(text)}
-					loading={loading}
+					text={"Name"}
+					editable={editableStates.name}
+					Edit={() => Edit("name", tempValues.name)}
+					value={editableStates.name ? tempValues.name : name}
+					onChangeText={(text) => setTempValues({ ...tempValues, name: text })}
+					loading={updating}
 				/>
 				<EditableInput
 					text={"Phone Number"}
 					editable={editableStates.phone}
-					Edit={() => Edit("phone", phone_number)}
-					value={phone}
-					onChangeText={(text) => set_phone(text)}
-					loading={loading}
+					Edit={() => Edit("phone", tempValues.phone)}
+					value={editableStates.phone ? tempValues.phone : phone}
+					onChangeText={(text) => setTempValues({ ...tempValues, phone: text })}
+					loading={updating}
 				/>
 				<EditableInput
 					text={"Email"}
 					editable={editableStates.email}
-					Edit={() => Edit("email", mail)}
-					value={email}
-					onChangeText={(text) => set_email(text)}
-					loading={loading}
+					Edit={() => Edit("email", tempValues.email)}
+					value={editableStates.email ? tempValues.email : email}
+					onChangeText={(text) => setTempValues({ ...tempValues, email: text })}
+					loading={updating}
 				/>
 			</View>
 		</View>
