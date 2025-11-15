@@ -1,19 +1,19 @@
-import { Dimensions, FlatList, StyleSheet, Text, View } from "react-native";
+import { FlatList, StyleSheet, Text, View, Dimensions } from "react-native";
 import React, { useEffect, useState } from "react";
 import { colors } from "../../constants/styling";
 import { SafeAreaView } from "react-native-safe-area-context";
 import BackButton from "../../components/buttons/BackButton";
 import HistoryCard from "../../components/HistoryCard";
-import axios from "axios";
-import API from "../../hooks/API";
 import { useUserDetails } from "../../constants/Store";
 import { ActivityIndicator } from "react-native-paper";
-const { width, height } = Dimensions.get("screen");
+import { getCustomerHistory } from "../../helpers/firebaseRides";
+
+const { width } = Dimensions.get("window");
 
 const History = () => {
 	const [loading, setLoading] = useState(false);
-	const [history, setHistory] = useState();
-	const accessToken = useUserDetails((state) => state?.accessToken);
+	const [history, setHistory] = useState([]);
+	const UserId = useUserDetails((state) => state?.UserId);
 	const currentMonth = new Date();
 	const currentMonthName = currentMonth.toLocaleString("default", {
 		month: "long",
@@ -21,26 +21,31 @@ const History = () => {
 	});
 
 	const getHistory = async () => {
+		console.log("🔍 History - Current UserId:", UserId || "MISSING");
+
+		if (!UserId) {
+			console.log("⚠️ No user ID found, cannot fetch history");
+			return;
+		}
+
 		setLoading(true);
-		const header = {
-			headers: { Authorization: `Bearer ${accessToken}` },
-		};
 		try {
-			const response = await axios.get(API.RideHistory, header);
-			console.log("history",response?.data)
-			setHistory(response?.data?.data);
-			setLoading(false);
+			console.log("📜 Fetching ride history for customer:", UserId);
+			const rides = await getCustomerHistory(UserId);
+			console.log("✅ History fetched:", rides.length, "rides");
+			console.log("📊 Ride details:", JSON.stringify(rides, null, 2));
+			setHistory(rides);
 		} catch (error) {
-			console.log(error.response.data.message);
-			if(error.response.data.message === "No trips found for the authenticated user."){
-				
-			}
+			console.error("❌ Error fetching history:", error);
+			setHistory([]);
+		} finally {
 			setLoading(false);
 		}
 	};
+
 	useEffect(() => {
 		getHistory();
-	}, []);
+	}, [UserId]);
 	return (
 		<SafeAreaView style={styles.container}>
 			<BackButton text={<Text style={styles.headText}>Ride history</Text>} />
@@ -52,12 +57,14 @@ const History = () => {
 				/>
 			) : (
 				<FlatList
-					data={history ? history.reverse() : []}
-					keyExtractor={(item, index) => index.toString()}
+					data={history}
+					keyExtractor={(item, index) => item.rideId || index.toString()}
 					renderItem={({ item, index }) => <HistoryCard history={item} />}
-					//using footer component because the flat_list has been inverted
 					ListHeaderComponent={
 						<Text style={styles.monthDate}>{currentMonthName}</Text>
+					}
+					ListEmptyComponent={
+						<Text style={styles.emptyText}>No ride history yet</Text>
 					}
 					contentContainerStyle={styles.contentContainer}
 					style={{ width }}
@@ -87,5 +94,12 @@ const styles = StyleSheet.create({
 	},
 	contentContainer: {
 		paddingHorizontal: 16,
+	},
+	emptyText: {
+		textAlign: "center",
+		marginTop: 40,
+		fontSize: 16,
+		fontFamily: "Albert-Regular",
+		color: colors.lightGrey3,
 	},
 });

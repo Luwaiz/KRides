@@ -8,11 +8,11 @@ import ActiveButton from "../../components/buttons/ActiveButton";
 import GoogleButton from "../../components/buttons/GoogleButton";
 import Terms from "../../components/Terms";
 import BackButton from "../../components/buttons/BackButton";
-import BiometricButton from "../../components/buttons/BiometricButton";
 import { useDriverDetails, useUserDetails } from "../../constants/Store";
 import axios from "axios";
 import API from "../../hooks/API";
-const { width, height } = Dimensions.get("screen");
+const {height,width} = Dimensions.get('window');
+
 
 const DriverLogin = ({ navigation }) => {
 	const [phone, set_phone] = useState();
@@ -112,7 +112,6 @@ const DriverLogin = ({ navigation }) => {
 									onPress={() => handleLogin()}
 								/>
 							</View>
-							<BiometricButton navigate={() => ToHome()} />
 						</View>
 						<View style={styles.OrContainer}>
 							<View style={styles.dash} />

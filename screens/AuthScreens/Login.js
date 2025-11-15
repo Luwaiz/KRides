@@ -8,91 +8,53 @@ import ActiveButton from "../../components/buttons/ActiveButton";
 import GoogleButton from "../../components/buttons/GoogleButton";
 import Terms from "../../components/Terms";
 import BackButton from "../../components/buttons/BackButton";
-import BiometricButton from "../../components/buttons/BiometricButton";
-import { useUserDetails } from "../../constants/Store";
-import axios from "axios";
-import API from "../../hooks/API";
-const { width, height } = Dimensions.get("screen");
+import Firebase from "../../hooks/Firebase";
+import Toast from "react-native-toast-message";
+const {height,width} = Dimensions.get('window');
 
 const Login = ({ navigation }) => {
-	const [email, set_email] = useState();
-	const [password, set_password] = useState();
-
-	const ToHome = () => {
-		navigation.replace("AppStack", {
-			params: {
-				params: "Home",
-			},
-		});
-	};
-
-	const { setEmail, setFirstName, setAccessToken, setLastName, setPhone } =
-		useUserDetails((state) => ({
-			setEmail: state.setEmail,
-			setFirstName: state.setFirstName,
-			setAccessToken: state.setAccessToken,
-			setLastName: state.setLastName,
-			setPhone: state.setPhone,
-		}));
+	const [email, setEmail] = useState("");
+	const [password, setPassword] = useState("");
 	const [loading, setLoading] = useState(false);
 
-	const loginUser = async (request) => {
-		const headers = {
-			headers: {
-				"Content-Type": "application/json",
-				Accept: "application/json, text/plain, */*",
-				"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-			},
-		};
-		try {
-			const response = await axios.post(API.Login, request);
-			console.log("Login Response:", response?.data);
-
-			if (response?.data?.access_token) {
-				setAccessToken(response.data.access_token);
-				fetchUserProfile(response.data.access_token); // Call the next function
-			} else {
-				console.error("Access token not found.");
-			}
-			setLoading(false);
-		} catch (error) {
-			setLoading(false);
-			console.log("Login Error:", error?.response?.data || error?.message);
-			alert("Login failed. Please check your credentials and try again.");
+	const handleLogin = async () => {
+		if (!email || !password) {
+			alert("Please enter both email and password");
+			return;
 		}
-	};
 
-	const fetchUserProfile = async (accessToken) => {
-		try {
-			const userResponse = await axios.get(API.UserProfile, {
-				headers: { Authorization: `Bearer ${accessToken}` },
-			});
-			console.log("User Response:", userResponse?.data?.data?.firstName);
-			setFirstName(userResponse?.data?.data?.firstName);
-			setLastName(userResponse?.data?.data?.lastName);
-			setEmail(userResponse?.data?.data?.email);
-			setPhone(userResponse?.data?.data?.phone);
-			setLoading(false);
-			ToHome();
-		} catch (error) {
-			setLoading(false);
-			console.error(
-				"User Profile Error:",
-				error.response?.data || error.message
-			);
-			alert("Failed to fetch user profile. Please try again.");
-		}
-	};
-
-	// Example usage
-	const handleLogin = () => {
 		setLoading(true);
-		const request = {
-			email,
-			password,
-		};
-		loginUser(request);
-	};
+		try {
+			await Firebase.signInWithEmail(email, password);
+			// Navigation.js will automatically handle routing based on Firebase Auth
+			Toast.show({
+				type: "tomatoToast",
+				text1: "Login Successful",
+				text2: "Welcome back!",
+				position: "top",
+				visibilityTime: 2000,
+			});
+		} catch (error) {
+			setLoading(false);
+			console.error("Login Error:", error);
+
+			let errorMessage = "Login failed. Please try again.";
+			if (
+				error.code === "auth/invalid-credential" ||
+				error.code === "auth/wrong-password"
+			) {
+				errorMessage = "Invalid email or password";
+			} else if (error.code === "auth/user-not-found") {
+				errorMessage = "No account found with this email";
+			} else if (error.code === "auth/invalid-email") {
+				errorMessage = "Invalid email address";
+			} else if (error.code === "auth/too-many-requests") {
+				errorMessage = "Too many failed attempts. Please try again later.";
+			}
+
+			alert(errorMessage);
+		}
+	}
 
 	return (
 		<SafeAreaView style={styles.container}>
@@ -105,24 +67,32 @@ const Login = ({ navigation }) => {
 						<TextInput1
 							text={"Email Address"}
 							placeholder={"johndoe22@gmail.com"}
-							onChangeText={(text) => set_email(text)}
+							onChangeText={(text) => setEmail(text)}
+							value={email}
+							keyboardType="email-address"
+							autoCapitalize="none"
 						/>
 						<TextInput1
 							text={"Password"}
 							placeholder={"*************"}
 							password
-							onChangeText={(text) => set_password(text)}
+							onChangeText={(text) => setPassword(text)}
+							value={password}
 						/>
-						<Text style={styles.forgot}>Forgot password?</Text>
+						<Text
+							style={styles.forgot}
+							onPress={() => navigation.navigate("ForgetPass")}
+						>
+							Forgot password?
+						</Text>
 						<View style={styles.buttons}>
 							<View style={styles.logInButton}>
 								<ActiveButton
 									title={"Login"}
 									loading={loading}
-									onPress={() => handleLogin()}
+									onPress={handleLogin}
 								/>
 							</View>
-							<BiometricButton navigate={() => ToHome()} />
 						</View>
 						<View style={styles.OrContainer}>
 							<View style={styles.dash} />

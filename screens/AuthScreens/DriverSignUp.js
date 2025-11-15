@@ -1,6 +1,5 @@
-import { Dimensions, ScrollView, StyleSheet, Text, View } from "react-native";
-import React, { use, useState } from "react";
-import BottomSheet from "@gorhom/bottom-sheet";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useState } from "react";
 import { colors } from "../../constants/styling";
 import { SafeAreaView } from "react-native-safe-area-context";
 import TextInput1 from "../../components/TextInput1";
@@ -9,87 +8,78 @@ import GoogleButton from "../../components/buttons/GoogleButton";
 import Terms from "../../components/Terms";
 import BackButton from "../../components/buttons/BackButton";
 import { useDriverDetails } from "../../constants/Store";
-import axios from "axios";
-import API from "../../hooks/API";
-const { width, height } = Dimensions.get("screen");
+import Firebase from "../../hooks/Firebase";
 
 const DriverSignup = ({ navigation }) => {
-	const [vehicle_id,setVehicle_id] = useState("")
-	const [password, setPass] = useState("")
-	const [phone, setPhoneNumber] = useState("")
-	const [fullName, setFull] = useState("")
+	const [vehicle_id, setVehicle_id] = useState("");
+	const [password, setPass] = useState("");
+	const [phone, setPhoneNumber] = useState("");
+	const [fullName, setFull] = useState("");
 	const [confirmPassword, setConfirmPassword] = useState("");
 	const [loading, setLoading] = useState(false);
 
-	const {
-		setVehicleId,
-		setPhone,
-		setFullName,
-	} = useDriverDetails((state) => ({
+	const { setVehicleId, setPhone, setFullName } = useDriverDetails((state) => ({
 		setVehicleId: state.setVehicleId,
 		setPhone: state.setPhone,
 		setFullName: state.setFullName,
 	}));
 
-	const passwordCheck = (password) => {
-		if (password?.length < 8) {
-			alert(
-				"Password must contain at least 8 characters, including uppercase and lowercase letters, numbers, and special characters."
-			);
+	const validateForm = () => {
+		if (!fullName || !vehicle_id || !phone || !password || !confirmPassword) {
+			alert("Please fill in all fields");
 			return false;
 		}
-		return true;
-	};
 
-	const VerifyPassword = (password, confirmPassword) => {
 		if (password !== confirmPassword) {
-			alert("Passwords do not match.");
+			alert("Passwords do not match");
 			return false;
 		}
+
 		return true;
 	};
 
 	const handleSignUp = async (password, confirmPassword) => {
 		setLoading(true);
-		if (!passwordCheck(password)) {
-			setLoading(false);
-			return;
-		}
-		if (!VerifyPassword(password, confirmPassword)) {
+
+		// Simple validation
+		if (!validateForm()) {
 			setLoading(false);
 			return;
 		}
 
-		const request = {
-			vehicle_id,
-			password,
-			phone,
-			fullname: fullName,
-		};
 		try {
-			const response = await axios.post(API.RegisterDriver, request);
-			console.log(response?.data);
-			setFullName(response?.data?.user?.fullName)
-			setVehicleId(response?.data?.user?.vehicle_id)
-			setPhone(response?.data?.user?.phone)
+			const user = await Firebase.signUpDriver({
+				phone,
+				password,
+				fullname: fullName,
+				vehicle_id,
+			});
+
+			// Update local state with the user info
+			setFullName(fullName);
+			setVehicleId(vehicle_id);
+			setPhone(phone);
+
+			// Register FCM token for notifications
+			await Firebase.registerFcmToken(user.uid);
+
 			setLoading(false);
+
+			// Navigate to driver home
+			navigation.replace("DriverStack", {
+				params: {
+					params: "DriverHome",
+				},
+			});
 		} catch (error) {
-            console.error("Error registering driver:", error?.response?.data);
-        
+			console.error("Error registering driver:", error);
 			setLoading(false);
-			try {
-				// Check if error response exists
-				const errorData = error?.response?.data;
-				const parsedData =typeof errorData === "string" ? JSON.parse(errorData) : errorData;
-				const vehicle_idErrors = parsedData?.vehicle_id || [];
-				if (vehicle_idErrors.length > 0) {
-					alert(vehicle_idErrors[0]); // Show error message to the user
-				} else {
-					console.log("No vehicle_id errors found.");
-				}
-			} catch (parseError) {
-				console.error("Error parsing response data:", parseError);
-				alert("An unknown error occurred.");
+			if (error.code === "auth/email-already-in-use") {
+				alert("A driver with this phone number is already registered.");
+			} else if (error.code === "auth/weak-password") {
+				alert("Please choose a stronger password.");
+			} else {
+				alert(error.message || "Registration failed. Please try again.");
 			}
 		}
 	};
@@ -203,7 +193,7 @@ const styles = StyleSheet.create({
 	},
 	bottomCont: {
 		backgroundColor: colors.secondary,
-		width: width,
+		width: "100%",
 		marginTop: 20,
 		borderTopLeftRadius: 30,
 		borderTopRightRadius: 30,

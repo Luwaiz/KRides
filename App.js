@@ -1,8 +1,10 @@
 import "react-native-gesture-handler";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
-import { StyleSheet, Text, View } from "react-native";
+import { enableScreens } from "react-native-screens";
+import { StyleSheet, Text, View, Alert } from "react-native";
 import Navigation from "./navigation/Navigation";
+import BaseUrlBanner from "./components/BaseUrlBanner";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import FontResources from "./react-native-config";
 import { PaperProvider } from "react-native-paper";
@@ -13,7 +15,9 @@ import {
 	configureReanimatedLogger,
 	ReanimatedLogLevel,
 } from "react-native-reanimated";
+import React from "react";
 
+enableScreens();
 // This is the default configuration
 configureReanimatedLogger({
 	level: ReanimatedLogLevel.warn,
@@ -21,6 +25,8 @@ configureReanimatedLogger({
 });
 export default function App() {
 	const fontLoaded = FontResources();
+
+	// Removed Firebase notification setup - not supported in React Native with Web SDK
 
 	if (!fontLoaded) {
 		return null;

@@ -1,29 +1,35 @@
-import { Dimensions, Image, Modal, StyleSheet, Text, View } from "react-native";
+import { Image, Modal, StyleSheet, Text, View } from "react-native";
 import React from "react";
 import ActiveButton from "../buttons/ActiveButton";
 import { useNavigation } from "@react-navigation/native";
-const { width, height } = Dimensions.get("screen");
 
-const SuccessNo = ({modal,setModal}) => {
-    const navigation = useNavigation()
-    const ToName =()=>{
-        setModal(false);
-        navigation.navigate("Name");
-    }
+const SuccessNo = ({ modal, setModal }) => {
+	const navigation = useNavigation();
+	const ToName = () => {
+		setModal(false);
+		navigation.navigate("Name");
+	};
 	return (
-		<Modal visible={modal} style={styles.modalCont} transparent statusBarTranslucent>
+		<Modal
+			visible={modal}
+			style={styles.modalCont}
+			transparent
+			statusBarTranslucent
+		>
 			<View style={styles.modal}>
 				<View style={styles.container}>
-                <View style={styles.icon}>
-					<Image
-						source={require("../../assets/images/VectorSuccessNo.png")}
-						resizeMode="contain"
-					/>
-                </View>
-                <Text style={styles.text}>Your phone number has been{"\n"}successfully verified!</Text>
-                <View style={styles.button}>
-					<ActiveButton title={"Proceed"} onPress={ToName}/>
-                </View>
+					<View style={styles.icon}>
+						<Image
+							source={require("../../assets/images/VectorSuccessNo.png")}
+							resizeMode="contain"
+						/>
+					</View>
+					<Text style={styles.text}>
+						Your phone number has been{"\n"}successfully verified!
+					</Text>
+					<View style={styles.button}>
+						<ActiveButton title={"Proceed"} onPress={ToName} />
+					</View>
 				</View>
 			</View>
 		</Modal>
@@ -44,14 +50,14 @@ const styles = StyleSheet.create({
 	},
 	text: {
 		fontWeight: "regular",
-        textAlign:"center",
-        fontSize: 16,
-        color: "black",
-        marginBottom: 20
+		textAlign: "center",
+		fontSize: 16,
+		color: "black",
+		marginBottom: 20,
 	},
 	container: {
 		backgroundColor: "white",
-		width: width/1.4,
+		width: "75%",
 		borderRadius: 5,
 		alignItems: "center",
 		padding: 24,
@@ -59,10 +65,10 @@ const styles = StyleSheet.create({
 	icon: {
 		width: 110,
 		height: 110,
-        justifyContent: "center",
-        alignItems: "center",
+		justifyContent: "center",
+		alignItems: "center",
 	},
-    button: {
-        marginTop: "auto"
-    }
+	button: {
+		marginTop: "auto",
+	},
 });

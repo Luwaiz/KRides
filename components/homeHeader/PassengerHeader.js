@@ -8,14 +8,10 @@ const PassengerHeader = () => {
 	const Back = useBottomTabStore((state)=>state.PassengerPage)
 	
 	return (
-		<View style={styles.container}>
+		<View style={styles.drawerNav} activeOpacity={0.7}>
 			<Pressable onPress={Back} style={styles.backButton}>
 				<AntDesign name="arrowleft" size={24} color="black" />
 			</Pressable>
-			<View style={styles.searchBox}>
-				<AntDesign name="search1" size={20} color="black" />
-				<TextInput style={styles.search} placeholder="BUSA HOUSE" cursorColor={"black"}></TextInput>
-			</View>
 		</View>
 	);
 };
@@ -23,36 +19,15 @@ const PassengerHeader = () => {
 export default PassengerHeader;
 
 const styles = StyleSheet.create({
-	container: {
-		width: "90%",
+	drawerNav: {
+		width: 48,
+		height: 48,
 		backgroundColor: colors.secondary,
-		alignSelf: "center",
-		borderRadius: 10,
-		position: "absolute",
-		top: 40,
-		height: 50,
-		flexDirection: "row",
-		alignItems: "center",
-		paddingHorizontal: 8,
-	},
-	backButton: {
-		width: 40,
-		height: 40,
 		justifyContent: "center",
 		alignItems: "center",
+		borderRadius: 24,
+		position: "absolute",
+		top: 40,
+		left: 16,
 	},
-	searchBox: {
-		width: "88%",
-		height: 40,
-		backgroundColor: colors.lightGrey2,
-		borderRadius: 8,
-		paddingHorizontal: 16,
-		flexDirection: "row",
-		alignItems: "center",
-		gap: 10,
-	},
-	search:{
-		width: "90%",
-        height: "100%",
-	}
 });

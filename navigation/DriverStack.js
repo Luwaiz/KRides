@@ -5,7 +5,8 @@ import HomePage from "../screens/DriverScreens/HomePage";
 import Support from "../screens/AppScreens/Support";
 import About from "../screens/AppScreens/About";
 import History from "../screens/AppScreens/History";
-import ProfilePage from "../screens/AppScreens/ProfilePage";
+// Driver-specific profile
+import DriverProfilePage from "../screens/DriverScreens/DriverProfilePage";
 import AcceptTab from "../components/DriversModal/AcceptTab";
 import DriverSettings from "../screens/DriverScreens/DriverSetting";
 
@@ -18,7 +19,7 @@ const DriverStack = () => {
 			<Stack.Screen name="Support" component={Support} />
 			<Stack.Screen name="About" component={About} />
 			<Stack.Screen name="History" component={History} />
-			<Stack.Screen name="Profile" component={ProfilePage} />
+			<Stack.Screen name="Profile" component={DriverProfilePage} />
 			<Stack.Screen name="Destinations" component={AcceptTab} />
 			<Stack.Screen component={DriverSettings} name="DriverSettings" />
 		</Stack.Navigator>

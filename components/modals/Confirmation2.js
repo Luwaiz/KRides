@@ -1,12 +1,11 @@
-import { Dimensions, Image, Modal, StyleSheet, Text, View } from "react-native";
+import { Image, Modal, StyleSheet, Text, View } from "react-native";
 import React from "react";
 import ActiveButton from "../buttons/ActiveButton";
 import LoginButton from "../buttons/LoginButton";
 import { useBottomTabStore } from "../../constants/Store";
-const { width, height } = Dimensions.get("screen");
 
 const Confirmation2 = ({ modal, setModal }) => {
-    const ToHome = useBottomTabStore((state)=>state.setHomePage)
+	const ToHome = useBottomTabStore((state) => state.setHomePage);
 
 	const Cancel = () => {
 		setModal(false);
@@ -18,7 +17,7 @@ const Confirmation2 = ({ modal, setModal }) => {
 			style={StyleSheet.absoluteFill}
 			transparent
 			statusBarTranslucent
-			onRequestClose={()=>setModal(false)}
+			onRequestClose={() => setModal(false)}
 		>
 			<View style={styles.modal}>
 				<View style={styles.container}>
@@ -27,8 +26,8 @@ const Confirmation2 = ({ modal, setModal }) => {
 					</Text>
 
 					<View style={styles.button}>
-						<ActiveButton title={"Yes"} onPress={ToHome}/>
-						<LoginButton title={"Cancel"} onPress={Cancel}/>
+						<ActiveButton title={"Yes"} onPress={ToHome} />
+						<LoginButton title={"Cancel"} onPress={Cancel} />
 					</View>
 				</View>
 			</View>
@@ -54,7 +53,7 @@ const styles = StyleSheet.create({
 	},
 	container: {
 		backgroundColor: "white",
-		width: width / 1.4,
+		width: "75%",
 		borderRadius: 5,
 		alignItems: "center",
 		paddingVertical: 64,

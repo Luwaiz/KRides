@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import React, { useState } from "react";
-import { useUserDetails } from "../../constants/Store";
+import React, { useEffect, useState } from "react";
+import useAuthStore, { useUserDetails } from "../../constants/Store";
 import Avatar from "../../assets/svg/Frame 91profile.svg";
 import Entypo from "@expo/vector-icons/Entypo";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
@@ -10,12 +10,16 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors } from "../../constants/styling";
 import Confirmation1 from "../../components/modals/Confirmation1";
+import { FIREBASE_AUTH, FIREBASE_DB } from "../../firebaseConfig";
+import { doc, onSnapshot } from "firebase/firestore";
 
 const Settings = ({ navigation }) => {
 	const [modal, setModal] = useState(false);
-	const { firstName, lastName } = useUserDetails((state) => ({
-		firstName: state.firstName,
-		lastName: state.lastName,
+	const [name, setName] = useState("");
+	const [loading, setLoading] = useState(false);
+
+	const { user } = useAuthStore((state) => ({
+		user: state.user,
 	}));
 	const [modalTitle, setModalTitle] = useState("");
 
@@ -23,10 +27,52 @@ const Settings = ({ navigation }) => {
 		setModalTitle(title);
 		setModal(true);
 	};
+	const fetchUserProfile = async () => {
+		try {
+			setLoading(true);
+			const auth = FIREBASE_AUTH;
+			const db = FIREBASE_DB;
+			const user = auth.currentUser;
+			if (user) {
+				const unsub = onSnapshot(
+					doc(db, "users", user.uid),
+					(docSnap) => {
+						if (docSnap.exists()) {
+							setName(docSnap.data()?.name);
+						}
+						setLoading(false);
+					},
+					(error) => {
+						// Silently handle permission-denied errors (happens during logout)
+						if (error.code === "permission-denied") {
+							console.log(
+								"🔒 Permission denied in Settings - user likely logged out"
+							);
+						} else {
+							console.error("❌ Error in Settings onSnapshot:", error);
+						}
+						setLoading(false);
+					}
+				);
+
+				// cleanup listener on unmount
+				return unsub;
+			}
+		} catch (e) {
+			console.error("Error fetching profile:", e);
+			setLoading(false);
+		}
+	};
+
+	useEffect(() => {
+		fetchUserProfile();
+	}, []);
+
+	console.log("User details in Settings:", user.email);
 	return (
 		<SafeAreaView style={styles.container}>
 			<View style={styles.topContainer}>
-				<Text style={styles.name}>{firstName + " " + lastName}</Text>
+				<Text style={styles.name}>{name}</Text>
 				<Avatar height={80} width={80} />
 			</View>
 			<View style={styles.middleContainer}>
@@ -41,10 +87,7 @@ const Settings = ({ navigation }) => {
 					/>
 					<Text style={styles.iconText}>Ride history</Text>
 				</Pressable>
-				<Pressable style={styles.iconContainer}>
-					<Entypo name="wallet" size={35} color={colors.primaryBlue} />
-					<Text style={styles.iconText}>Wallet</Text>
-				</Pressable>
+
 				<Pressable
 					style={styles.iconContainer}
 					onPress={() => navigation.navigate("About")}
@@ -97,7 +140,7 @@ const styles = StyleSheet.create({
 		flexDirection: "row",
 		justifyContent: "space-between",
 		alignItems: "center",
-		marginBottom: 50,
+		marginBottom: 30,
 	},
 	name: {
 		fontSize: 35,
@@ -110,7 +153,7 @@ const styles = StyleSheet.create({
 		justifyContent: "space-between",
 	},
 	iconContainer: {
-		width: 100,
+		width: "45%",
 		height: 95,
 		borderRadius: 7,
 		backgroundColor: colors.lightGrey2,
@@ -123,7 +166,7 @@ const styles = StyleSheet.create({
 		fontFamily: "Albert-Medium",
 	},
 	bottomContainer: {
-		marginTop: 50,
+		marginTop: 20,
 	},
 	options: {
 		flexDirection: "row",

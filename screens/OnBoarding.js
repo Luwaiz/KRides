@@ -1,25 +1,20 @@
-import {
-	Dimensions,
-	FlatList,
-	Image,
-	StyleSheet,
-	Text,
-	View,
-} from "react-native";
+import { FlatList, Image, StyleSheet, Text, View } from "react-native";
 import React, { useRef, useState } from "react";
 import { OnBoard } from "../constants/OnBoardData";
 import BottomSheet from "@gorhom/bottom-sheet";
 import Footer from "../components/Footer";
-const { width, height } = Dimensions.get("screen");
 import {
 	configureReanimatedLogger,
 	ReanimatedLogLevel,
-  } from 'react-native-reanimated';
-  
-  configureReanimatedLogger({
+} from "react-native-reanimated";
+
+configureReanimatedLogger({
 	level: ReanimatedLogLevel.warn,
 	strict: true, // Reanimated runs in strict mode by default
-  });
+});
+
+const width = 375; // Fixed width for onboarding
+const height = 812; // Fixed height for onboarding
 
 const OnBoarding = ({ navigation }) => {
 	const [currentIndex, setCurrentIndex] = useState(0);
@@ -104,8 +99,8 @@ const styles = StyleSheet.create({
 		flex: 1,
 	},
 	image: {
-		width: width,
-		height: height / 2,
+		width: "100%",
+		height: 400,
 	},
 	contain: {
 		flex: 1,
@@ -122,7 +117,7 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		textAlign: "center",
 		flexWrap: "wrap",
-		maxWidth: width - 120,
+		maxWidth: 255,
 		lineHeight: 20,
 	},
 	Sheet: {

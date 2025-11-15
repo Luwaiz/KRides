@@ -1,17 +1,38 @@
 import { StatusBar, StyleSheet, Text, View } from "react-native";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Octicons } from "@expo/vector-icons";
 import { DrawerActions, useNavigation } from "@react-navigation/native";
 import { TouchableOpacity } from "react-native-gesture-handler";
 import { colors } from "../../constants/styling";
 import Cash from "../../assets/svg/Cash.svg";
 import Calendar from "../../assets/svg/Calendar.svg";
+import axios from "axios";
+import API from "../../hooks/API";
 
 const HomeHeader = () => {
 	const navigation = useNavigation();
+	const [completedTrips, setCompletedTrips] = useState(0);
+	const [earnedToday, setEarnedToday] = useState(0);
+
 	const OpenDrawer = () => {
-		navigation.navigate("DriverSettings");
+		// Open the drawer instead of navigating to settings
+		navigation.dispatch(DrawerActions.openDrawer());
 	};
+
+	const summaryData = async () => {
+		try {
+			const response = await axios.get(API.DriverSummary);
+			console.log("Driver Summary Data:", response?.data);
+			setCompletedTrips(response?.data?.completed_trips);
+			setEarnedToday(response?.data?.earned_today);
+		} catch (error) {
+			console.log("Error fetching summary data:", error);
+		}
+	};
+
+	useEffect(() => {
+		summaryData();
+	}, []);
 	return (
 		<View style={styles.container}>
 			<TouchableOpacity
@@ -27,14 +48,14 @@ const HomeHeader = () => {
 				<Calendar height={28} width={28} />
 				<View style={styles.texts}>
 					<Text style={styles.text}>Completed Trips</Text>
-					<Text style={styles.text2}>10</Text>
+					<Text style={styles.text2}>{completedTrips}</Text>
 				</View>
 			</View>
 			<View style={styles.box}>
 				<Cash height={28} width={28} />
 				<View style={styles.texts}>
 					<Text style={styles.text}>Earned today</Text>
-					<Text style={styles.text2}>N1000</Text>
+					<Text style={styles.text2}>{earnedToday}</Text>
 				</View>
 			</View>
 		</View>

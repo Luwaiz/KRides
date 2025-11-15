@@ -1,13 +1,11 @@
-import { Dimensions, Modal, StyleSheet, Text, View } from "react-native";
+import { Modal, StyleSheet, Text, View } from "react-native";
 import React, { useState } from "react";
 import ActiveButton from "../buttons/ActiveButton";
 import Keke from "../../assets/svg/Keke.svg";
 import Toast from "react-native-toast-message";
 import { useBottomTabStore, useRideStore } from "../../constants/Store";
-const { width } = Dimensions.get("screen");
 
 const RideConfirm = ({ modal, setModal, driverName }) => {
-	
 	const [cancel, setCancel] = useState(false);
 	const ToHome = useBottomTabStore((state) => state.setHomePage);
 	const setLocation = useRideStore((state) => state.setLocation);
@@ -77,7 +75,7 @@ const styles = StyleSheet.create({
 	},
 	container: {
 		backgroundColor: "white",
-		width: width / 1.4,
+		width: "75%",
 		borderRadius: 5,
 		alignItems: "center",
 		paddingVertical: 64,

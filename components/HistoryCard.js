@@ -1,5 +1,4 @@
 import {
-	Dimensions,
 	Pressable,
 	StyleSheet,
 	Text,
@@ -10,16 +9,40 @@ import React, { useState } from "react";
 import { colors } from "../constants/styling";
 import Direction from "../assets/svg/Frame 34direction.svg";
 import AntDesign from "@expo/vector-icons/AntDesign";
-import { formatDate, parseISO } from "date-fns";
-import DangerButton from "./buttons/DangerButton";
-const { width, height } = Dimensions.get("screen");
+import { format } from "date-fns";
 
 const HistoryCard = ({ history }) => {
-	const [status, setStatus] = useState(true);
 	const [selected, setSelected] = useState(null);
-	const date = "000000";
-	const DateFormat = history ? formatDate(date, "dd MMMM yyyy") : "000000";
-	const time = history ? formatDate(date, "hh:mm a") : "000000";
+
+	if (!history) {
+		return null;
+	}
+
+	// Get the timestamp (completedAt or cancelledAt or createdAt as fallback)
+	const timestamp =
+		history?.completedAt || history?.cancelledAt || history?.createdAt;
+
+	let date;
+	try {
+		date = timestamp?.toDate ? timestamp.toDate() : new Date();
+	} catch (error) {
+		console.error("Error parsing date:", error);
+		date = new Date();
+	}
+
+	// Format date and time
+	let dateFormat = "N/A";
+	let time = "N/A";
+
+	try {
+		dateFormat = format(date, "dd MMMM yyyy");
+		time = format(date, "hh:mm a");
+	} catch (error) {
+		console.error("Error formatting date:", error);
+	}
+
+	// Determine if ride was completed or cancelled
+	const isCompleted = history?.status === "completed";
 
 	const onhold = (id) => {
 		if (selected === id) {
@@ -29,58 +52,53 @@ const HistoryCard = ({ history }) => {
 		}
 	};
 	return (
-		<>
-			<View style={styles.historyContainer}>
-				{history !== undefined && (
-					<>
-						<Pressable onLongPress={() => onhold(history?.id)}>
-							<View style={styles.dateContainer}>
-								<Text style={styles.dayDate}>{DateFormat}</Text>
-								<Text style={styles.time}>{time}</Text>
-							</View>
+		<View style={styles.historyContainer}>
+			{history !== undefined && (
+				<Pressable onLongPress={() => onhold(history?.rideId)}>
+					<View style={styles.dateContainer}>
+						<Text style={styles.dayDate}>{dateFormat}</Text>
+						<Text style={styles.time}>{time}</Text>
+					</View>
 
-							<View style={styles.locationCont}>
-								<Direction width={40} height={80} />
-								<View style={styles.places}>
-									<View style={styles.location}>
-										<Text style={styles.locationText}>{history?.location}</Text>
-									</View>
-									<View style={styles.location}>
-										<Text style={styles.locationText}>
-											{history?.destination}
-										</Text>
-									</View>
-								</View>
+					<View style={styles.locationCont}>
+						<Direction width={40} height={80} />
+						<View style={styles.places}>
+							<View style={styles.location}>
+								<Text style={styles.locationText}>
+									{history?.pickupLocation || "Pickup location"}
+								</Text>
 							</View>
-							<View style={styles.dateContainer}>
-								<Text style={styles.dayDate}>Rider</Text>
-								<Text style={styles.time}>{history?.rider_name}</Text>
+							<View style={styles.location}>
+								<Text style={styles.locationText}>
+									{history?.destination || "Destination"}
+								</Text>
 							</View>
-							<View style={styles.status}>
-							
-								<Text style={styles.statusText}># {history?.amount}</Text>
-								{status ? (
-									<Text style={styles.complete}>Completed</Text>
-								) : (
-									<Text style={styles.cancelled}>Cancelled</Text>
-								)}
-							</View>
-						</Pressable>
-					</>
-				)}
-			</View>
-			{history?.id === selected && (
-				<View style={styles.cancelling}>
-					<DangerButton title={"Cancel ride"} width={"195%"} />
-					<TouchableOpacity
-						activeOpacity={0.5}
-						onPress={() => setSelected(null)}
-					>
-						<AntDesign name="close" size={24} color="black" />
-					</TouchableOpacity>
-				</View>
+						</View>
+					</View>
+
+					<View style={styles.dateContainer}>
+						<Text style={styles.dayDate}>Driver</Text>
+						<Text style={styles.time}>
+							{history?.driverName || "No driver assigned"}
+						</Text>
+					</View>
+
+					<View style={styles.dateContainer}>
+						<Text style={styles.dayDate}>Passengers</Text>
+						<Text style={styles.time}>{history?.numberOfPassengers || 1}</Text>
+					</View>
+
+					<View style={styles.status}>
+						<Text style={styles.statusText}>₦ {history?.amount || 0}</Text>
+						{isCompleted ? (
+							<Text style={styles.complete}>Completed</Text>
+						) : (
+							<Text style={styles.cancelled}>Cancelled</Text>
+						)}
+					</View>
+				</Pressable>
 			)}
-		</>
+		</View>
 	);
 };
 
@@ -99,7 +117,7 @@ const styles = StyleSheet.create({
 		borderRadius: 16,
 		padding: 16,
 		marginVertical: 16,
-		width: width - 32,
+		width: "100%",
 		borderColor: colors.lightGrey2,
 		borderWidth: 2,
 	},
@@ -156,17 +174,5 @@ const styles = StyleSheet.create({
 		color: colors.lightGrey3,
 		marginTop: 4,
 		marginBottom: 4,
-	},
-	rider: {
-		marginVertical: 16,
-		fontSize: 18,
-		fontFamily: "Albert-SemiBold",
-	},
-	cancelling: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "space-between",
-
-		marginVertical: 8,
 	},
 });
