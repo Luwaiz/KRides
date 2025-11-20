@@ -9,6 +9,7 @@ import {
 	signInWithEmailAndPassword,
 	signOut as firebaseSignOut,
 	onAuthStateChanged as firebaseOnAuthStateChanged,
+	sendPasswordResetEmail,
 } from "firebase/auth";
 import {
 	getFirestore,
@@ -77,11 +78,27 @@ export async function signUpWithEmail({
 
 	console.log(`📝 Creating document in ${collectionName}/${uid}:`, userData);
 
-	await setDoc(userRef, userData);
-
-	console.log(
-		`✅ User document created successfully in ${collectionName}/${uid}`
-	);
+	try {
+		await setDoc(userRef, userData);
+		console.log(
+			`✅ User document created successfully in ${collectionName}/${uid}`
+		);
+	} catch (firestoreError) {
+		console.error(`❌ Failed to create user document in ${collectionName}/${uid}:`, firestoreError);
+		console.error("Error code:", firestoreError.code);
+		console.error("Error message:", firestoreError.message);
+		
+		// If Firestore write fails due to permission-denied, log but don't throw
+		// The user account is still created in Auth, Navigation will handle the read error
+		if (firestoreError.code === "permission-denied") {
+			console.error("🚨 CRITICAL: Firestore permission denied on user creation!");
+			console.error("User auth account created, but Firestore document failed.");
+			console.error("Please update Firestore security rules to allow user creation.");
+		} else {
+			// For other errors, throw so the signup flow knows it failed
+			throw firestoreError;
+		}
+	}
 
 	return credential.user;
 }
@@ -166,6 +183,19 @@ export function onAuthStateChanged(cb) {
 	return firebaseOnAuthStateChanged(FIREBASE_AUTH, cb);
 }
 
+/** ---------- PASSWORD RESET ---------- **/
+
+export async function resetPassword(email) {
+	if (!email) throw new Error("Email is required");
+	try {
+		await sendPasswordResetEmail(FIREBASE_AUTH, email);
+		return { success: true };
+	} catch (error) {
+		console.error("Password reset error:", error);
+		throw error;
+	}
+}
+
 /** ---------- USER DOC FETCH ---------- **/
 
 export async function getUserDoc(uid) {
@@ -201,5 +231,6 @@ export default {
 	setupNotificationHandlers,
 	signOut,
 	onAuthStateChanged,
+	resetPassword,
 	getUserDoc,
 };

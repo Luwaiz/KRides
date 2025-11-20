@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, View, Alert } from "react-native";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { FIREBASE_AUTH, FIREBASE_DB } from "../firebaseConfig";
@@ -43,21 +43,30 @@ const Navigation = () => {
 	}));
 
 	useEffect(() => {
+		let mounted = true;
+		
 		const unsubscribe = onAuthStateChanged(
 			FIREBASE_AUTH,
 			async (currentUser) => {
+				if (!mounted) return;
+				
 				setUser(currentUser);
 
 				if (currentUser && !storeRole) {
 					setRoleLoading(true);
 					try {
+						console.log("🔍 Fetching user profile for:", currentUser.uid);
+						
 						// First check if user exists in "users" collection
 						const userRef = doc(FIREBASE_DB, "users", currentUser.uid);
 						const userSnap = await getDoc(userRef);
 
+						if (!mounted) return;
+
 						if (userSnap.exists()) {
 							const profile = userSnap.data();
 							const role = profile.role || "customer";
+							console.log("✅ Found customer profile:", profile);
 							setAuthData(currentUser, profile, role);
 
 							// Populate useUserDetails store for customers
@@ -79,13 +88,17 @@ const Navigation = () => {
 								setLastName(profile.lastName || "");
 							}
 						} else {
+							console.log("🔍 Not found in users, checking drivers...");
 							// Otherwise check in "drivers"
 							const driverRef = doc(FIREBASE_DB, "drivers", currentUser.uid);
 							const driverSnap = await getDoc(driverRef);
 
+							if (!mounted) return;
+
 							if (driverSnap.exists()) {
 								const profile = driverSnap.data();
 								const role = profile.role || "driver";
+								console.log("✅ Found driver profile:", profile);
 								setAuthData(currentUser, profile, role);
 
 								// Populate useDriverDetails store for drivers
@@ -98,24 +111,85 @@ const Navigation = () => {
 									uid: currentUser.uid,
 								});
 							} else {
-								setAuthData(currentUser, null, "customer"); // fallback
+								console.log("⚠️ User not found in any collection, using defaults");
+								setAuthData(currentUser, { 
+									email: currentUser.email,
+									name: currentUser.displayName || "User"
+								}, "customer"); // fallback
 							}
 						}
 					} catch (error) {
-						console.error("Error fetching user role:", error);
-						setAuthData(currentUser, null, "customer");
+						console.error("❌ Error fetching user role:", error);
+						console.error("Error code:", error.code);
+						console.error("Error message:", error.message);
+						
+						// Check if it's a Firestore permission error
+						if (error.code === "permission-denied") {
+							console.error("🚨 CRITICAL: Firestore permission denied!");
+							console.error("This means Firestore security rules are blocking user profile access.");
+							console.error("Please update Firestore rules in Firebase Console.");
+							
+							// Show detailed alert about Firestore rules
+							Alert.alert(
+								"Setup Required",
+								"Your account was created successfully, but the app cannot load your profile due to database security settings.\n\nThis is a one-time setup issue that needs to be fixed in Firebase Console.\n\nPlease contact support or check the documentation (FIRESTORE_RULES_FIX.md) for instructions.",
+								[{ text: "OK" }]
+							);
+						} else {
+							// Alert user for other errors
+							if (!__DEV__) {
+								Alert.alert(
+									"Connection Error",
+									"Unable to load user data. Please check your internet connection and try again.",
+									[{ text: "OK" }]
+								);
+							}
+						}
+						
+						// Set comprehensive fallback data to prevent crashes
+						if (!mounted) return;
+						
+						const fallbackProfile = {
+							email: currentUser.email || "",
+							name: currentUser.displayName || "User",
+							phone: currentUser.phoneNumber || "",
+							uid: currentUser.uid,
+						};
+						
+						console.log("⚠️ Using fallback profile data:", fallbackProfile);
+						
+						// Set auth data
+						setAuthData(currentUser, fallbackProfile, "customer");
+						
+						// Populate user details store with fallback data
+						setUserId(currentUser.uid);
+						setEmail(currentUser.email || "");
+						setPhone(currentUser.phoneNumber || "");
+						
+						const nameParts = (currentUser.displayName || "User").split(" ");
+						setFirstName(nameParts[0] || "User");
+						setLastName(nameParts.slice(1).join(" ") || "");
+						
+						console.log("✅ Fallback profile data populated in stores");
 					} finally {
 						setRoleLoading(false);
 					}
 				} else if (!currentUser) {
-					setAuthData(null, null, null);
+					if (mounted) {
+						setAuthData(null, null, null);
+					}
 				}
 
-				setInitializing(false);
+				if (mounted) {
+					setInitializing(false);
+				}
 			}
 		);
 
-		return unsubscribe;
+		return () => {
+			mounted = false;
+			unsubscribe();
+		};
 	}, [storeRole]);
 
 	if (initializing || (user && !storeRole && roleLoading)) {

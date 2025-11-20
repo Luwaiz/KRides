@@ -9,6 +9,16 @@ const Payment = ({ email, amount, name, phoneNumber, BookRide }) => {
 	console.log("   - Name:", name || "MISSING");
 	console.log("   - Phone:", phoneNumber || "MISSING");
 
+	// Safety check for required data
+	if (!amount || amount <= 0) {
+		console.error("❌ Invalid amount for payment:", amount);
+		return (
+			<View style={styles.container}>
+				<Text style={styles.errorText}>Unable to process payment: Invalid amount</Text>
+			</View>
+		);
+	}
+
 	const handleOnRedirect = (data) => {
 		console.log("💳 Payment redirect data:", data);
 		console.log("💳 Payment status:", data?.status);
@@ -110,5 +120,11 @@ const styles = StyleSheet.create({
 		color: "#FFFFFF",
 		fontSize: 18,
 		fontWeight: "bold",
+	},
+	errorText: {
+		color: "#FF3B30",
+		fontSize: 14,
+		textAlign: "center",
+		padding: 16,
 	},
 });

@@ -1,4 +1,12 @@
-import { Image, Modal, StyleSheet, Text, View } from "react-native";
+import {
+	Image,
+	Modal,
+	StyleSheet,
+	Text,
+	View,
+	Alert,
+	ActivityIndicator,
+} from "react-native";
 import React, { useState } from "react";
 import ActiveButton from "../buttons/ActiveButton";
 import { CommonActions, useNavigation } from "@react-navigation/native";
@@ -9,8 +17,11 @@ import useAuthStore, {
 } from "../../constants/Store";
 import axios from "axios";
 import API from "../../hooks/API";
-import { FIREBASE_AUTH } from "../../firebaseConfig";
-import { signOut } from "firebase/auth";
+import { FIREBASE_AUTH, FIREBASE_DB } from "../../firebaseConfig";
+import { signOut, deleteUser as firebaseDeleteUser } from "firebase/auth";
+import { doc, deleteDoc } from "firebase/firestore";
+import Toast from "react-native-toast-message";
+import { colors } from "../../constants/styling";
 
 const Confirmation1 = ({ modal, setModal, title }) => {
 	const navigation = useNavigation();
@@ -34,23 +45,93 @@ const Confirmation1 = ({ modal, setModal, title }) => {
 	};
 
 	const deleteUser = async () => {
-		setLoading(true);
-		const header = {
-			headers: {
-				Authorization: `Bearer ${accessToken}`,
-			},
-		};
 		try {
-			const response = await axios.delete(
-				`${API.DeleteProfile}/${email}`,
-				header
+			setLoading(true);
+			const currentUser = FIREBASE_AUTH.currentUser;
+
+			if (!currentUser) {
+				Alert.alert("Error", "No user is currently logged in.");
+				setLoading(false);
+				return;
+			}
+
+			console.log("🗑️ Starting account deletion process...");
+			console.log("   - User ID:", currentUser.uid);
+			console.log("   - Email:", currentUser.email);
+
+			// Determine if user is a driver or customer based on store state
+			const { role } = useAuthStore.getState();
+			const collection = role === "driver" ? "drivers" : "users";
+
+			console.log("   - Account type:", collection);
+
+			// Step 1: Delete user document from Firestore
+			try {
+				const userDocRef = doc(FIREBASE_DB, collection, currentUser.uid);
+				await deleteDoc(userDocRef);
+				console.log("✅ User document deleted from Firestore");
+			} catch (firestoreError) {
+				console.error("❌ Error deleting Firestore document:", firestoreError);
+				// Continue with auth deletion even if Firestore fails
+			}
+
+			// Step 2: Delete user from Firebase Authentication
+			try {
+				await firebaseDeleteUser(currentUser);
+				console.log("✅ User deleted from Firebase Auth");
+			} catch (authError) {
+				console.error("❌ Error deleting Firebase Auth user:", authError);
+
+				if (authError.code === "auth/requires-recent-login") {
+					Alert.alert(
+						"Re-authentication Required",
+						"For security reasons, you need to log in again before deleting your account. Please log out and log back in, then try deleting your account again.",
+						[{ text: "OK" }]
+					);
+					setLoading(false);
+					setModal(false);
+					return;
+				}
+
+				throw authError;
+			}
+
+			// Step 3: Clear all local stores
+			useUserDetails.getState().clearUser();
+			useDriverDetails.getState().clearDriver();
+			useAuthStore.getState().clearAuth();
+
+			console.log("✅ Account deletion completed successfully");
+
+			// Step 4: Show success message and navigate to auth screen
+			Toast.show({
+				type: "tomatoToast",
+				text1: "Account Deleted",
+				text2: "Your account has been permanently deleted",
+				text2Style: { flexWrap: "wrap", maxWidth: 250 },
+				position: "top",
+				visibilityTime: 5000,
+			});
+
+			// Navigate to AuthStack
+			setModal(false);
+			navigation.dispatch(
+				CommonActions.reset({
+					index: 0,
+					routes: [{ name: "AuthStack" }],
+				})
 			);
-			console.log(response?.data);
+
 			setLoading(false);
-		} catch (e) {
+		} catch (error) {
 			setLoading(false);
-			console.error("Error deleting user:", e);
-			alert("An unknown error occurred.");
+			console.error("❌ Error deleting user:", error);
+
+			Alert.alert(
+				"Deletion Failed",
+				`Failed to delete account: ${error.message}. Please try again or contact support.`,
+				[{ text: "OK" }]
+			);
 		}
 	};
 
@@ -83,34 +164,56 @@ const Confirmation1 = ({ modal, setModal, title }) => {
 	};
 
 	return (
-		<Modal
-			visible={modal}
-			style={StyleSheet.absoluteFill}
-			transparent
-			statusBarTranslucent
-		>
-			<View style={styles.modal}>
-				<View style={styles.container}>
-					{title === "Logout" ? (
-						<Text style={styles.text}>Are you sure you want to logout</Text>
-					) : (
-						<Text style={styles.text}>
-							Are you sure you want to permanently{"\n"} delete your Kampus
-							Ride's account?
-						</Text>
-					)}
+		<>
+			<Modal
+				visible={modal}
+				style={StyleSheet.absoluteFill}
+				transparent
+				statusBarTranslucent
+			>
+				<View style={styles.modal}>
+					<View style={styles.container}>
+						{title === "Logout" ? (
+							<Text style={styles.text}>Are you sure you want to logout</Text>
+						) : (
+							<Text style={styles.text}>
+								Are you sure you want to permanently{"\n"} delete your Kampus
+								Ride's account?
+							</Text>
+						)}
 
-					<View style={styles.button}>
-						<ActiveButton
-							title={"Yes"}
-							onPress={ToAuthScreen}
-							loading={loading}
-						/>
-						<LoginButton title={"Cancel"} onPress={Close} />
+						<View style={styles.button}>
+							<ActiveButton
+								title={"Yes"}
+								onPress={ToAuthScreen}
+								loading={loading}
+							/>
+							<LoginButton title={"Cancel"} onPress={Close} />
+						</View>
 					</View>
 				</View>
-			</View>
-		</Modal>
+			</Modal>
+
+			{/* Loading Overlay */}
+			{loading && (
+				<Modal
+					visible={loading}
+					transparent
+					statusBarTranslucent
+					animationType="fade"
+				>
+					<View style={styles.loadingOverlay}>
+						<View style={styles.loadingContainer}>
+							<ActivityIndicator size="large" color={colors.primaryBlue} />
+							<Text style={styles.loadingText}>
+								{title === "Logout" ? "Logging out..." : "Deleting account..."}
+							</Text>
+							<Text style={styles.loadingSubText}>Please wait</Text>
+						</View>
+					</View>
+				</Modal>
+			)}
+		</>
 	);
 };
 
@@ -141,5 +244,38 @@ const styles = StyleSheet.create({
 	},
 	button: {
 		marginTop: "auto",
+	},
+	loadingOverlay: {
+		flex: 1,
+		backgroundColor: "rgba(0, 0, 0, 0.7)",
+		justifyContent: "center",
+		alignItems: "center",
+	},
+	loadingContainer: {
+		backgroundColor: "white",
+		borderRadius: 15,
+		padding: 30,
+		alignItems: "center",
+		minWidth: 200,
+		shadowColor: "#000",
+		shadowOffset: {
+			width: 0,
+			height: 2,
+		},
+		shadowOpacity: 0.25,
+		shadowRadius: 3.84,
+		elevation: 5,
+	},
+	loadingText: {
+		marginTop: 15,
+		fontSize: 18,
+		fontFamily: "Albert-SemiBold",
+		color: "#333",
+	},
+	loadingSubText: {
+		marginTop: 5,
+		fontSize: 14,
+		fontFamily: "Albert-Regular",
+		color: "#666",
 	},
 });

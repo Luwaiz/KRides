@@ -190,6 +190,34 @@ const ConfirmRide = () => {
 			return;
 		}
 
+		// Validation: Check if user profile data is loaded
+		if (!email || !firstName) {
+			console.log("⚠️ Warning: User profile data incomplete");
+			console.log("   - Email:", email || "MISSING");
+			console.log("   - First Name:", firstName || "MISSING");
+			console.log("   - Last Name:", lastName || "MISSING");
+			Alert.alert(
+				"Profile Data Missing",
+				"Your profile information is incomplete. This might be due to Firestore security rules blocking data access.\n\nPlease ensure:\n1. Firestore rules allow authenticated users to read their profiles\n2. Your profile has been created properly\n\nDo you want to continue anyway?",
+				[
+					{
+						text: "Cancel",
+						style: "cancel",
+						onPress: () => setLoading(false),
+					},
+					{
+						text: "Continue",
+						onPress: () => continueBooking(),
+					},
+				]
+			);
+			return;
+		}
+
+		await continueBooking();
+	};
+
+	const continueBooking = async () => {
 		setLoading(true);
 		try {
 			const rideData = {

@@ -99,10 +99,7 @@ const DriverDrawerItem = ({ icon, title, navigateTo }) => {
 							alert("Failed to logout");
 						}
 					}
-
-					if (title === "Delete Account") {
-						alert("Driver delete account flow to implement");
-					}
+					// Delete Account is now handled directly in Confirmation1.js
 				}}
 			/>
 		</>

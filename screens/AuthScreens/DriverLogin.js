@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
 		marginTop: 20,
 		borderTopLeftRadius: 30,
 		borderTopRightRadius: 30,
-		height: height - 140,
+		height: height - 100,
 	},
 	headText: {
 		color: colors.secondary,
@@ -185,7 +185,7 @@ const styles = StyleSheet.create({
 		fontWeight: "700",
 	},
 	logInButton: {
-		width: "85%",
+		width: "100%",
 	},
 	buttons: {
 		flexDirection: "row",

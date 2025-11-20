@@ -1,21 +1,65 @@
 {
-	"cli": {
-		"version": ">= 14.2.0",
-		"appVersionSource": "remote"
-	},
-	"build": {
-		"development": {
-			"developmentClient": true,
-			"distribution": "internal"
-		},
-		"preview": {
-			"distribution": "internal"
-		},
-		"production": {
-			"autoIncrement": true
-		}
-	},
-	"submit": {
-		"production": {}
-	}
+  "cli": {
+    "version": ">= 14.2.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "MAPBOX_DOWNLOADS_TOKEN": "sk.eyJ1IjoiZWx1d2FpeiIsImEiOiJjbTVibXJsNWk0ZXE4MmpwN2FvNjJ2cmJ3In0.ITvpOypF_zViRDy3hHU8OA",
+        "API_URL": "https://krides.olaoluwaeyeclinic.com/api",
+        "DEV_API_URL": "http://localhost:3000/api",
+        "Map_Public": "pk.eyJ1IjoiZWx1d2FpeiIsImEiOiJjbTVibXJsNWk0ZXE4MmpwN2FvNjJ2cmJ3In0.ITvpOypF_zViRDy3hHU8OA",
+        "FIREBASE_API_KEY": "AIzaSyA2EsyMXZlABPA1ZJ06Y9S6VOsKR62EQkA",
+        "FIREBASE_AUTH_DOMAIN": "kampusride.firebaseapp.com",
+        "FIREBASE_PROJECT_ID": "kampusride",
+        "FIREBASE_STORAGE_BUCKET": "kampusride.firebasestorage.app",
+        "FIREBASE_MESSAGING_SENDER_ID": "1054058095059",
+        "FIREBASE_APP_ID": "1:1054058095059:web:ff2a3c61ad63d32d818f26",
+        "FIREBASE_MEASUREMENT_ID": "G-GJK6Q51CPP"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "MAPBOX_DOWNLOADS_TOKEN": "sk.eyJ1IjoiZWx1d2FpeiIsImEiOiJjbTVibXJsNWk0ZXE4MmpwN2FvNjJ2cmJ3In0.ITvpOypF_zViRDy3hHU8OA",
+        "API_URL": "https://krides.olaoluwaeyeclinic.com/api",
+        "DEV_API_URL": "https://krides.olaoluwaeyeclinic.com/api",
+        "Map_Public": "pk.eyJ1IjoiZWx1d2FpeiIsImEiOiJjbTVibXJsNWk0ZXE4MmpwN2FvNjJ2cmJ3In0.ITvpOypF_zViRDy3hHU8OA",
+        "FIREBASE_API_KEY": "AIzaSyA2EsyMXZlABPA1ZJ06Y9S6VOsKR62EQkA",
+        "FIREBASE_AUTH_DOMAIN": "kampusride.firebaseapp.com",
+        "FIREBASE_PROJECT_ID": "kampusride",
+        "FIREBASE_STORAGE_BUCKET": "kampusride.firebasestorage.app",
+        "FIREBASE_MESSAGING_SENDER_ID": "1054058095059",
+        "FIREBASE_APP_ID": "1:1054058095059:web:ff2a3c61ad63d32d818f26",
+        "FIREBASE_MEASUREMENT_ID": "G-GJK6Q51CPP"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "MAPBOX_DOWNLOADS_TOKEN": "sk.eyJ1IjoiZWx1d2FpeiIsImEiOiJjbTVibXJsNWk0ZXE4MmpwN2FvNjJ2cmJ3In0.ITvpOypF_zViRDy3hHU8OA",
+        "API_URL": "https://krides.olaoluwaeyeclinic.com/api",
+        "Map_Public": "pk.eyJ1IjoiZWx1d2FpeiIsImEiOiJjbTVibXJsNWk0ZXE4MmpwN2FvNjJ2cmJ3In0.ITvpOypF_zViRDy3hHU8OA",
+        "FIREBASE_API_KEY": "AIzaSyA2EsyMXZlABPA1ZJ06Y9S6VOsKR62EQkA",
+        "FIREBASE_AUTH_DOMAIN": "kampusride.firebaseapp.com",
+        "FIREBASE_PROJECT_ID": "kampusride",
+        "FIREBASE_STORAGE_BUCKET": "kampusride.firebasestorage.app",
+        "FIREBASE_MESSAGING_SENDER_ID": "1054058095059",
+        "FIREBASE_APP_ID": "1:1054058095059:web:ff2a3c61ad63d32d818f26",
+        "FIREBASE_MEASUREMENT_ID": "G-GJK6Q51CPP"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
 }

@@ -3,24 +3,6 @@
     "name": "KRides",
     "slug": "KRides",
     "version": "1.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "splash": {
-		"image": "./assets/splashscreen_logo.png",
-		"resizeMode": "contain",
-		"backgroundColor": "#ffffff"
-    },
-    "ios": {
-      "supportsTablet": true
-    },
-    "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
-      "package": "com.eluwaiz.KRides"
-    },
     "web": {
       "favicon": "./assets/favicon.png"
     },
@@ -29,14 +11,17 @@
       [
         "@rnmapbox/maps",
         {
-          "RNMapboxMapsDownloadToken": "sk.eyJ1IjoiZWx1d2FpeiIsImEiOiJjbTVibXJsNWk0ZXE4MmpwN2FvNjJ2cmJ3In0.ITvpOypF_zViRDy3hHU8OA"
+          "RNMapboxMapsImpl": "mapbox"
         }
       ]
     ],
     "extra": {
       "eas": {
-        "projectId": "8bd3366e-c67f-4c79-a093-e409ebb147f4"
+        "projectId": "4f4f3190-f45f-4415-97a9-b3dfb44bba45"
       }
+    },
+    "android": {
+      "package": "com.eluwaiz.KRides"
     }
   }
 }

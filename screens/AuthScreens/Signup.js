@@ -52,6 +52,8 @@ const Signup = ({ navigation }) => {
 
 		setLoading(true);
 		try {
+			console.log("🚀 Starting customer signup process...");
+			
 			// Use Firebase Auth to create user and Firestore user doc
 			const user = await Firebase.signUpWithEmail({
 				email,
@@ -63,8 +65,14 @@ const Signup = ({ navigation }) => {
 
 			console.log("✅ Customer signup success:", user.uid);
 
-			// Register FCM token for notifications
-			await Firebase.registerFcmToken(user.uid);
+			try {
+				// Register FCM token for notifications
+				await Firebase.registerFcmToken(user.uid);
+				console.log("✅ FCM token registered");
+			} catch (fcmError) {
+				// Don't fail signup if FCM registration fails
+				console.warn("⚠️ FCM token registration failed:", fcmError);
+			}
 
 			Toast.show({
 				type: "tomatoToast",
@@ -73,7 +81,8 @@ const Signup = ({ navigation }) => {
 				position: "top",
 				visibilityTime: 2000,
 			});
-
+			
+			// Don't setLoading(false) here - let Navigation handle the transition
 			// Navigation.js will automatically route to customer home
 			// No need to manually navigate
 		} catch (error) {

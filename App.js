@@ -10,6 +10,7 @@ import FontResources from "./react-native-config";
 import { PaperProvider } from "react-native-paper";
 import Toast from "react-native-toast-message";
 import ToastConfig from "./components/ToastConfig";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 import {
 	configureReanimatedLogger,
@@ -18,6 +19,28 @@ import {
 import React from "react";
 
 enableScreens();
+
+// Global error handler for production
+if (!__DEV__) {
+	const originalConsoleError = console.error;
+	console.error = (...args) => {
+		// Log to console
+		originalConsoleError(...args);
+		
+		// Show user-friendly alert for critical errors
+		const errorMessage = args.join(' ');
+		if (errorMessage.includes('Firebase') || 
+		    errorMessage.includes('Network') ||
+		    errorMessage.includes('FATAL')) {
+			Alert.alert(
+				'Error',
+				'An error occurred. Please try again or contact support.',
+				[{ text: 'OK' }]
+			);
+		}
+	};
+}
+
 // This is the default configuration
 configureReanimatedLogger({
 	level: ReanimatedLogLevel.warn,
@@ -32,15 +55,17 @@ export default function App() {
 		return null;
 	} else {
 		return (
-			<GestureHandlerRootView style={styles.container}>
-				<SafeAreaProvider>
-					<PaperProvider>
-						<Navigation />
-						<StatusBar style="auto" />
-						<Toast config={ToastConfig} />
-					</PaperProvider>
-				</SafeAreaProvider>
-			</GestureHandlerRootView>
+			<ErrorBoundary>
+				<GestureHandlerRootView style={styles.container}>
+					<SafeAreaProvider>
+						<PaperProvider>
+							<Navigation />
+							<StatusBar style="auto" />
+							<Toast config={ToastConfig} />
+						</PaperProvider>
+					</SafeAreaProvider>
+				</GestureHandlerRootView>
+			</ErrorBoundary>
 		);
 	}
 }
