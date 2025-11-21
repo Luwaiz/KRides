@@ -6,6 +6,7 @@ import {
     ScrollView,
     Alert,
     ActivityIndicator,
+    TouchableOpacity,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors } from "../../constants/styling";
@@ -138,7 +139,12 @@ const BankAccountDetails = ({ navigation, route }) => {
         <SafeAreaView style={styles.container}>
             <ScrollView style={{ flex: 1 }}>
                 <View style={styles.topCont}>
-                    <BackButton text={<Text style={styles.headText}>Bank Details</Text>} />
+                    <View style={styles.headerRow}>
+                        <BackButton text={<Text style={styles.headText}>Bank Details</Text>} />
+                        <TouchableOpacity onPress={() => navigation.navigate("DriverHome")}>
+                            <Text style={styles.skipText}>Skip</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
                 <View style={styles.bottomCont}>
                     <View style={styles.sheetCont}>
@@ -212,6 +218,17 @@ const styles = StyleSheet.create({
         color: colors.secondary,
         fontSize: 24,
         fontFamily: "Albert-SemiBold",
+    },
+    headerRow: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        paddingRight: 20,
+    },
+    skipText: {
+        color: colors.secondary,
+        fontSize: 16,
+        fontFamily: "Albert-Medium",
     },
     bottomCont: {
         backgroundColor: colors.secondary,

@@ -9,6 +9,7 @@ import Terms from "../../components/Terms";
 import BackButton from "../../components/buttons/BackButton";
 import { useDriverDetails } from "../../constants/Store";
 import Firebase from "../../hooks/Firebase";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const DriverSignup = ({ navigation }) => {
 	const [vehicle_id, setVehicle_id] = useState("");
@@ -62,6 +63,9 @@ const DriverSignup = ({ navigation }) => {
 
 			// Register FCM token for notifications
 			await Firebase.registerFcmToken(user.uid);
+
+			// Set flag for new driver to redirect to bank details
+			await AsyncStorage.setItem("isNewDriver", "true");
 
 			setLoading(false);
 

@@ -20,6 +20,7 @@ import Mapbox, {
 	ShapeSource,
 	LineLayer,
 } from "@rnmapbox/maps";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const HomePage = () => {
 	const Accept = useBottomTabStore((state) => state.AcceptRidePage);
@@ -27,6 +28,22 @@ const HomePage = () => {
 	const acceptedRide = useAcceptedRideStore((state) => state.acceptedRide);
 	const isRideActive = useAcceptedRideStore((state) => state.isRideActive);
 	const navigation = useNavigation();
+
+	// Check if new driver and redirect to bank details
+	useEffect(() => {
+		const checkNewDriver = async () => {
+			try {
+				const isNewDriver = await AsyncStorage.getItem("isNewDriver");
+				if (isNewDriver === "true") {
+					await AsyncStorage.removeItem("isNewDriver");
+					navigation.navigate("BankAccountDetails");
+				}
+			} catch (error) {
+				console.error("Error checking new driver status:", error);
+			}
+		};
+		checkNewDriver();
+	}, []);
 
 	Mapbox.setAccessToken(Map_Public);
 

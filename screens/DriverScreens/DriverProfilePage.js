@@ -7,8 +7,11 @@ import useAuthStore, { useDriverDetails } from "../../constants/Store";
 import EditableInput from "../../components/EditableInput";
 import { FIREBASE_DB } from "../../firebaseConfig";
 import { doc, updateDoc, getDoc } from "firebase/firestore";
+import ActiveButton from "../../components/buttons/ActiveButton";
+import { useNavigation } from "@react-navigation/native";
 
 const DriverProfilePage = () => {
+	const navigation = useNavigation();
 	const {
 		fullName,
 		phone,
@@ -159,6 +162,12 @@ const DriverProfilePage = () => {
 					value={profile?.email || email || ""}
 					editable={false}
 				/>
+				<View style={{ marginTop: 20 }}>
+					<ActiveButton
+						title="Bank Details"
+						onPress={() => navigation.navigate("BankAccountDetails")}
+					/>
+				</View>
 			</View>
 		</View>
 	);
