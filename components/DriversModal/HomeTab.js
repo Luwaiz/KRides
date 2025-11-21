@@ -24,7 +24,9 @@ import Destination from "../Destination";
 import axios from "axios";
 import API from "../../hooks/API";
 import { getRideCoordinates } from "../../helpers/getLocationCoordinates";
-import { listenToPendingRides, acceptRide } from "../../helpers/firebaseRides";
+import { listenToPendingRides } from "../../helpers/firebaseRides";
+import { httpsCallable } from "firebase/functions";
+import { FIREBASE_FUNCTIONS } from "../../firebaseConfig";
 import { sp, fs, br, ms } from "../../constants/responsive";
 
 const HomeTab = () => {
@@ -107,10 +109,11 @@ const HomeTab = () => {
 				vehicleId: VehicleId || "",
 			};
 
-			console.log("📤 Sending driver data to Firestore:", driverData);
+			console.log("📤 Sending driver data to Firestore via Cloud Function");
 
-			// Accept the ride in Firestore
-			await acceptRide(rideId, driverData);
+			// Accept the ride via Cloud Function
+			const acceptRideFn = httpsCallable(FIREBASE_FUNCTIONS, "acceptRide");
+			await acceptRideFn({ rideId });
 
 			// Store the accepted ride details with coordinates
 			setAcceptedRide({

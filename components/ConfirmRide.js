@@ -1,4 +1,4 @@
-import { StyleSheet, Text, TouchableOpacity, View, Alert } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View, Alert, ActivityIndicator } from "react-native";
 import BottomSheet from "@gorhom/bottom-sheet";
 import React, { useEffect, useState } from "react";
 import ActiveButton from "./buttons/ActiveButton";
@@ -39,6 +39,7 @@ const ConfirmRide = () => {
 	const [rideStatus, setRideStatus] = useState("pending");
 	const [acceptedDriverName, setAcceptedDriverName] = useState("");
 	const [acceptedDriverId, setAcceptedDriverId] = useState("");
+	const [driverSubaccountId, setDriverSubaccountId] = useState(null);
 	const [showRatingModal, setShowRatingModal] = useState(false);
 	const setHomePage = useBottomTabStore((state) => state.setHomePage);
 	const clearAuth = useAuthStore((state) => state.clearAuth);
@@ -82,7 +83,7 @@ const ConfirmRide = () => {
 	console.log("   - Phone:", phone || "MISSING");
 	console.log("   - User ID:", UserId || "MISSING");
 
-	const Price = numberOfPassenger * 200;
+	const Price = (numberOfPassenger * 200) + 50;
 
 	const ToPromo = () => {
 		navigation.navigate("Promo");
@@ -98,167 +99,58 @@ const ConfirmRide = () => {
 
 		// Check Firebase Auth state
 		const currentUser = FIREBASE_AUTH.currentUser;
-		console.log("🔐 Firebase Auth State:");
-		console.log("   - User exists:", !!currentUser);
-		console.log("   - User UID:", currentUser?.uid);
-		console.log("   - Store UserId:", UserId);
-		console.log("   - Match:", currentUser?.uid === UserId);
-
-		// Validation: Check if user is logged in
-		if (!UserId) {
-			console.log("❌ Validation failed: User not logged in");
-			Alert.alert(
-				"Session Expired",
-				"Please log in to book a ride.",
-				[
-					{
-						text: "OK",
-						onPress: async () => {
-							try {
-								console.log("🔓 Logging out user...");
-								await signOut(FIREBASE_AUTH);
-								clearAuth();
-								clearUser();
-								console.log("✅ User logged out successfully");
-								Toast.show({
-									type: "tomatoToast",
-									text1: "Logged Out",
-									text2: "Please log in again",
-									position: "top",
-									visibilityTime: 2000,
-								});
-							} catch (error) {
-								console.error("❌ Logout error:", error);
-							}
-						},
-					},
-				],
-				{ cancelable: false }
-			);
+		if (!currentUser) {
+			console.error("❌ No authenticated user found!");
+			Alert.alert("Error", "You must be logged in to book a ride.");
 			return;
 		}
 
-		// Validation: Check if Firebase Auth user matches store user
-		if (!currentUser || currentUser.uid !== UserId) {
-			console.log(
-				"❌ Auth mismatch - Firebase UID:",
-				currentUser?.uid,
-				"Store UID:",
-				UserId
-			);
-			Alert.alert(
-				"Authentication Error",
-				"Your session is out of sync. Please log in again.",
-				[
-					{
-						text: "OK",
-						onPress: async () => {
-							try {
-								await signOut(FIREBASE_AUTH);
-								clearAuth();
-								clearUser();
-								Toast.show({
-									type: "tomatoToast",
-									text1: "Please Log In Again",
-									text2: "Session was out of sync",
-									position: "top",
-									visibilityTime: 2000,
-								});
-							} catch (error) {
-								console.error("❌ Logout error:", error);
-							}
-						},
-					},
-				],
-				{ cancelable: false }
-			);
-			return;
-		}
-
-		// Validation before booking
-		if (!pickupLocation || !destinationCoords) {
-			console.log("❌ Validation failed: Missing location information");
-			alert(
-				"Missing location information. Please go back and select pickup and destination again."
-			);
-			return;
-		}
-
-		if (!numberOfPassenger) {
-			console.log("❌ Validation failed: No passengers selected");
-			alert("Please select number of passengers.");
-			return;
-		}
-
-		// Validation: Check if user profile data is loaded
-		if (!email || !firstName) {
-			console.log("⚠️ Warning: User profile data incomplete");
-			console.log("   - Email:", email || "MISSING");
-			console.log("   - First Name:", firstName || "MISSING");
-			console.log("   - Last Name:", lastName || "MISSING");
-			Alert.alert(
-				"Profile Data Missing",
-				"Your profile information is incomplete. This might be due to Firestore security rules blocking data access.\n\nPlease ensure:\n1. Firestore rules allow authenticated users to read their profiles\n2. Your profile has been created properly\n\nDo you want to continue anyway?",
-				[
-					{
-						text: "Cancel",
-						style: "cancel",
-						onPress: () => setLoading(false),
-					},
-					{
-						text: "Continue",
-						onPress: () => continueBooking(),
-					},
-				]
-			);
-			return;
-		}
-
-		await continueBooking();
-	};
-
-	const continueBooking = async () => {
 		setLoading(true);
+		setPending(true);
+
 		try {
-			const rideData = {
-				customerId: UserId,
-				customerName:
-					`${firstName || ""} ${lastName || ""}`.trim() || "Customer",
-				customerPhone: phone || "N/A",
-				pickupLocation: location,
-				pickupCoords: pickupLocation,
-				destination: destination,
-				destinationCoords: destinationCoords,
+			const newRideId = await createRide({
+				customerId: currentUser.uid,
+				customerName: `${firstName} ${lastName}`,
+				customerPhone: phone,
+				pickupLocation,
+				destination: destinationCoords,
+				pickupAddress: location,
+				destinationAddress: destination,
+				price: Price,
 				numberOfPassengers: numberOfPassenger,
-				amount: Price,
 				paymentMethod: "flutterwave",
-			};
+			});
 
-			console.log(
-				"📦 Creating ride in Firestore with data:",
-				JSON.stringify(rideData, null, 2)
-			);
-			const newRideId = await createRide(rideData);
-			console.log("✅ Ride created successfully! Ride ID:", newRideId);
-
-			setRideId(newRideId);
-			setPending(true);
-			setLoading(false);
+			if (newRideId) {
+				console.log("✅ Ride created successfully with ID:", newRideId);
+				setRideId(newRideId);
+				setRideStatus("pending");
+			} else {
+				throw new Error("Failed to create ride - no ID returned");
+			}
 		} catch (error) {
 			console.error("❌ Error creating ride:", error);
-			let errorMessage = "Failed to create ride. Please try again.";
+			setPending(false);
 
-			if (error.code === "permission-denied") {
-				errorMessage =
-					"Permission denied. This is a Firebase security rule issue. Please check FIRESTORE_RULES_FIX.md for instructions.";
-				Alert.alert(
-					"Firebase Permission Error",
-					"The Firestore security rules are blocking ride creation. This is a Firebase Console configuration issue, not an app issue.\n\nPlease:\n1. Open Firebase Console\n2. Go to Firestore → Rules\n3. Update and publish the security rules\n\nSee FIRESTORE_RULES_FIX.md for detailed instructions.",
-					[{ text: "OK" }]
-				);
+			// Show user-friendly error message
+			let errorMessage = "Unable to book ride. Please try again.";
+			if (error.message.includes("permission-denied")) {
+				errorMessage = "Permission denied. Please check your account status.";
+			} else if (error.message.includes("unavailable")) {
+				errorMessage = "Network unavailable. Please check your connection.";
+			}
+
+			if (Platform.OS === 'android') {
+				Toast.show({
+					type: 'error',
+					text1: 'Booking Failed',
+					text2: errorMessage
+				});
 			} else {
 				alert(errorMessage);
 			}
+		} finally {
 			setLoading(false);
 		}
 	};
@@ -301,6 +193,11 @@ const ConfirmRide = () => {
 
 					if (rideData.driverId) {
 						setAcceptedDriverId(rideData.driverId);
+					}
+
+					if (rideData.driverSubaccountId) {
+						console.log("   - Driver Subaccount ID:", rideData.driverSubaccountId);
+						setDriverSubaccountId(rideData.driverSubaccountId);
 					}
 
 					setPending(false);
@@ -484,6 +381,7 @@ const ConfirmRide = () => {
 								phoneNumber={phone}
 								name={`${firstName} ${lastName}`}
 								BookRide={BookRide}
+								subaccountId={driverSubaccountId}
 							/>
 						)}
 					</View>

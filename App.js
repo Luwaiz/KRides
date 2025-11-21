@@ -27,17 +27,18 @@ if (!__DEV__) {
 		// Log to console
 		originalConsoleError(...args);
 		
-		// Show user-friendly alert for critical errors
+		// Only show user-friendly alert for FATAL/CRITICAL errors
+		// Let components handle their own Firebase/Network errors
 		const errorMessage = args.join(' ');
-		if (errorMessage.includes('Firebase') || 
-		    errorMessage.includes('Network') ||
-		    errorMessage.includes('FATAL')) {
+		if (errorMessage.includes('FATAL') || errorMessage.includes('CRITICAL')) {
 			Alert.alert(
-				'Error',
-				'An error occurred. Please try again or contact support.',
+				'Critical Error',
+				'A critical error occurred. Please restart the app or contact support.',
 				[{ text: 'OK' }]
 			);
 		}
+		// Other errors (Firebase, Network) are logged but not alerted
+		// This allows components to show specific error messages
 	};
 }
 

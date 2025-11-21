@@ -65,12 +65,8 @@ const DriverSignup = ({ navigation }) => {
 
 			setLoading(false);
 
-			// Navigate to driver home
-			navigation.replace("DriverStack", {
-				params: {
-					params: "DriverHome",
-				},
-			});
+			// Navigate to bank account details
+			navigation.replace("BankAccountDetails");
 		} catch (error) {
 			console.error("Error registering driver:", error);
 			setLoading(false);

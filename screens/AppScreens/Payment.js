@@ -2,7 +2,7 @@ import { StyleSheet, Text, View, TouchableOpacity } from "react-native";
 import { PayWithFlutterwave } from "flutterwave-react-native";
 import React from "react";
 
-const Payment = ({ email, amount, name, phoneNumber, BookRide }) => {
+const Payment = ({ email, amount, name, phoneNumber, BookRide, subaccountId }) => {
 	console.log("💳 Payment component rendered with:");
 	console.log("   - Email:", email || "MISSING");
 	console.log("   - Amount:", amount);
@@ -66,8 +66,8 @@ const Payment = ({ email, amount, name, phoneNumber, BookRide }) => {
 					{isInitializing
 						? "Initializing..."
 						: disabled
-						? "Processing..."
-						: `Pay ₦${amount}`}
+							? "Processing..."
+							: `Pay ₦${amount}`}
 				</Text>
 			</TouchableOpacity>
 		);
@@ -91,6 +91,15 @@ const Payment = ({ email, amount, name, phoneNumber, BookRide }) => {
 					amount: amount,
 					currency: "NGN",
 					payment_options: "card,banktransfer,ussd",
+					...(subaccountId && {
+						subaccounts: [
+							{
+								id: subaccountId,
+								transaction_split_ratio: amount - 50, // Driver gets amount minus 50 naira fee
+								transaction_charge_type: "flat_subaccount",
+							},
+						],
+					}),
 				}}
 				customButton={CustomButton}
 			/>

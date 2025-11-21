@@ -8,6 +8,7 @@ import {
 	StyleSheet,
 	ActivityIndicator,
 	Modal,
+	Alert
 } from "react-native";
 import { AntDesign, Ionicons } from "@expo/vector-icons";
 import { colors } from "../constants/styling";
@@ -67,6 +68,27 @@ const LocationPicker = ({
 		} catch (error) {
 			console.error("Error fetching locations:", error);
 			setLoading(false);
+
+			// Show specific error message to user
+			if (error.code === 'permission-denied') {
+				Alert.alert(
+					'Permission Error',
+					'Unable to load locations due to database permissions. Please contact support.',
+					[{ text: 'OK', onPress: onClose }]
+				);
+			} else if (error.message?.includes('network') || error.message?.includes('fetch')) {
+				Alert.alert(
+					'Connection Error',
+					'Unable to load locations. Please check your internet connection and try again.',
+					[{ text: 'Retry', onPress: fetchLocations }, { text: 'Cancel', onPress: onClose }]
+				);
+			} else {
+				Alert.alert(
+					'Error',
+					'Unable to load locations. Please try again later.',
+					[{ text: 'OK', onPress: onClose }]
+				);
+			}
 		}
 	};
 
@@ -217,8 +239,8 @@ const LocationPicker = ({
 							searchQuery
 								? filteredLocations
 								: popularLocations.length > 0
-								? popularLocations
-								: filteredLocations
+									? popularLocations
+									: filteredLocations
 						}
 						renderItem={renderLocationItem}
 						keyExtractor={(item) => item.id}
