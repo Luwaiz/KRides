@@ -45,7 +45,11 @@ const HomePage = () => {
 		checkNewDriver();
 	}, []);
 
-	Mapbox.setAccessToken(Map_Public);
+	if (Map_Public) {
+		Mapbox.setAccessToken(Map_Public);
+	} else {
+		console.error("❌ Mapbox token is missing!");
+	}
 
 	const BABCOCK_COORDINATES = {
 		latitude: 6.8935,
@@ -81,12 +85,12 @@ const HomePage = () => {
 				type: "LineString",
 				coordinates: [
 					[
-						acceptedRide.pickupCoords.longitude,
-						acceptedRide.pickupCoords.latitude,
+						parseFloat(acceptedRide.pickupCoords.longitude),
+						parseFloat(acceptedRide.pickupCoords.latitude),
 					],
 					[
-						acceptedRide.destinationCoords.longitude,
-						acceptedRide.destinationCoords.latitude,
+						parseFloat(acceptedRide.destinationCoords.longitude),
+						parseFloat(acceptedRide.destinationCoords.latitude),
 					],
 				],
 			},
@@ -95,11 +99,12 @@ const HomePage = () => {
 
 	return (
 		<View style={styles.container}>
-			{HeaderComponents}
+			<View style={styles.head}>{HeaderComponents}</View>
 
-			{/* Show map when ride is accepted */}
-			{isRideActive && acceptedRide && (
+			{/* Map is always visible */}
+			{Map_Public ? (
 				<Mapbox.MapView style={styles.map}>
+
 					<Mapbox.Camera
 						centerCoordinate={[
 							BABCOCK_COORDINATES.longitude,
@@ -108,6 +113,7 @@ const HomePage = () => {
 						zoomLevel={BABCOCK_COORDINATES.zoom}
 					/>
 
+					{/* Driver's current location - always visible */}
 					<Mapbox.LocationPuck
 						visible={true}
 						pulsing={{
@@ -117,8 +123,8 @@ const HomePage = () => {
 						}}
 					/>
 
-					{/* Route line */}
-					{routeGeoJSON && (
+					{/* Route line - only visible when ride is active */}
+					{isRideActive && acceptedRide && routeGeoJSON && (
 						<ShapeSource id="routeSource" shape={routeGeoJSON}>
 							<LineLayer
 								id="routeLine"
@@ -132,13 +138,13 @@ const HomePage = () => {
 						</ShapeSource>
 					)}
 
-					{/* Pickup marker */}
-					{acceptedRide.pickupCoords && (
+					{/* Pickup marker - only visible when ride is active */}
+					{isRideActive && acceptedRide?.pickupCoords && (
 						<PointAnnotation
 							id="pickup"
 							coordinate={[
-								acceptedRide.pickupCoords.longitude,
-								acceptedRide.pickupCoords.latitude,
+								parseFloat(acceptedRide.pickupCoords.longitude),
+								parseFloat(acceptedRide.pickupCoords.latitude),
 							]}
 						>
 							<View
@@ -154,13 +160,13 @@ const HomePage = () => {
 						</PointAnnotation>
 					)}
 
-					{/* Destination marker */}
-					{acceptedRide.destinationCoords && (
+					{/* Destination marker - only visible when ride is active */}
+					{isRideActive && acceptedRide?.destinationCoords && (
 						<PointAnnotation
 							id="destination"
 							coordinate={[
-								acceptedRide.destinationCoords.longitude,
-								acceptedRide.destinationCoords.latitude,
+								parseFloat(acceptedRide.destinationCoords.longitude),
+								parseFloat(acceptedRide.destinationCoords.latitude),
 							]}
 						>
 							<View
@@ -176,6 +182,12 @@ const HomePage = () => {
 						</PointAnnotation>
 					)}
 				</Mapbox.MapView>
+			) : (
+				<View
+					style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+				>
+					<Text>Map loading or configuration error...</Text>
+				</View>
 			)}
 
 			{BottomSheetComponents}
@@ -193,5 +205,9 @@ const styles = StyleSheet.create({
 	map: {
 		...StyleSheet.absoluteFillObject,
 		height: "60%",
+	},
+	head: {
+		flex: 0.1,
+		zIndex: 999,
 	},
 });

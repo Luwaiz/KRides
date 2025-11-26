@@ -31,19 +31,23 @@ const MainPage = () => {
 	const isPassengers = useBottomTabStore((state) => state.passengerPage);
 	const confirm = useBottomTabStore((state) => state.confirmPage);
 	// const ToHome = useBottomTabStore((state) => state.setHomePage);
-	Mapbox.setAccessToken(Map_Public);
+	if (Map_Public) {
+		Mapbox.setAccessToken(Map_Public);
+	} else {
+		console.error("❌ Mapbox token is missing!");
+	}
 
-	const BABCOCK_COORDINATES = location
+	const BABCOCK_COORDINATES = (location && location.coords)
 		? {
-				latitude: location?.coord?.latitude, // Replace with Babcock's central latitude
-				longitude: location?.coord?.longitude, // Replace with Babcock's central longitude
-				zoom: 17,
-		  }
+			latitude: location.coords.latitude,
+			longitude: location.coords.longitude,
+			zoom: 17,
+		}
 		: {
-				latitude: 6.8935, // Replace with Babcock's central latitude
-				longitude: 3.723, // Replace with Babcock's central longitude
-				zoom: 17, // Adjust zoom level to focus only on the campus
-		  };
+			latitude: 6.8935, // Replace with Babcock's central latitude
+			longitude: 3.723, // Replace with Babcock's central longitude
+			zoom: 17, // Adjust zoom level to focus only on the campus
+		};
 
 	const requestLocationPermissions = async () => {
 		try {
@@ -63,7 +67,7 @@ const MainPage = () => {
 			} else {
 				return false;
 			}
-		} catch (e) {}
+		} catch (e) { }
 	};
 
 	const getLocationN = async () => {
@@ -81,7 +85,7 @@ const MainPage = () => {
 				);
 			} else {
 			}
-		} catch (error) {}
+		} catch (error) { }
 	};
 
 	useEffect(() => {
@@ -129,7 +133,12 @@ const MainPage = () => {
 	const fetchDrivingRoute = async (from, to) => {
 		try {
 			const token = Map_Public;
-			const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${from.longitude},${from.latitude};${to.longitude},${to.latitude}?geometries=geojson&overview=full&access_token=${token}`;
+			const fromLong = parseFloat(from.longitude);
+			const fromLat = parseFloat(from.latitude);
+			const toLong = parseFloat(to.longitude);
+			const toLat = parseFloat(to.latitude);
+
+			const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${fromLong},${fromLat};${toLong},${toLat}?geometries=geojson&overview=full&access_token=${token}`;
 			const res = await axios.get(url);
 			const coords = res?.data?.routes?.[0]?.geometry?.coordinates;
 			if (coords && coords.length) {
@@ -144,8 +153,8 @@ const MainPage = () => {
 				e?.message || e
 			);
 			const straight = [
-				[from.longitude, from.latitude],
-				[to.longitude, to.latitude],
+				[parseFloat(from.longitude), parseFloat(from.latitude)],
+				[parseFloat(to.longitude), parseFloat(to.latitude)],
 			];
 			setRouteCoords(straight);
 			setDenseCoords(densify(straight, 8));
@@ -155,7 +164,14 @@ const MainPage = () => {
 	// Watch pickup/destination and request route
 	useEffect(() => {
 		if (pickup && destination) {
-			fetchDrivingRoute(pickup, destination);
+			// Ensure we are passing objects with longitude/latitude properties
+			// pickup.coord usually has { latitude, longitude }
+			const pickupCoords = pickup.coord || pickup;
+			const destCoords = destination.coord || destination;
+
+			if (pickupCoords.latitude && pickupCoords.longitude && destCoords.latitude && destCoords.longitude) {
+				fetchDrivingRoute(pickupCoords, destCoords);
+			}
 		} else {
 			setRouteCoords(null);
 			setDenseCoords(null);
@@ -222,110 +238,104 @@ const MainPage = () => {
 	return (
 		<View style={styles.container}>
 			<View style={styles.head}>{HeaderComponents}</View>
-			<Mapbox.MapView style={styles.map}>
-				<Mapbox.UserLocation
-					// onUpdate={(newLocation) => setLocation(newLocation)}
-					visible={false}
-				/>
-				<Mapbox.Camera
-					centerCoordinate={[
-						BABCOCK_COORDINATES.longitude,
-						BABCOCK_COORDINATES.latitude,
-					]}
-					zoomLevel={BABCOCK_COORDINATES.zoom}
-					followUserLocation={true}
-					followUserMode={UserTrackingMode.Follow}
-					followZoomLevel={17}
-				/>
-				<Mapbox.LocationPuck
-					visible={location ? true : false}
-					scale={["interpolate", ["linear"], ["zoom"], 10, 1.0, 20, 4.0]}
-					pulsing={{
-						isEnabled: true,
-						color: "teal",
-						radius: 50.0,
-					}}
-				/>
-
-				{/* Draw route if present */}
-				{routeCoords && (
-					<ShapeSource
-						id="routeSource"
-						shape={{
-							type: "Feature",
-							geometry: { type: "LineString", coordinates: routeCoords },
-						}}
-					>
-						<LineLayer
-							id="routeLine"
-							style={{
-								lineColor: "#1976D2",
-								lineWidth: 5,
-								lineCap: "round",
-								lineJoin: "round",
-							}}
-						/>
-					</ShapeSource>
-				)}
-
-				{/* moving marker (animated along denseCoords) */}
-				{denseCoords && denseCoords[movingIndex] && (
-					<PointAnnotation
-						id={`moving`}
-						coordinate={[
-							denseCoords[movingIndex][0],
-							denseCoords[movingIndex][1],
+			{/* Map is always visible */}
+			{Map_Public ? (
+				<Mapbox.MapView style={styles.map}>
+					<Mapbox.Camera
+						centerCoordinate={[
+							BABCOCK_COORDINATES.longitude,
+							BABCOCK_COORDINATES.latitude,
 						]}
-					>
-						<View
-							style={{
-								width: 20,
-								height: 20,
-								borderRadius: 10,
-								backgroundColor: "#ff3b30",
-								borderWidth: 2,
-								borderColor: "#fff",
-							}}
-						/>
-					</PointAnnotation>
-				)}
+						zoomLevel={BABCOCK_COORDINATES.zoom}
+					/>
 
-				{/* start and end markers */}
-				{pickup && (
-					<PointAnnotation
-						id="pickup"
-						coordinate={[pickup.longitude, pickup.latitude]}
-					>
-						<View
-							style={{
-								width: 18,
-								height: 18,
-								borderRadius: 9,
-								backgroundColor: "#4caf50",
-								borderWidth: 2,
-								borderColor: "#fff",
+					{/* User's current location - always visible */}
+					<Mapbox.LocationPuck
+						visible={true}
+						pulsing={{
+							isEnabled: true,
+							color: "blue",
+							radius: 50.0,
+						}}
+					/>
+
+					{/* Route line - only visible when ride is active */}
+					{routeCoords && (
+						<ShapeSource
+							id="routeSource"
+							shape={{
+								type: "Feature",
+								geometry: {
+									type: "LineString",
+									coordinates: routeCoords,
+								},
 							}}
-						/>
-					</PointAnnotation>
-				)}
-				{destination && (
-					<PointAnnotation
-						id="destination"
-						coordinate={[destination.longitude, destination.latitude]}
-					>
-						<View
-							style={{
-								width: 18,
-								height: 18,
-								borderRadius: 9,
-								backgroundColor: "#1976D2",
-								borderWidth: 2,
-								borderColor: "#fff",
-							}}
-						/>
-					</PointAnnotation>
-				)}
-			</Mapbox.MapView>
+						>
+							<LineLayer
+								id="routeLine"
+								style={{
+									lineColor: "#007AFF",
+									lineWidth: 4,
+									lineCap: "round",
+									lineJoin: "round",
+								}}
+							/>
+						</ShapeSource>
+					)}
+
+					{/* Pickup marker - only visible when ride is active */}
+					{pickup && (
+						<PointAnnotation
+							id="pickup"
+							coordinate={[
+								parseFloat(pickup.coord?.longitude || pickup.longitude),
+								parseFloat(pickup.coord?.latitude || pickup.latitude)
+							]}
+						>
+							<View
+								style={{
+									width: 24,
+									height: 24,
+									borderRadius: 12,
+									backgroundColor: "#4caf50",
+									borderWidth: 3,
+									borderColor: "#fff",
+								}}
+							/>
+						</PointAnnotation>
+					)}
+
+					{/* Destination marker - only visible when ride is active */}
+					{destination && (
+						<PointAnnotation
+							id="destination"
+							coordinate={[
+								parseFloat(destination.coord?.longitude || destination.longitude),
+								parseFloat(destination.coord?.latitude || destination.latitude)
+							]}
+						>
+							<View
+								style={{
+									width: 24,
+									height: 24,
+									borderRadius: 12,
+									backgroundColor: "#1976D2",
+									borderWidth: 3,
+									borderColor: "#fff",
+								}}
+							/>
+						</PointAnnotation>
+					)}
+				</Mapbox.MapView>
+			) : (
+				<View
+					style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+				>
+					<Text>Map loading or configuration error...</Text>
+				</View>
+			)}
+
+			{/* Bottom Sheet */}
 			{BottomSheetComponents}
 		</View>
 	);

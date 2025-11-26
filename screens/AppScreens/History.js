@@ -4,9 +4,9 @@ import { colors } from "../../constants/styling";
 import { SafeAreaView } from "react-native-safe-area-context";
 import BackButton from "../../components/buttons/BackButton";
 import HistoryCard from "../../components/HistoryCard";
-import { useUserDetails } from "../../constants/Store";
+import { useUserDetails, useDriverDetails } from "../../constants/Store";
 import { ActivityIndicator } from "react-native-paper";
-import { getCustomerHistory } from "../../helpers/firebaseRides";
+import { getCustomerHistory, getDriverHistory } from "../../helpers/firebaseRides";
 
 const { width } = Dimensions.get("window");
 
@@ -14,6 +14,8 @@ const History = () => {
 	const [loading, setLoading] = useState(false);
 	const [history, setHistory] = useState([]);
 	const UserId = useUserDetails((state) => state?.UserId);
+	const driverUid = useDriverDetails((state) => state?.uid);
+
 	const currentMonth = new Date();
 	const currentMonthName = currentMonth.toLocaleString("default", {
 		month: "long",
@@ -21,17 +23,24 @@ const History = () => {
 	});
 
 	const getHistory = async () => {
-		console.log("🔍 History - Current UserId:", UserId || "MISSING");
+		// Determine if user is a driver by checking which ID is available
+		const isDriver = !!driverUid && !UserId;
+		const userId = isDriver ? driverUid : UserId;
 
-		if (!UserId) {
+		console.log("🔍 History - Is Driver:", isDriver);
+		console.log("🔍 History - User ID:", userId || "MISSING");
+
+		if (!userId) {
 			console.log("⚠️ No user ID found, cannot fetch history");
 			return;
 		}
 
 		setLoading(true);
 		try {
-			console.log("📜 Fetching ride history for customer:", UserId);
-			const rides = await getCustomerHistory(UserId);
+			console.log(`📜 Fetching ${isDriver ? "driver" : "customer"} history for:`, userId);
+			const rides = isDriver
+				? await getDriverHistory(userId)
+				: await getCustomerHistory(userId);
 			console.log("✅ History fetched:", rides.length, "rides");
 			console.log("📊 Ride details:", JSON.stringify(rides, null, 2));
 			setHistory(rides);
@@ -45,7 +54,8 @@ const History = () => {
 
 	useEffect(() => {
 		getHistory();
-	}, [UserId]);
+	}, [UserId, driverUid]);
+
 	return (
 		<SafeAreaView style={styles.container}>
 			<BackButton text={<Text style={styles.headText}>Ride history</Text>} />

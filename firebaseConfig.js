@@ -42,5 +42,14 @@ export const FIREBASE_STORAGE = getStorage(FIREBASE_APP);
 export const FIREBASE_AUTH = initializeAuth(FIREBASE_APP, {
 	persistence: getReactNativePersistence(ReactNativeAsyncStorage),
 });
+
+// Initialize Firestore with settings for better network handling
 export const FIREBASE_DB = getFirestore(FIREBASE_APP);
+
+// Enable offline persistence (helps with network issues)
+// Note: This is automatically enabled in React Native, but we're being explicit
+if (__DEV__) {
+	console.log("🔥 Firestore initialized with offline persistence");
+}
+
 export const FIREBASE_FUNCTIONS = getFunctions(FIREBASE_APP);

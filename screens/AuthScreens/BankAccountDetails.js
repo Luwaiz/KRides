@@ -7,6 +7,7 @@ import {
     Alert,
     ActivityIndicator,
     TouchableOpacity,
+    Dimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors } from "../../constants/styling";
@@ -14,11 +15,11 @@ import TextInput1 from "../../components/TextInput1";
 import ActiveButton from "../../components/buttons/ActiveButton";
 import BackButton from "../../components/buttons/BackButton";
 import { Picker } from "@react-native-picker/picker";
-import { httpsCallable } from "firebase/functions";
-import { FIREBASE_FUNCTIONS, FIREBASE_DB, FIREBASE_AUTH } from "../../firebaseConfig";
-import { doc, updateDoc } from "firebase/firestore";
+import { FIREBASE_DB, FIREBASE_AUTH } from "../../firebaseConfig";
+import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import axios from "axios";
 import { useDriverDetails } from "../../constants/Store";
-
+const { width, height } = Dimensions.get("window");
 const NIGERIAN_BANKS = [
     { label: "Access Bank", value: "044" },
     { label: "Guaranty Trust Bank", value: "058" },
@@ -81,29 +82,62 @@ const BankAccountDetails = ({ navigation, route }) => {
 
             console.log("Creating subaccount for driver:", driverId);
 
-            // 1. Call Firebase Function to create subaccount
-            const createSubAccountFn = httpsCallable(
-                FIREBASE_FUNCTIONS,
-                "createDriverSubAccount"
-            );
+            // WARNING: EXPOSING SECRET KEY ON CLIENT SIDE IS NOT SECURE FOR PRODUCTION
+            // TODO: Move this to a secure backend or use a proxy server when going live.
+            const FLUTTERWAVE_SECRET_KEY = "FLWSECK_TEST-f3c5c2ad9a10329d839b64ba46d167bd-X";
 
-            const response = await createSubAccountFn({
-                driverId,
-                accountBank: bankCode,
-                accountNumber,
-                businessName: fullName || accountName, // Fallback to account name if full name missing
-                businessEmail: `${phone}@rideapp.com`, // Generated email
-                businessMobile: phone,
-                splitValue: 50, // Company fee
-            });
+            // 1. Call Flutterwave API directly
+            const payload = {
+                account_bank: bankCode,
+                account_number: accountNumber,
+                business_name: fullName || accountName,
+                business_email: `${phone}@rideapp.com`,
+                business_mobile: phone,
+                country: "NG",
+                split_type: "flat",
+                split_value: 50,
+            };
+            console.log("Sending payload to Flutterwave:", JSON.stringify(payload, null, 2));
+
+            const response = await axios.post(
+                "https://api.flutterwave.com/v3/subaccounts",
+                payload,
+                {
+                    headers: {
+                        Authorization: `Bearer ${FLUTTERWAVE_SECRET_KEY}`,
+                        "Content-Type": "application/json",
+                    },
+                }
+            );
 
             const result = response.data;
             console.log("Subaccount creation result:", result);
 
-            if (result.status === "success" || result.status === "ok") {
-                // 2. Update Firestore locally (redundant if function does it, but good for UI update)
-                // The function should handle the Firestore update for security, but we can update local state if needed.
-                // We'll assume the function updated the 'drivers' collection.
+            if (result.status === "success") {
+                const subaccountId = result.data.subaccount_id;
+                const verifiedBankName = result.data.bank_name || bankName;
+
+                // 2. Update Firestore locally
+                const driverRef = doc(FIREBASE_DB, "drivers", driverId);
+                await updateDoc(driverRef, {
+                    bankName: verifiedBankName,
+                    bankCode: bankCode,
+                    accountNumber: accountNumber,
+                    accountName: fullName || accountName,
+                    subaccountId: subaccountId,
+                    subaccountCreatedAt: serverTimestamp(),
+                    bankDetailsVerified: true,
+                });
+
+                // Update local store to trigger navigation switch
+                useDriverDetails.getState().setDriverProfile({
+                    ...useDriverDetails.getState(),
+                    bankName: verifiedBankName,
+                    bankCode: bankCode,
+                    accountNumber: accountNumber,
+                    accountName: fullName || accountName,
+                    bankDetailsVerified: true,
+                });
 
                 Alert.alert(
                     "Success",
@@ -112,11 +146,7 @@ const BankAccountDetails = ({ navigation, route }) => {
                         {
                             text: "Continue",
                             onPress: () => {
-                                navigation.replace("DriverStack", {
-                                    params: {
-                                        params: "DriverHome",
-                                    },
-                                });
+                                navigation.navigate("DriverHome");
                             },
                         },
                     ]
@@ -126,13 +156,53 @@ const BankAccountDetails = ({ navigation, route }) => {
             }
         } catch (error) {
             console.error("Error saving bank details:", error);
-            Alert.alert(
-                "Error",
-                error.message || "Could not save bank details. Please try again."
-            );
+            if (error.response) {
+                console.error("Flutterwave Error Response:", JSON.stringify(error.response.data, null, 2));
+            }
+            const errorMessage = error.response?.data?.message || error.message || "Could not save bank details.";
+            Alert.alert("Error", errorMessage);
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleSkip = async () => {
+        Alert.alert(
+            "Skip Bank Details",
+            "Are you sure you want to skip? You won't be able to receive payments until you add your bank details.",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Skip",
+                    onPress: async () => {
+                        setLoading(true);
+                        try {
+                            const driverId = uid || FIREBASE_AUTH.currentUser?.uid;
+                            if (!driverId) return;
+
+                            // Update Firestore
+                            const driverRef = doc(FIREBASE_DB, "drivers", driverId);
+                            await updateDoc(driverRef, {
+                                bankDetailsVerified: true, // Mark as "handled" so they can enter the app
+                            });
+
+                            // Update local store to trigger navigation switch
+                            useDriverDetails.getState().setDriverProfile({
+                                ...useDriverDetails.getState(),
+                                bankDetailsVerified: true,
+                            });
+
+                            // Navigation will be handled by Navigation.js switching stacks
+                        } catch (error) {
+                            console.error("Error skipping:", error);
+                            Alert.alert("Error", "Could not skip. Please try again.");
+                        } finally {
+                            setLoading(false);
+                        }
+                    },
+                },
+            ]
+        );
     };
 
     return (
@@ -141,8 +211,8 @@ const BankAccountDetails = ({ navigation, route }) => {
                 <View style={styles.topCont}>
                     <View style={styles.headerRow}>
                         <BackButton text={<Text style={styles.headText}>Bank Details</Text>} />
-                        <TouchableOpacity onPress={() => navigation.navigate("DriverHome")}>
-                            <Text style={styles.skipText}>Skip</Text>
+                        <TouchableOpacity onPress={handleSkip} disabled={loading}>
+                            <Text style={styles.skipText}>{loading ? "..." : "Skip"}</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -212,7 +282,7 @@ const styles = StyleSheet.create({
     topCont: {
         flex: 1,
         backgroundColor: colors.primaryBlue,
-        paddingTop: 26,
+        paddingTop: 20,
     },
     headText: {
         color: colors.secondary,
@@ -223,20 +293,21 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
-        paddingRight: 20,
+        paddingRight: 50,
     },
     skipText: {
         color: colors.secondary,
         fontSize: 16,
         fontFamily: "Albert-Medium",
+        paddingTop: 10,
     },
     bottomCont: {
         backgroundColor: colors.secondary,
-        width: "100%",
+        width: width,
         marginTop: 20,
         borderTopLeftRadius: 30,
         borderTopRightRadius: 30,
-        minHeight: 600,
+        height: height - 100,
     },
     sheetCont: {
         flex: 1,

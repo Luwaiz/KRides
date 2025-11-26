@@ -6,33 +6,42 @@ import { TouchableOpacity } from "react-native-gesture-handler";
 import { colors } from "../../constants/styling";
 import Cash from "../../assets/svg/Cash.svg";
 import Calendar from "../../assets/svg/Calendar.svg";
-import axios from "axios";
-import API from "../../hooks/API";
+import { getDriverTodayStats } from "../../helpers/driverStats";
+import { useDriverDetails } from "../../constants/Store";
 
 const HomeHeader = () => {
 	const navigation = useNavigation();
 	const [completedTrips, setCompletedTrips] = useState(0);
 	const [earnedToday, setEarnedToday] = useState(0);
 
+	// Get driver ID from store
+	const uid = useDriverDetails((state) => state.uid);
+	const VehicleId = useDriverDetails((state) => state.vehicle_id);
+	const driverId = uid || VehicleId;
+
 	const OpenDrawer = () => {
 		// Open the drawer instead of navigating to settings
 		navigation.dispatch(DrawerActions.openDrawer());
 	};
 
-	const summaryData = async () => {
+	const fetchDriverStats = async () => {
+		if (!driverId) {
+			console.log("⚠️ No driver ID available yet");
+			return;
+		}
+
 		try {
-			const response = await axios.get(API.DriverSummary);
-			console.log("Driver Summary Data:", response?.data);
-			setCompletedTrips(response?.data?.completed_trips);
-			setEarnedToday(response?.data?.earned_today);
+			const stats = await getDriverTodayStats(driverId);
+			setCompletedTrips(stats.completedTrips);
+			setEarnedToday(stats.earnedToday);
 		} catch (error) {
-			console.log("Error fetching summary data:", error);
+			console.log("Error fetching driver stats:", error);
 		}
 	};
 
 	useEffect(() => {
-		summaryData();
-	}, []);
+		fetchDriverStats();
+	}, [driverId]);
 	return (
 		<View style={styles.container}>
 			<TouchableOpacity
@@ -83,7 +92,7 @@ const styles = StyleSheet.create({
 		marginRight: 10,
 	},
 	box: {
-		width: 140,
+		width: 150,
 		height: 70,
 		backgroundColor: colors.secondary,
 		marginHorizontal: 5,

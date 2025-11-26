@@ -1,23 +1,51 @@
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View, TouchableOpacity } from "react-native";
 import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
-import { Feather } from "@expo/vector-icons";
-import React, { useState } from "react";
+import { MaterialIcons, Octicons } from "@expo/vector-icons";
+import React, { useState, useEffect } from "react";
 import Phone from "../../assets/svg/Call.svg";
 import ActiveButton from "../buttons/ActiveButton";
 import { colors } from "../../constants/styling";
-import { sp, fs, br, ms } from "../../constants/responsive";
-import { useBottomTabStore, useAcceptedRideStore } from "../../constants/Store";
+import { sp, fs, br } from "../../constants/responsive";
+import { useAcceptedRideStore, useDriverDetails } from "../../constants/Store";
 import Avatar from "../../assets/svg/Frame 77avatar.svg";
 import Arrival from "../modals/Arrival";
-import { updateRideStatus } from "../../helpers/firebaseRides";
+import { updateRideStatus, listenToPendingRides } from "../../helpers/firebaseRides";
+import { getRideCoordinates } from "../../helpers/getLocationCoordinates";
+import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { FIREBASE_DB } from "../../firebaseConfig";
+import { DrawerActions, useNavigation } from "@react-navigation/native";
+import { calculateDriverEarnings } from "../../constants/commission";
 
 const AcceptTab = () => {
 	const [endRide, setEndRide] = useState(false);
 	const [loading, setLoading] = useState(false);
+	const [accepting, setAccepting] = useState(null);
+	const [showPendingRides, setShowPendingRides] = useState(false);
+	const [pendingRides, setPendingRides] = useState([]);
+
 	const acceptedRide = useAcceptedRideStore((state) => state.acceptedRide);
-	const clearAcceptedRide = useAcceptedRideStore(
-		(state) => state.clearAcceptedRide
-	);
+	const nextRide = useAcceptedRideStore((state) => state.nextRide);
+	const clearAcceptedRide = useAcceptedRideStore((state) => state.clearAcceptedRide);
+	const setNextRide = useAcceptedRideStore((state) => state.setNextRide);
+	const activateNextRide = useAcceptedRideStore((state) => state.activateNextRide);
+
+	const fullName = useDriverDetails((state) => state.fullName);
+	const phone = useDriverDetails((state) => state.phone);
+	const VehicleId = useDriverDetails((state) => state.vehicle_id);
+	const uid = useDriverDetails((state) => state.uid);
+
+	const navigation = useNavigation();
+	const OpenDrawer = () => {
+		navigation.dispatch(DrawerActions.openDrawer());
+	};
+
+	// Listen to pending rides
+	useEffect(() => {
+		const unsubscribe = listenToPendingRides((rides) => {
+			setPendingRides(rides);
+		});
+		return unsubscribe;
+	}, []);
 
 	const RideEnded = async () => {
 		if (!acceptedRide?.rideId) {
@@ -28,33 +56,105 @@ const AcceptTab = () => {
 		setLoading(true);
 		try {
 			console.log("✅ Completing ride:", acceptedRide.rideId);
-			// Update ride status to completed in Firebase
-			await updateRideStatus(acceptedRide.rideId, "completed");
-			console.log("✅ Ride marked as completed");
+			console.log("📋 Next ride queued?:", !!nextRide);
+			if (nextRide) {
+				console.log("📋 Next ride details:", {
+					rideId: nextRide.rideId,
+					customer: nextRide.customerName,
+					amount: nextRide.amount
+				});
+			}
 
-			// Show success modal and clear ride data
+			await updateRideStatus(acceptedRide.rideId, "completed");
+			console.log("✅ Ride marked as completed in Firestore");
+
+			// Show success modal
 			setEndRide(true);
-			clearAcceptedRide();
+
+			// Activate next ride after a brief delay
+			setTimeout(() => {
+				console.log("⏰ Timeout triggered - checking for next ride...");
+				if (nextRide) {
+					console.log("🔄 Activating next queued ride:", nextRide.rideId);
+					console.log("🔄 Before activation - acceptedRide:", acceptedRide?.rideId);
+					activateNextRide();
+					console.log("🔄 After activation called");
+					setEndRide(false); // Close modal
+				} else {
+					console.log("🏁 No next ride queued, clearing accepted ride");
+					clearAcceptedRide();
+				}
+			}, 1500);
 		} catch (error) {
 			console.error("❌ Error completing ride:", error);
-			alert(
-				"Unable to complete ride. Please check your connection and try again."
-			);
+			alert("Unable to complete ride. Please check your connection and try again.");
 		} finally {
 			setLoading(false);
 		}
 	};
+
+	const AcceptNextRide = async (rideId) => {
+		if (nextRide) {
+			alert("You already have a ride queued. Complete the current rides first.");
+			return;
+		}
+
+		console.log("🚗 Accepting next ride:", rideId);
+		setAccepting(rideId);
+
+		try {
+			const rideDetails = pendingRides.find((r) => (r.rideId || r.id) === rideId);
+			if (!rideDetails) {
+				throw new Error("Ride not found");
+			}
+
+			const { pickup, destination } = await getRideCoordinates(
+				rideDetails.pickupLocation,
+				rideDetails.destination
+			);
+
+			const rideRef = doc(FIREBASE_DB, "rides", rideId);
+			await updateDoc(rideRef, {
+				status: "accepted",
+				driverId: uid || VehicleId,
+				driverName: fullName || "Driver",
+				driverPhone: phone || "",
+				vehicleId: VehicleId || "",
+				acceptedAt: serverTimestamp(),
+			});
+
+			setNextRide({
+				...rideDetails,
+				rideId: rideId,
+				pickupCoords: pickup,
+				destinationCoords: destination,
+				driverId: uid || VehicleId,
+				driverName: fullName || "Driver",
+			});
+
+			console.log("✅ Next ride queued successfully");
+			alert("Next ride accepted! It will start after you complete the current ride.");
+		} catch (error) {
+			console.error("❌ Error accepting next ride:", error);
+			alert("Unable to accept ride. Please try again.");
+		} finally {
+			setAccepting(null);
+		}
+	};
+
 	return (
 		<>
 			<BottomSheet
-				snapPoints={["40%"]}
+				snapPoints={showPendingRides ? ["70%"] : ["40%"]}
 				backgroundStyle={{ borderRadius: 30 }}
 				handleComponent={null}
 			>
 				<BottomSheetScrollView>
 					<View style={styles.sheetCont}>
+						{/* Menu Button */}
+
 						<View style={styles.topText}>
-							<Text style={styles.where}>Ride request</Text>
+							<Text style={styles.where}>Current Ride</Text>
 							<Text style={styles.time}>
 								{acceptedRide?.pickupCoords?.name || "Picking up..."}
 							</Text>
@@ -64,29 +164,92 @@ const AcceptTab = () => {
 								<Avatar width={50} height={50} />
 								<View>
 									<Text style={styles.name}>
-										{acceptedRide?.name || "Henry"}
+										{acceptedRide?.customerName || acceptedRide?.name || "Customer"}
 									</Text>
-									<Text style={styles.time}>Cash payment</Text>
-									<Text style={styles.time}>
-										N{acceptedRide?.amount || "150"}
-									</Text>
+									<Text style={styles.time}>Card Payment</Text>
+									<Text style={styles.time}>₦{calculateDriverEarnings(acceptedRide?.amount) || "0"}</Text>
 								</View>
 							</View>
 							<Phone width={24} height={24} />
 						</View>
 
-						{/* Show route info */}
 						{acceptedRide && (
 							<View style={styles.routeInfo}>
 								<Text style={styles.routeLabel}>From:</Text>
 								<Text style={styles.routeText}>
-									{acceptedRide.location || acceptedRide.pickupCoords?.name}
+									{typeof acceptedRide.location === "object"
+										? acceptedRide.location?.name || acceptedRide.location?.address
+										: acceptedRide.location || acceptedRide.pickupCoords?.name || "Unknown"}
 								</Text>
 								<Text style={styles.routeLabel}>To:</Text>
 								<Text style={styles.routeText}>
-									{acceptedRide.destination ||
-										acceptedRide.destinationCoords?.name}
+									{typeof acceptedRide.destination === "object"
+										? acceptedRide.destination?.name || acceptedRide.destination?.address
+										: acceptedRide.destination || acceptedRide.destinationCoords?.name || "Unknown"}
 								</Text>
+							</View>
+						)}
+
+						{nextRide && (
+							<View style={styles.nextRideInfo}>
+								<Text style={styles.nextRideLabel}>Next Ride Queued</Text>
+								<Text style={styles.nextRideText}>
+									{nextRide.customerName} • ₦{calculateDriverEarnings(nextRide.amount)}
+								</Text>
+							</View>
+						)}
+
+						<TouchableOpacity
+							style={styles.collapsibleHeader}
+							onPress={() => setShowPendingRides(!showPendingRides)}
+							activeOpacity={0.7}
+						>
+							<Text style={styles.collapsibleTitle}>
+								Available Rides ({pendingRides.length})
+							</Text>
+							<MaterialIcons
+								name={showPendingRides ? "keyboard-arrow-up" : "keyboard-arrow-down"}
+								size={24}
+								color={colors.primaryBlue}
+							/>
+						</TouchableOpacity>
+
+						{showPendingRides && (
+							<View style={styles.pendingRidesContainer}>
+								{pendingRides.length === 0 ? (
+									<Text style={styles.noPendingText}>No pending rides available</Text>
+								) : (
+									pendingRides.map((ride) => (
+										<View key={ride.rideId} style={styles.pendingRideCard}>
+											<View style={styles.pendingRideInfo}>
+												<Text style={styles.pendingCustomerName}>
+													{ride.customerName || "Customer"}
+												</Text>
+												<Text style={styles.pendingRideDetails}>
+													{typeof ride.pickupLocation === "object"
+														? ride.pickupLocation?.name || "Pickup"
+														: ride.pickupLocation || "Pickup"} →{" "}
+													{typeof ride.destination === "object"
+														? ride.destination?.name || "Destination"
+														: ride.destination || "Destination"}
+												</Text>
+												<Text style={styles.pendingRidePrice}>₦{calculateDriverEarnings(ride.amount) || 0}</Text>
+											</View>
+											<TouchableOpacity
+												style={[
+													styles.acceptButton,
+													(nextRide || accepting === ride.rideId) && styles.acceptButtonDisabled
+												]}
+												onPress={() => AcceptNextRide(ride.rideId || ride.id)}
+												disabled={!!nextRide || accepting === ride.rideId}
+											>
+												<Text style={styles.acceptButtonText}>
+													{accepting === ride.rideId ? "..." : nextRide ? "Queued" : "Accept"}
+												</Text>
+											</TouchableOpacity>
+										</View>
+									))
+								)}
 							</View>
 						)}
 
@@ -110,9 +273,19 @@ export default AcceptTab;
 const styles = StyleSheet.create({
 	sheetCont: {
 		flex: 1,
-		paddingBottom: sp(16),
+		paddingBottom: sp(40),
 		paddingTop: sp(30),
 		paddingHorizontal: sp(16),
+	},
+	menuButton: {
+		width: 48,
+		height: 48,
+		backgroundColor: colors.secondary,
+		justifyContent: "center",
+		alignItems: "center",
+		borderRadius: 24,
+		marginBottom: sp(16),
+		alignSelf: "flex-start",
 	},
 	topText: {
 		flexDirection: "row",
@@ -165,5 +338,91 @@ const styles = StyleSheet.create({
 		fontWeight: "500",
 		color: "black",
 		marginBottom: sp(4),
+	},
+	nextRideInfo: {
+		backgroundColor: colors.primaryBlue + "20",
+		padding: sp(12),
+		borderRadius: br(8),
+		marginBottom: sp(12),
+		borderLeftWidth: 4,
+		borderLeftColor: colors.primaryBlue,
+	},
+	nextRideLabel: {
+		fontSize: fs(12),
+		color: colors.primaryBlue,
+		fontWeight: "600",
+		marginBottom: sp(4),
+	},
+	nextRideText: {
+		fontSize: fs(14),
+		color: "black",
+	},
+	collapsibleHeader: {
+		flexDirection: "row",
+		justifyContent: "space-between",
+		alignItems: "center",
+		padding: sp(12),
+		backgroundColor: colors.lightGrey2,
+		borderRadius: br(8),
+		marginTop: sp(12),
+		marginBottom: sp(8),
+	},
+	collapsibleTitle: {
+		fontSize: fs(16),
+		fontWeight: "600",
+		color: colors.primaryBlue,
+	},
+	pendingRidesContainer: {
+		marginBottom: sp(12),
+	},
+	noPendingText: {
+		textAlign: "center",
+		color: colors.lightGrey3,
+		fontSize: fs(14),
+		paddingVertical: sp(20),
+	},
+	pendingRideCard: {
+		backgroundColor: "white",
+		padding: sp(12),
+		borderRadius: br(8),
+		marginBottom: sp(8),
+		flexDirection: "row",
+		justifyContent: "space-between",
+		alignItems: "center",
+		borderWidth: 1,
+		borderColor: colors.lightGrey2,
+	},
+	pendingRideInfo: {
+		flex: 1,
+	},
+	pendingCustomerName: {
+		fontSize: fs(16),
+		fontWeight: "600",
+		color: "black",
+		marginBottom: sp(4),
+	},
+	pendingRideDetails: {
+		fontSize: fs(12),
+		color: colors.lightGrey3,
+		marginBottom: sp(4),
+	},
+	pendingRidePrice: {
+		fontSize: fs(14),
+		fontWeight: "600",
+		color: colors.primaryBlue,
+	},
+	acceptButton: {
+		backgroundColor: colors.primaryBlue,
+		paddingHorizontal: sp(16),
+		paddingVertical: sp(8),
+		borderRadius: br(8),
+	},
+	acceptButtonDisabled: {
+		backgroundColor: colors.lightGrey3,
+	},
+	acceptButtonText: {
+		color: "white",
+		fontSize: fs(14),
+		fontWeight: "600",
 	},
 });

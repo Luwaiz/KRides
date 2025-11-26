@@ -47,11 +47,14 @@ export const useDriverDetails = create((set) => ({
 	vehicle_id: "",
 	uid: "",
 	accessToken: "",
-	isOnline: false,
 	rating: 0,
 	totalRides: 0,
 	profileImageUrl: null,
 	createdAt: null,
+	bankName: "",
+	accountNumber: "",
+	accountName: "",
+	bankDetailsVerified: false,
 	// Actions
 	setDriverProfile: (profile) =>
 		set({
@@ -61,18 +64,20 @@ export const useDriverDetails = create((set) => ({
 			vehicle_id: profile.vehicle_id,
 			uid: profile.uid,
 			accessToken: profile.accessToken || "",
-			isOnline: profile.isOnline || false,
 			rating: profile.rating || 0,
 			totalRides: profile.totalRides || 0,
 			profileImageUrl: profile.profileImageUrl,
 			createdAt: profile.createdAt,
+			bankName: profile.bankName || "",
+			accountNumber: profile.accountNumber || "",
+			accountName: profile.accountName || "",
+			bankDetailsVerified: profile.bankDetailsVerified || false,
 		}),
 	setFullName: (fullName) => set({ fullName }),
 	setPhone: (phone) => set({ phone }),
 	setEmail: (email) => set({ email }),
 	setVehicleId: (vehicle_id) => set({ vehicle_id }),
 	setAccessToken: (accessToken) => set({ accessToken }),
-	setIsOnline: (isOnline) => set({ isOnline }),
 	setRating: (rating) => set({ rating }),
 	setTotalRides: (totalRides) => set({ totalRides }),
 	setProfileImageUrl: (url) => set({ profileImageUrl: url }),
@@ -84,11 +89,14 @@ export const useDriverDetails = create((set) => ({
 			vehicle_id: "",
 			uid: "",
 			accessToken: "",
-			isOnline: false,
 			rating: 0,
 			totalRides: 0,
 			profileImageUrl: null,
 			createdAt: null,
+			bankName: "",
+			accountNumber: "",
+			accountName: "",
+			bankDetailsVerified: false,
 		}),
 	clearDriver: () =>
 		set({
@@ -98,11 +106,14 @@ export const useDriverDetails = create((set) => ({
 			vehicle_id: "",
 			uid: "",
 			accessToken: "",
-			isOnline: false,
 			rating: 0,
 			totalRides: 0,
 			profileImageUrl: null,
 			createdAt: null,
+			bankName: "",
+			accountNumber: "",
+			accountName: "",
+			bankDetailsVerified: false,
 		}),
 }));
 
@@ -159,8 +170,17 @@ export const useRideDetailsStore = create((set) => ({
 
 // Store for driver's accepted ride details
 export const useAcceptedRideStore = create((set) => ({
-	acceptedRide: null, // Full ride object with coordinates
+	acceptedRide: null, // Current active ride
+	nextRide: null, // Next queued ride
 	isRideActive: false,
 	setAcceptedRide: (ride) => set({ acceptedRide: ride, isRideActive: true }),
+	setNextRide: (ride) => set({ nextRide: ride }),
 	clearAcceptedRide: () => set({ acceptedRide: null, isRideActive: false }),
+	clearNextRide: () => set({ nextRide: null }),
+	// Move next ride to active when current ride completes
+	activateNextRide: () => set((state) => ({
+		acceptedRide: state.nextRide,
+		nextRide: null,
+		isRideActive: !!state.nextRide,
+	})),
 }));

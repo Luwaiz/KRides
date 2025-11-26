@@ -10,7 +10,7 @@ import Terms from "../../components/Terms";
 import BackButton from "../../components/buttons/BackButton";
 import Firebase from "../../hooks/Firebase";
 import Toast from "react-native-toast-message";
-const {height,width} = Dimensions.get('window');
+const { height, width } = Dimensions.get('window');
 
 const Login = ({ navigation }) => {
 	const [email, setEmail] = useState("");

@@ -36,5 +36,7 @@ const styles = StyleSheet.create({
 		position: "absolute",
 		top: 40,
 		left: 16,
+		zIndex: 1000, // Ensure it appears above map
+		elevation: 5, // For Android shadow
 	},
 });

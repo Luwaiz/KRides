@@ -10,7 +10,7 @@
       "env": {
         "MAPBOX_DOWNLOADS_TOKEN": "sk.eyJ1IjoiZWx1d2FpeiIsImEiOiJjbTVibXJsNWk0ZXE4MmpwN2FvNjJ2cmJ3In0.ITvpOypF_zViRDy3hHU8OA",
         "API_URL": "https://krides.olaoluwaeyeclinic.com/api",
-        "DEV_API_URL": "http://localhost:3000/api",
+        "DEV_API_URL": "https://krides.olaoluwaeyeclinic.com/api",
         "Map_Public": "pk.eyJ1IjoiZWx1d2FpeiIsImEiOiJjbTVibXJsNWk0ZXE4MmpwN2FvNjJ2cmJ3In0.ITvpOypF_zViRDy3hHU8OA",
         "FIREBASE_API_KEY": "AIzaSyA2EsyMXZlABPA1ZJ06Y9S6VOsKR62EQkA",
         "FIREBASE_AUTH_DOMAIN": "kampusride.firebaseapp.com",

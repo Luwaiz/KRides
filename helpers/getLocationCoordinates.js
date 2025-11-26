@@ -3,11 +3,37 @@ import { collection, query, where, getDocs } from "firebase/firestore";
 
 /**
  * Get coordinates for a location by name from Firestore
- * @param {string} locationName - Name of the location
+ * @param {string|object} locationName - Name of the location or location object
  * @returns {Promise<{latitude: number, longitude: number, name: string} | null>}
  */
 export const getLocationCoordinates = async (locationName) => {
 	if (!locationName) return null;
+
+	// If locationName is already an object with coordinates, return it
+	if (typeof locationName === "object") {
+		// Check if it already has coordinates
+		if (locationName.latitude && locationName.longitude) {
+			return {
+				latitude: parseFloat(locationName.latitude),
+				longitude: parseFloat(locationName.longitude),
+				name: locationName.name || "Unknown",
+				address: locationName.address || "",
+			};
+		}
+		// If it's an object but only has a name property, extract the name
+		if (locationName.name) {
+			locationName = locationName.name;
+		} else {
+			console.warn("Invalid location object:", locationName);
+			return null;
+		}
+	}
+
+	// Ensure locationName is a string
+	if (typeof locationName !== "string") {
+		console.warn("Location name must be a string or object:", locationName);
+		return null;
+	}
 
 	try {
 		const locationsRef = collection(FIREBASE_DB, "locations");
@@ -23,8 +49,8 @@ export const getLocationCoordinates = async (locationName) => {
 			const doc = querySnapshot.docs[0];
 			const data = doc.data();
 			return {
-				latitude: data.coordinates.latitude,
-				longitude: data.coordinates.longitude,
+				latitude: parseFloat(data.coordinates.latitude),
+				longitude: parseFloat(data.coordinates.longitude),
 				name: data.name,
 				address: data.address,
 			};
@@ -44,8 +70,8 @@ export const getLocationCoordinates = async (locationName) => {
 				)
 			) {
 				return {
-					latitude: data.coordinates.latitude,
-					longitude: data.coordinates.longitude,
+					latitude: parseFloat(data.coordinates.latitude),
+					longitude: parseFloat(data.coordinates.longitude),
 					name: data.name,
 					address: data.address,
 				};

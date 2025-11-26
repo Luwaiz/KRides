@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View, Image } from "react-native";
 import { DrawerContentScrollView, DrawerItem } from "@react-navigation/drawer";
 import React, { useEffect, useState, useRef } from "react";
 import { AntDesign } from "@expo/vector-icons";
@@ -95,6 +95,7 @@ const DrawerComponent = (props) => {
 
 	const navigation = useNavigation();
 	const [name, setName] = useState("Loading...");
+	const [profileUrl, setProfileUrl] = useState(null);
 	const [loading, setLoading] = useState(true);
 	const listenerSetup = useRef(false);
 
@@ -126,10 +127,12 @@ const DrawerComponent = (props) => {
 						const displayName =
 							userData?.name || userData?.fullname || "Customer";
 						setName(displayName);
+						setProfileUrl(userData?.profileUrl || null);
 						console.log("✅ Customer profile loaded. Name:", displayName);
 					} else {
 						console.log("❌ No customer profile document found");
 						setName("Customer");
+						setProfileUrl(null);
 					}
 					setLoading(false);
 				},
@@ -141,6 +144,7 @@ const DrawerComponent = (props) => {
 						console.error("❌ Error in onSnapshot:", error);
 					}
 					setName("Customer");
+					setProfileUrl(null);
 					setLoading(false);
 				}
 			);
@@ -164,9 +168,16 @@ const DrawerComponent = (props) => {
 			<DrawerContentScrollView {...props}>
 				<TouchableOpacity onPress={() => navigation.navigate("Profile")}>
 					<View style={styles.topCont}>
-						{/* <View>
-							<Avatar />
-						</View> */}
+						<View>
+							{profileUrl ? (
+								<Image
+									source={{ uri: profileUrl }}
+									style={{ width: 50, height: 50, borderRadius: 25 }}
+								/>
+							) : (
+								<Avatar width={50} height={50} />
+							)}
+						</View>
 						<View style={styles.container}>
 							<Text style={styles.title}>{loading ? "Loading..." : name}</Text>
 							<Text style={styles.subTitle}>Edit Profile</Text>

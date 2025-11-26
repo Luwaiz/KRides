@@ -95,6 +95,11 @@ export const formatTime = (minutes) => {
  */
 export const calculateFare = (distanceKm, passengers = 1) => {
 	const baseFare = 200;
-	const fare = baseFare * passengers;
+	let fare;
+	if (passengers >= 3) {
+		fare = baseFare * passengers + 100;
+	} else {
+		fare = baseFare * passengers + 50;
+	}
 	return fare;
 };

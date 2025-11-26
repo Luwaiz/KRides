@@ -117,7 +117,7 @@ const ConfirmRide = () => {
 				destination: destinationCoords,
 				pickupAddress: location,
 				destinationAddress: destination,
-				price: Price,
+				amount: Price,
 				numberOfPassengers: numberOfPassenger,
 				paymentMethod: "flutterwave",
 			});

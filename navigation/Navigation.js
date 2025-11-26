@@ -15,6 +15,7 @@ import OnBoarding from "../screens/OnBoarding";
 import AuthStack from "./AuthStack";
 import DrawerNavigator from "./DrawerNavigator"; // for customers (with drawer)
 import DriverDrawer from "./DriverDrawer"; // for drivers (with drawer)
+import DriverOnboardingStack from "./DriverOnboardingStack";
 
 const Stack = createNativeStackNavigator();
 
@@ -44,19 +45,19 @@ const Navigation = () => {
 
 	useEffect(() => {
 		let mounted = true;
-		
+
 		const unsubscribe = onAuthStateChanged(
 			FIREBASE_AUTH,
 			async (currentUser) => {
 				if (!mounted) return;
-				
+
 				setUser(currentUser);
 
 				if (currentUser && !storeRole) {
 					setRoleLoading(true);
 					try {
 						console.log("🔍 Fetching user profile for:", currentUser.uid);
-						
+
 						// First check if user exists in "users" collection
 						const userRef = doc(FIREBASE_DB, "users", currentUser.uid);
 						const userSnap = await getDoc(userRef);
@@ -112,7 +113,7 @@ const Navigation = () => {
 								});
 							} else {
 								console.log("⚠️ User not found in any collection, using defaults");
-								setAuthData(currentUser, { 
+								setAuthData(currentUser, {
 									email: currentUser.email,
 									name: currentUser.displayName || "User"
 								}, "customer"); // fallback
@@ -122,13 +123,13 @@ const Navigation = () => {
 						console.error("❌ Error fetching user role:", error);
 						console.error("Error code:", error.code);
 						console.error("Error message:", error.message);
-						
+
 						// Check if it's a Firestore permission error
 						if (error.code === "permission-denied") {
 							console.error("🚨 CRITICAL: Firestore permission denied!");
 							console.error("This means Firestore security rules are blocking user profile access.");
 							console.error("Please update Firestore rules in Firebase Console.");
-							
+
 							// Show detailed alert about Firestore rules
 							Alert.alert(
 								"Setup Required",
@@ -145,31 +146,31 @@ const Navigation = () => {
 								);
 							}
 						}
-						
+
 						// Set comprehensive fallback data to prevent crashes
 						if (!mounted) return;
-						
+
 						const fallbackProfile = {
 							email: currentUser.email || "",
 							name: currentUser.displayName || "User",
 							phone: currentUser.phoneNumber || "",
 							uid: currentUser.uid,
 						};
-						
+
 						console.log("⚠️ Using fallback profile data:", fallbackProfile);
-						
+
 						// Set auth data
 						setAuthData(currentUser, fallbackProfile, "customer");
-						
+
 						// Populate user details store with fallback data
 						setUserId(currentUser.uid);
 						setEmail(currentUser.email || "");
 						setPhone(currentUser.phoneNumber || "");
-						
+
 						const nameParts = (currentUser.displayName || "User").split(" ");
 						setFirstName(nameParts[0] || "User");
 						setLastName(nameParts.slice(1).join(" ") || "");
-						
+
 						console.log("✅ Fallback profile data populated in stores");
 					} finally {
 						setRoleLoading(false);
@@ -210,12 +211,22 @@ const Navigation = () => {
 						<Stack.Screen name="AuthStack" component={AuthStack} />
 					</>
 				) : storeRole === "driver" ? (
-					// Driver logged in - use key to force remount when role changes
-					<Stack.Screen
-						key="driver-drawer"
-						name="DriverDrawer"
-						component={DriverDrawer}
-					/>
+					// Driver logged in
+					// Check if bank details are verified
+					useDriverDetails.getState().bankDetailsVerified ? (
+						<Stack.Screen
+							key="driver-drawer"
+							name="DriverDrawer"
+							component={DriverDrawer}
+						/>
+					) : (
+						// If not verified, show onboarding stack
+						<Stack.Screen
+							key="driver-onboarding"
+							name="DriverOnboardingStack"
+							component={DriverOnboardingStack}
+						/>
+					)
 				) : (
 					// Customer logged in - use key to force remount when role changes
 					<Stack.Screen

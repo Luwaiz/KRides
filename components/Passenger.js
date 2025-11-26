@@ -23,7 +23,7 @@ import {
 
 const Passenger = () => {
 	const MIN_PASSENGERS = 1;
-	const MAX_PASSENGERS = 3; // Keke capacity
+	const MAX_PASSENGERS = 4; // Keke capacity
 	const [selected, setSelected] = useState(null);
 	const [error, setError] = useState("");
 	const [distance, setDistance] = useState(0);
@@ -135,6 +135,15 @@ const Passenger = () => {
 							color={colors.primaryBlue}
 						/>
 						<Text style={styles.radioText}>3 Passengers</Text>
+					</View>
+					<View style={styles.RadioContainer}>
+						<RadioButton.Android
+							value="4"
+							status={selected === "4" ? "checked" : "unchecked"}
+							onPress={() => handlePassengerSelect("4")}
+							color={colors.primaryBlue}
+						/>
+						<Text style={styles.radioText}>4 Passengers</Text>
 					</View>
 
 					{/* Error Message */}

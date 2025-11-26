@@ -9,9 +9,8 @@ import GoogleButton from "../../components/buttons/GoogleButton";
 import Terms from "../../components/Terms";
 import BackButton from "../../components/buttons/BackButton";
 import { useDriverDetails, useUserDetails } from "../../constants/Store";
-import axios from "axios";
-import API from "../../hooks/API";
-const {height,width} = Dimensions.get('window');
+import Firebase from "../../hooks/Firebase";
+const { height, width } = Dimensions.get('window');
 
 
 const DriverLogin = ({ navigation }) => {
@@ -35,53 +34,39 @@ const DriverLogin = ({ navigation }) => {
 		}));
 	const [loading, setLoading] = useState(false);
 
-	const loginUser = async (request) => {
-		try {
-			const response = await axios.post(API.DriverLogin, request);
-			console.log("loggeed in Access Token:", response?.data);
-
-			if (response?.data?.access_token) {
-				setAccessToken(response.data.access_token);
-				fetchUserProfile(response.data.access_token); // Call the next function
-			} else {
-				console.error("Access token not found.");
-			}
-		} catch (error) {
-			setLoading(false);
-			console.log("Login Error:", error?.response?.data || error?.message);
-			alert("Login failed. Please check your credentials and try again.");
+	const handleLogin = async () => {
+		if (!phone || !password) {
+			alert("Please enter both phone number and password");
+			return;
 		}
-	};
 
-	const fetchUserProfile = async (accessToken) => {
-		try {
-			const userResponse = await axios.get(API.DriverProfile, {
-				headers: { Authorization: `Bearer ${accessToken}` },
-			});
-
-			console.log("User Response:", userResponse?.data?.data);
-			setPhone(userResponse?.data?.data?.phone);
-			setFullName(userResponse?.data?.data?.fullName);
-			setVehicleId(userResponse?.data?.data?.vehicle_id);
-			setLoading(false);
-			ToHome();
-		} catch (error) {
-			setLoading(false);
-			console.error(
-				"User Profile Error:",
-				error.response?.data || error.message
-			);
-			alert("Failed to fetch user profile. Please try again.");
-		}
-	};
-
-	const handleLogin = () => {
 		setLoading(true);
-		const request = {
-			phone,
-			password,
-		};
-		loginUser(request);
+		try {
+			// Construct email from phone number
+			const email = `${phone}@rideapp.com`;
+			await Firebase.signInWithEmail(email, password);
+
+			// Navigation.js will automatically handle routing based on Firebase Auth
+			// But we can show a success toast
+			console.log("✅ Driver logged in successfully");
+		} catch (error) {
+			setLoading(false);
+			console.log("Login Error:", error);
+
+			let errorMessage = "Login failed. Please try again.";
+			if (
+				error.code === "auth/invalid-credential" ||
+				error.code === "auth/wrong-password" ||
+				error.code === "auth/user-not-found" ||
+				error.code === "auth/invalid-email"
+			) {
+				errorMessage = "Invalid phone number or password";
+			} else if (error.code === "auth/too-many-requests") {
+				errorMessage = "Too many failed attempts. Please try again later.";
+			}
+
+			alert(errorMessage);
+		}
 	};
 
 	return (

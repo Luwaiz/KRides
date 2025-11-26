@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View, Image } from "react-native";
 import React, { useEffect, useState } from "react";
 import useAuthStore, { useUserDetails } from "../../constants/Store";
 import Avatar from "../../assets/svg/Frame 91profile.svg";
@@ -16,6 +16,7 @@ import { doc, onSnapshot } from "firebase/firestore";
 const Settings = ({ navigation }) => {
 	const [modal, setModal] = useState(false);
 	const [name, setName] = useState("");
+	const [profileUrl, setProfileUrl] = useState(null);
 	const [loading, setLoading] = useState(false);
 
 	const { user } = useAuthStore((state) => ({
@@ -38,7 +39,9 @@ const Settings = ({ navigation }) => {
 					doc(db, "users", user.uid),
 					(docSnap) => {
 						if (docSnap.exists()) {
-							setName(docSnap.data()?.name);
+							const data = docSnap.data();
+							setName(data?.name);
+							setProfileUrl(data?.profileUrl || null);
 						}
 						setLoading(false);
 					},
@@ -73,7 +76,14 @@ const Settings = ({ navigation }) => {
 		<SafeAreaView style={styles.container}>
 			<View style={styles.topContainer}>
 				<Text style={styles.name}>{name}</Text>
-				<Avatar height={80} width={80} />
+				{profileUrl ? (
+					<Image
+						source={{ uri: profileUrl }}
+						style={{ width: 80, height: 80, borderRadius: 40 }}
+					/>
+				) : (
+					<Avatar height={80} width={80} />
+				)}
 			</View>
 			<View style={styles.middleContainer}>
 				<Pressable

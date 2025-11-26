@@ -25,8 +25,8 @@ import axios from "axios";
 import API from "../../hooks/API";
 import { getRideCoordinates } from "../../helpers/getLocationCoordinates";
 import { listenToPendingRides } from "../../helpers/firebaseRides";
-import { httpsCallable } from "firebase/functions";
-import { FIREBASE_FUNCTIONS } from "../../firebaseConfig";
+import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { FIREBASE_DB } from "../../firebaseConfig";
 import { sp, fs, br, ms } from "../../constants/responsive";
 
 const HomeTab = () => {
@@ -109,11 +109,18 @@ const HomeTab = () => {
 				vehicleId: VehicleId || "",
 			};
 
-			console.log("📤 Sending driver data to Firestore via Cloud Function");
+			console.log("📤 Updating ride status in Firestore directly");
 
-			// Accept the ride via Cloud Function
-			const acceptRideFn = httpsCallable(FIREBASE_FUNCTIONS, "acceptRide");
-			await acceptRideFn({ rideId });
+			// Accept the ride via direct Firestore update
+			const rideRef = doc(FIREBASE_DB, "rides", rideId);
+			await updateDoc(rideRef, {
+				status: "accepted",
+				driverId: uid || VehicleId,
+				driverName: fullName || "Driver",
+				driverPhone: phone || "",
+				vehicleId: VehicleId || "",
+				acceptedAt: serverTimestamp(),
+			});
 
 			// Store the accepted ride details with coordinates
 			setAcceptedRide({
@@ -130,11 +137,13 @@ const HomeTab = () => {
 				fullName || "Driver"
 			);
 
-			// Switch to AcceptTab to show the "Complete Ride" button
-			setAcceptRidePage();
-			console.log("🔄 Switched to AcceptTab");
-
-			setAccepting(null);
+			// Add a small delay to ensure smooth transition and prevent flashing of the previous screen
+			setTimeout(() => {
+				// Switch to AcceptTab to show the "Complete Ride" button
+				setAcceptRidePage();
+				console.log("🔄 Switched to AcceptTab");
+				setAccepting(null);
+			}, 500);
 
 			// Remove from pending list (will be handled by listener automatically)
 		} catch (error) {
@@ -218,6 +227,7 @@ const HomeTab = () => {
 					) : (
 						<BottomSheetFlatList
 							data={rides}
+							extraData={accepting}
 							refreshControl={
 								<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
 							}
@@ -335,3 +345,4 @@ const styles = StyleSheet.create({
 		paddingHorizontal: sp(16),
 	},
 });
+

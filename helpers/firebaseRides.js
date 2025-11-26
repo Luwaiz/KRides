@@ -85,7 +85,7 @@ export const createRide = async (rideData) => {
 			driverName: null,
 			driverPhone: null,
 			vehicleId: null,
-			paymentMethod: rideData.paymentMethod || "cash",
+			paymentMethod: rideData.paymentMethod || "flutterwave",
 			createdAt: serverTimestamp(),
 			acceptedAt: null,
 			completedAt: null,
@@ -192,7 +192,7 @@ export const listenToPendingRides = (callback) => {
 		return unsubscribe;
 	} catch (error) {
 		console.error("❌ Error setting up pending rides listener:", error);
-		return () => {};
+		return () => { };
 	}
 };
 
@@ -234,7 +234,7 @@ export const listenToRide = (rideId, callback) => {
 		return unsubscribe;
 	} catch (error) {
 		console.error("❌ Error setting up ride listener:", error);
-		return () => {};
+		return () => { };
 	}
 };
 
@@ -282,7 +282,7 @@ export const listenToCustomerRides = (customerId, callback) => {
 		return unsubscribe;
 	} catch (error) {
 		console.error("❌ Error setting up customer rides listener:", error);
-		return () => {};
+		return () => { };
 	}
 };
 
@@ -384,7 +384,7 @@ export const listenToDriverRides = (driverId, callback) => {
 		};
 	} catch (error) {
 		console.error("❌ Error setting up driver rides listener:", error);
-		return () => {};
+		return () => { };
 	}
 };
 
@@ -480,6 +480,63 @@ export const getCustomerHistory = async (customerId) => {
 		return rides;
 	} catch (error) {
 		console.error("❌ Error getting customer history:", error);
+		return [];
+	}
+};
+
+/**
+ * Get driver ride history (completed and cancelled rides)
+ * @param {string} driverId - Driver ID
+ * @returns {Promise<Array>} Array of completed/cancelled rides
+ */
+export const getDriverHistory = async (driverId) => {
+	try {
+		const ridesRef = collection(FIREBASE_DB, "rides");
+
+		// Query for completed rides
+		const completedQuery = query(
+			ridesRef,
+			where("driverId", "==", driverId),
+			where("status", "==", "completed")
+		);
+
+		// Query for cancelled rides
+		const cancelledQuery = query(
+			ridesRef,
+			where("driverId", "==", driverId),
+			where("status", "==", "cancelled")
+		);
+
+		const [completedSnapshot, cancelledSnapshot] = await Promise.all([
+			getDocs(completedQuery),
+			getDocs(cancelledQuery),
+		]);
+
+		const rides = [];
+
+		completedSnapshot.forEach((doc) => {
+			rides.push({ ...doc.data(), rideId: doc.id });
+		});
+
+		cancelledSnapshot.forEach((doc) => {
+			rides.push({ ...doc.data(), rideId: doc.id });
+		});
+
+		// Sort by completion/cancellation date (newest first)
+		rides.sort((a, b) => {
+			const aTime = (a.completedAt || a.cancelledAt)?.toMillis
+				? (a.completedAt || a.cancelledAt).toMillis()
+				: 0;
+			const bTime = (b.completedAt || b.cancelledAt)?.toMillis
+				? (b.completedAt || b.cancelledAt).toMillis()
+				: 0;
+			return bTime - aTime;
+		});
+
+		console.log("📜 Driver history fetched:", rides.length, "rides");
+		return rides;
+	} catch (error) {
+		console.error("❌ Error getting driver history:", error);
 		return [];
 	}
 };

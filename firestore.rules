@@ -2,7 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Users collection - simplified without circular dependency
+    // Users collection
     match /users/{userId} {
       allow read: if request.auth != null && request.auth.uid == userId;
       allow create: if request.auth != null && request.auth.uid == userId;
@@ -10,29 +10,34 @@ service cloud.firestore {
       allow delete: if request.auth != null && request.auth.uid == userId;
     }
     
-    // Drivers collection (if you're storing driver profiles separately)
+    // Drivers collection
     match /drivers/{driverId} {
       allow read: if request.auth != null && request.auth.uid == driverId;
       allow create: if request.auth != null && request.auth.uid == driverId;
-      allow update: if request.auth != null && request.auth.uid == driverId;
+      // Allow driver to update their own profile, OR allow customers to add ratings
+      allow update: if request.auth != null && (
+        request.auth.uid == driverId ||
+        // Allow adding ratings (only specific fields can be updated by customers)
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ratings', 'totalRatings', 'ratingSum']))
+      );
       allow delete: if request.auth != null && request.auth.uid == driverId;
     }
     
     // Rides collection
     match /rides/{rideId} {
-      // Any authenticated user can read rides (needed for drivers to see available rides)
+      // Any authenticated user can read rides
       allow read: if request.auth != null;
       
       // Only authenticated users can create rides
-      // Changed from customerUid to customerId to match app code
       allow create: if request.auth != null 
                       && request.resource.data.customerId == request.auth.uid;
       
       // Customer or assigned driver can update
-      // Changed from customerUid/assignedDriverUid to customerId/driverId to match app code
       allow update: if request.auth != null && (
         resource.data.customerId == request.auth.uid ||
-        resource.data.driverId == request.auth.uid
+        resource.data.driverId == request.auth.uid ||
+        // Allow a driver to accept a ride (assign themselves) if no driver is currently assigned
+        ((resource.data.driverId == null || resource.data.driverId == "") && request.resource.data.driverId == request.auth.uid)
       );
       
       // Only customer can delete their ride
@@ -48,9 +53,7 @@ service cloud.firestore {
     
     // Locations collection
     match /locations/{locationId} {
-      // All authenticated users can read locations
       allow read: if request.auth != null;
-      // Only admins should write (via Firebase Console or Cloud Functions)
       allow write: if false;
     }
     

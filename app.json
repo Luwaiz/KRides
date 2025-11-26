@@ -1,27 +1,39 @@
 {
   "expo": {
     "name": "KRides",
-    "slug": "KRides",
+    "slug": "krides",
     "version": "1.0.0",
-    "web": {
-      "favicon": "./assets/favicon.png"
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splashscreen_logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
     },
-    "plugins": [
-      "expo-font",
-      [
-        "@rnmapbox/maps",
-        {
-          "RNMapboxMapsImpl": "mapbox"
-        }
-      ]
-    ],
     "extra": {
       "eas": {
-        "projectId": "4f4f3190-f45f-4415-97a9-b3dfb44bba45"
+        "projectId": "960cb227-598a-4ca3-ad50-bccaa10465e3"
       }
     },
     "android": {
-      "package": "com.eluwaiz.KRides"
-    }
+      "package": "com.eluwaiz.KRides",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "com.eluwaiz.KRides",
+      "usesNonExemptEncryption": false
+    },
+    "plugins": [
+      [
+        "@rnmapbox/maps",
+        {
+          "RNMapboxMapsImpl": "mapbox",
+          "RNMapboxMapsDownloadToken": "sk.eyJ1IjoiZWx1d2FpeiIsImEiOiJjbTVibXJsNWk0ZXE4MmpwN2FvNjJ2cmJ3In0.ITvpOypF_zViRDy3hHU8OA"
+        }
+      ],
+      "expo-font"
+    ]
   }
 }
