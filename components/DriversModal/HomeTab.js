@@ -24,7 +24,7 @@ import Destination from "../Destination";
 import axios from "axios";
 import API from "../../hooks/API";
 import { getRideCoordinates } from "../../helpers/getLocationCoordinates";
-import { listenToPendingRides } from "../../helpers/firebaseRides";
+import { listenToPendingRides, declineRide } from "../../helpers/firebaseRides";
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { FIREBASE_DB } from "../../firebaseConfig";
 import { sp, fs, br, ms } from "../../constants/responsive";
@@ -51,6 +51,7 @@ const HomeTab = () => {
 	const [loading, setLoading] = useState(false);
 	const [refreshing, setRefreshing] = useState(false);
 	const [accepting, setAccepting] = useState(null);
+	const [declining, setDeclining] = useState(null);
 	const [rides, setRides] = useState([]);
 
 	// ✅ Listen to pending rides from Firestore (real-time)
@@ -62,19 +63,42 @@ const HomeTab = () => {
 			console.log("📨 Received pending rides:", pendingRides.length);
 			setRides(pendingRides);
 			setLoading(false);
-		});
+		}, uid); // Pass driver ID to filter out declined rides
 
 		return () => {
 			console.log("🔌 Cleaning up pending rides listener");
 			unsubscribe();
 		};
-	}, []);
+	}, [uid]);
 
 	const onRefresh = () => {
 		console.log("🔄 Manual refresh - Firestore listeners auto-update");
 		// Firestore listeners automatically update, but we can show refreshing state
 		setRefreshing(true);
 		setTimeout(() => setRefreshing(false), 1000);
+	};
+
+	// ❌ Decline ride
+	const DeclineRide = async (rideId) => {
+		console.log("❌ Declining ride:", rideId);
+		setDeclining(rideId);
+
+		try {
+			await declineRide(rideId, uid);
+			console.log("✅ Ride declined successfully");
+			// Ride will automatically disappear from list via listener
+		} catch (error) {
+			console.error("❌ Error declining ride:", error);
+
+			let errorMessage = "Unable to decline ride. Please try again.";
+			if (error.message?.includes("not found")) {
+				errorMessage = "This ride is no longer available.";
+			}
+
+			alert(errorMessage);
+		} finally {
+			setDeclining(null);
+		}
 	};
 
 	// ✅ Accept ride using Firestore
@@ -256,7 +280,11 @@ const HomeTab = () => {
 										destination={item?.destination}
 									/>
 									<View style={styles.button}>
-										<DangerButton title={"Decline"} />
+										<DangerButton
+											title={"Decline"}
+											onPress={() => DeclineRide(item?.rideId || item?.id)}
+											loading={declining === (item?.rideId || item?.id)}
+										/>
 										<ActiveButton
 											title={"Accept"}
 											onPress={() => AcceptRide(item?.rideId || item?.id)}

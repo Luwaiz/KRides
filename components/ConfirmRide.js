@@ -1,4 +1,4 @@
-import { StyleSheet, Text, TouchableOpacity, View, Alert, ActivityIndicator } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View, Alert, ActivityIndicator, Platform } from "react-native";
 import BottomSheet from "@gorhom/bottom-sheet";
 import React, { useEffect, useState } from "react";
 import ActiveButton from "./buttons/ActiveButton";
@@ -23,11 +23,12 @@ import {
 import InActiveButton from "./buttons/InActiveButton";
 import DangerButton from "./buttons/DangerButton";
 import Payment from "../screens/AppScreens/Payment";
-import { createRide, listenToRide, cancelRide } from "../helpers/firebaseRides";
+import { createRide, listenToRide, cancelRide, cancelRideWithRefund } from "../helpers/firebaseRides";
 import { FIREBASE_DB, FIREBASE_AUTH } from "../firebaseConfig";
 import { doc, updateDoc } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import useAuthStore from "../constants/Store";
+import { calculateFare } from "../helpers/rideCalculations";
 
 const ConfirmRide = () => {
 	const navigation = useNavigation();
@@ -83,19 +84,20 @@ const ConfirmRide = () => {
 	console.log("   - Phone:", phone || "MISSING");
 	console.log("   - User ID:", UserId || "MISSING");
 
-	const Price = (numberOfPassenger * 200) + 50;
+	const Price = calculateFare(null,numberOfPassenger);
 
 	const ToPromo = () => {
 		navigation.navigate("Promo");
 	};
 
 	// ✅ Create a new ride using Firebase helper
-	const BookRide = async () => {
+	const BookRide = async (transactionId = null, paymentData = null) => {
 		console.log("🚀 BookRide function called!");
 		console.log("📍 Pickup:", location, pickupLocation);
 		console.log("📍 Destination:", destination, destinationCoords);
 		console.log("👥 Passengers:", numberOfPassenger);
 		console.log("💰 Price:", Price);
+		console.log("💳 Transaction ID:", transactionId);
 
 		// Check Firebase Auth state
 		const currentUser = FIREBASE_AUTH.currentUser;
@@ -120,10 +122,19 @@ const ConfirmRide = () => {
 				amount: Price,
 				numberOfPassengers: numberOfPassenger,
 				paymentMethod: "flutterwave",
+				transactionId: transactionId, // Save transaction ID for refunds
+				paymentData: paymentData ? {
+					tx_ref: paymentData.tx_ref,
+					flw_ref: paymentData.flw_ref,
+					status: paymentData.status,
+				} : null,
 			});
 
 			if (newRideId) {
 				console.log("✅ Ride created successfully with ID:", newRideId);
+				if (transactionId) {
+					console.log("✅ Transaction ID saved:", transactionId);
+				}
 				setRideId(newRideId);
 				setRideStatus("pending");
 			} else {
@@ -235,7 +246,7 @@ const ConfirmRide = () => {
 		};
 	}, [rideId]);
 
-	// ❌ Cancel ride with confirmation dialog
+	// ❌ Cancel ride with confirmation dialog and automatic refund
 	const handleCancelRide = () => {
 		if (!rideId) {
 			alert("No active ride to cancel");
@@ -259,8 +270,15 @@ const ConfirmRide = () => {
 					onPress: async () => {
 						setCancelling(true);
 						try {
-							await cancelRide(rideId);
+							// Use cancelRideWithRefund to automatically process refunds
+							const result = await cancelRideWithRefund(
+								rideId,
+								'customer',
+								'Customer cancelled the ride'
+							);
+
 							console.log("✅ Ride cancelled successfully");
+							console.log("   Refund status:", result.refundStatus || "N/A");
 
 							// Reset all states
 							setPending(false);
@@ -272,13 +290,33 @@ const ConfirmRide = () => {
 							// Navigate back to home
 							setHomePage();
 
-							Toast.show({
-								type: "tomatoToast",
-								text1: "Ride Cancelled",
-								text2: "Your ride has been cancelled successfully",
-								position: "top",
-								visibilityTime: 3000,
-							});
+							// Show appropriate message based on refund status
+							if (result.refundStatus === "completed") {
+								Toast.show({
+									type: "tomatoToast",
+									text1: "Ride Cancelled & Refunded",
+									text2: `₦${result.refundAmount} will be refunded to your account`,
+									position: "top",
+									visibilityTime: 4000,
+								});
+							} else if (result.refundStatus === "failed") {
+								Toast.show({
+									type: "tomatoToast",
+									text1: "Ride Cancelled",
+									text2: "Refund failed. Please contact support for assistance.",
+									position: "top",
+									visibilityTime: 4000,
+								});
+							} else {
+								// No refund needed (cash payment or no transaction)
+								Toast.show({
+									type: "tomatoToast",
+									text1: "Ride Cancelled",
+									text2: "Your ride has been cancelled successfully",
+									position: "top",
+									visibilityTime: 3000,
+								});
+							}
 						} catch (error) {
 							console.error("❌ Error cancelling ride:", error);
 							Toast.show({

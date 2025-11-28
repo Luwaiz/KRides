@@ -22,11 +22,13 @@ const Payment = ({ email, amount, name, phoneNumber, BookRide, subaccountId }) =
 	const handleOnRedirect = (data) => {
 		console.log("💳 Payment redirect data:", data);
 		console.log("💳 Payment status:", data?.status);
+		console.log("💳 Transaction ID:", data?.transaction_id);
 
 		if (data.status === "completed" || data.status === "successful") {
 			// Handle successful payment
 			console.log("✅ Payment successful! Creating ride...");
-			BookRide();
+			// Pass transaction data to BookRide for saving
+			BookRide(data.transaction_id, data);
 		} else {
 			console.log("❌ Payment was not completed. Status:", data.status);
 		}

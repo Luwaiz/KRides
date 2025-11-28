@@ -19,20 +19,21 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
+      },
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyB7fe6OfWqZs2BP0AoZS-2jLi5mIVbiYTM"
+        }
       }
     },
     "ios": {
       "bundleIdentifier": "com.eluwaiz.KRides",
-      "usesNonExemptEncryption": false
+      "usesNonExemptEncryption": false,
+      "config": {
+        "googleMapsApiKey": "AIzaSyB7fe6OfWqZs2BP0AoZS-2jLi5mIVbiYTM"
+      }
     },
     "plugins": [
-      [
-        "@rnmapbox/maps",
-        {
-          "RNMapboxMapsImpl": "mapbox",
-          "RNMapboxMapsDownloadToken": "sk.eyJ1IjoiZWx1d2FpeiIsImEiOiJjbTVibXJsNWk0ZXE4MmpwN2FvNjJ2cmJ3In0.ITvpOypF_zViRDy3hHU8OA"
-        }
-      ],
       "expo-font"
     ]
   }

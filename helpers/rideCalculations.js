@@ -93,7 +93,7 @@ export const formatTime = (minutes) => {
  * @param {number} passengers - Number of passengers
  * @returns {number} Fare in Naira
  */
-export const calculateFare = (distanceKm, passengers = 1) => {
+export const calculateFare = (distanceKm, passengers) => {
 	const baseFare = 200;
 	let fare;
 	if (passengers >= 3) {
