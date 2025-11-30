@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, TouchableOpacity } from "react-native";
+import { StyleSheet, Text, View, TouchableOpacity, Image } from "react-native";
 import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import { MaterialIcons, Octicons } from "@expo/vector-icons";
 import React, { useState, useEffect } from "react";
@@ -161,13 +161,20 @@ const AcceptTab = () => {
 						</View>
 						<View style={styles.details}>
 							<View style={styles.detailCont}>
-								<Avatar width={50} height={50} />
+								{acceptedRide?.customerPhotoURL ? (
+									<Image
+										source={{ uri: acceptedRide.customerPhotoURL }}
+										style={{ width: 50, height: 50, borderRadius: 25 }}
+									/>
+								) : (
+									<Avatar width={50} height={50} />
+								)}
 								<View>
 									<Text style={styles.name}>
 										{acceptedRide?.customerName || acceptedRide?.name || "Customer"}
 									</Text>
 									<Text style={styles.time}>Card Payment</Text>
-									<Text style={styles.time}>₦{calculateDriverEarnings(acceptedRide?.amount) || "0"}</Text>
+									<Text style={styles.time}>₦{calculateDriverEarnings(acceptedRide?.amount, acceptedRide?.numberOfPassengers) || "0"}</Text>
 								</View>
 							</View>
 							<Phone width={24} height={24} />
@@ -194,7 +201,7 @@ const AcceptTab = () => {
 							<View style={styles.nextRideInfo}>
 								<Text style={styles.nextRideLabel}>Next Ride Queued</Text>
 								<Text style={styles.nextRideText}>
-									{nextRide.customerName} • ₦{calculateDriverEarnings(nextRide.amount)}
+									{nextRide.customerName} • ₦{calculateDriverEarnings(nextRide.amount, nextRide.numberOfPassengers)}
 								</Text>
 							</View>
 						)}
@@ -233,7 +240,7 @@ const AcceptTab = () => {
 														? ride.destination?.name || "Destination"
 														: ride.destination || "Destination"}
 												</Text>
-												<Text style={styles.pendingRidePrice}>₦{calculateDriverEarnings(ride.amount) || 0}</Text>
+												<Text style={styles.pendingRidePrice}>₦{calculateDriverEarnings(ride.amount, ride.numberOfPassengers) || 0}</Text>
 											</View>
 											<TouchableOpacity
 												style={[

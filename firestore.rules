@@ -4,7 +4,8 @@ service cloud.firestore {
     
     // Users collection
     match /users/{userId} {
-      allow read: if request.auth != null && request.auth.uid == userId;
+      // Allow any authenticated user to read user profiles (needed for drivers to get push tokens)
+      allow read: if request.auth != null;
       allow create: if request.auth != null && request.auth.uid == userId;
       allow update: if request.auth != null && request.auth.uid == userId;
       allow delete: if request.auth != null && request.auth.uid == userId;
@@ -12,7 +13,8 @@ service cloud.firestore {
     
     // Drivers collection
     match /drivers/{driverId} {
-      allow read: if request.auth != null && request.auth.uid == driverId;
+      // Allow any authenticated user to read driver profiles (needed for customers to see driver info)
+      allow read: if request.auth != null;
       allow create: if request.auth != null && request.auth.uid == driverId;
       // Allow driver to update their own profile, OR allow customers to add ratings
       allow update: if request.auth != null && (
@@ -37,7 +39,10 @@ service cloud.firestore {
         resource.data.customerId == request.auth.uid ||
         resource.data.driverId == request.auth.uid ||
         // Allow a driver to accept a ride (assign themselves) if no driver is currently assigned
-        ((resource.data.driverId == null || resource.data.driverId == "") && request.resource.data.driverId == request.auth.uid)
+        ((resource.data.driverId == null || resource.data.driverId == "") && request.resource.data.driverId == request.auth.uid) ||
+        // Allow any driver to decline a ride by adding themselves to declined_by array
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['declined_by']) && 
+         request.resource.data.declined_by is list)
       );
       
       // Only customer can delete their ride

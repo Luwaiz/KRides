@@ -11,6 +11,7 @@ import { PaperProvider } from "react-native-paper";
 import Toast from "react-native-toast-message";
 import ToastConfig from "./components/ToastConfig";
 import ErrorBoundary from "./components/ErrorBoundary";
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 
 import {
 	configureReanimatedLogger,
@@ -26,7 +27,7 @@ if (!__DEV__) {
 	console.error = (...args) => {
 		// Log to console
 		originalConsoleError(...args);
-		
+
 		// Only show user-friendly alert for FATAL/CRITICAL errors
 		// Let components handle their own Firebase/Network errors
 		const errorMessage = args.join(' ');
@@ -47,6 +48,15 @@ configureReanimatedLogger({
 	level: ReanimatedLogLevel.warn,
 	strict: false, // Reanimated runs in strict mode by default
 });
+
+// Configure Google Sign-In
+// Web Client ID from google-services.json (client_type: 3)
+GoogleSignin.configure({
+	webClientId: '1054058095059-6j788gaiqicduqgt1jo322hsvb7ums7b.apps.googleusercontent.com',
+	offlineAccess: true,
+	forceCodeForRefreshToken: true,
+});
+
 export default function App() {
 	const fontLoaded = FontResources();
 

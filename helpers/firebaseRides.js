@@ -74,6 +74,7 @@ export const createRide = async (rideData) => {
 			customerId: rideData.customerId,
 			customerName: rideData.customerName || "",
 			customerPhone: rideData.customerPhone || "",
+			customerPhotoURL: rideData.customerPhotoURL || null,
 			pickupLocation: rideData.pickupLocation || "",
 			pickupCoords: rideData.pickupCoords || null,
 			destination: rideData.destination || "",

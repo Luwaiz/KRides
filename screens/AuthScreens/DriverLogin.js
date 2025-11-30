@@ -1,29 +1,20 @@
 import { Dimensions, StyleSheet, Text, View } from "react-native";
 import React, { useState } from "react";
-import BottomSheet from "@gorhom/bottom-sheet";
 import { colors } from "../../constants/styling";
 import { SafeAreaView } from "react-native-safe-area-context";
 import TextInput1 from "../../components/TextInput1";
 import ActiveButton from "../../components/buttons/ActiveButton";
-import GoogleButton from "../../components/buttons/GoogleButton";
 import Terms from "../../components/Terms";
 import BackButton from "../../components/buttons/BackButton";
-import { useDriverDetails, useUserDetails } from "../../constants/Store";
+import { useDriverDetails } from "../../constants/Store";
 import Firebase from "../../hooks/Firebase";
-const { height, width } = Dimensions.get('window');
 
+const { height, width } = Dimensions.get('window');
 
 const DriverLogin = ({ navigation }) => {
 	const [phone, set_phone] = useState();
 	const [password, set_password] = useState();
-
-	const ToHome = () => {
-		navigation.replace("DriverStack", {
-			params: {
-				params: "DriverHome",
-			},
-		});
-	};
+	const [loading, setLoading] = useState(false);
 
 	const { setAccessToken, setPhone, setFullName, setVehicleId } =
 		useDriverDetails((state) => ({
@@ -32,7 +23,6 @@ const DriverLogin = ({ navigation }) => {
 			setFullName: state.setFullName,
 			setVehicleId: state.setVehicleId,
 		}));
-	const [loading, setLoading] = useState(false);
 
 	const handleLogin = async () => {
 		if (!phone || !password) {
@@ -47,7 +37,6 @@ const DriverLogin = ({ navigation }) => {
 			await Firebase.signInWithEmail(email, password);
 
 			// Navigation.js will automatically handle routing based on Firebase Auth
-			// But we can show a success toast
 			console.log("✅ Driver logged in successfully");
 		} catch (error) {
 			setLoading(false);
@@ -88,7 +77,12 @@ const DriverLogin = ({ navigation }) => {
 							password
 							onChangeText={(text) => set_password(text)}
 						/>
-						<Text style={styles.forgot}>Forgot password?</Text>
+						<Text
+							style={styles.forgot}
+							onPress={() => navigation.navigate("ForgetPass")}
+						>
+							Forgot password?
+						</Text>
 						<View style={styles.buttons}>
 							<View style={styles.logInButton}>
 								<ActiveButton
@@ -98,12 +92,6 @@ const DriverLogin = ({ navigation }) => {
 								/>
 							</View>
 						</View>
-						<View style={styles.OrContainer}>
-							<View style={styles.dash} />
-							<Text style={styles.OrText}>OR</Text>
-							<View style={styles.dash} />
-						</View>
-						<GoogleButton title={"Continue with Google"} />
 					</View>
 				</View>
 				<Terms />
@@ -151,23 +139,6 @@ const styles = StyleSheet.create({
 		alignSelf: "flex-end",
 		marginTop: -10,
 		marginBottom: 16,
-	},
-	OrContainer: {
-		flexDirection: "row",
-		alignItems: "center",
-		width: "100%",
-		height: 40,
-		justifyContent: "space-between",
-	},
-	dash: {
-		width: "47%",
-		height: 1,
-		backgroundColor: "black",
-	},
-	OrText: {
-		color: "black",
-		fontSize: 16,
-		fontWeight: "700",
 	},
 	logInButton: {
 		width: "100%",

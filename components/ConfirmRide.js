@@ -67,13 +67,14 @@ const ConfirmRide = () => {
 			destination: state.destination,
 		}));
 
-	const { firstName, lastName, email, phone, UserId } = useUserDetails(
+	const { firstName, lastName, email, phone, UserId, profileImageUrl } = useUserDetails(
 		(state) => ({
 			firstName: state.firstName,
 			lastName: state.lastName,
 			email: state.email,
 			phone: state.phone,
 			UserId: state.UserId,
+			profileImageUrl: state.profileImageUrl,
 		})
 	);
 
@@ -84,7 +85,7 @@ const ConfirmRide = () => {
 	console.log("   - Phone:", phone || "MISSING");
 	console.log("   - User ID:", UserId || "MISSING");
 
-	const Price = calculateFare(null,numberOfPassenger);
+	const Price = calculateFare(null, numberOfPassenger);
 
 	const ToPromo = () => {
 		navigation.navigate("Promo");
@@ -110,11 +111,15 @@ const ConfirmRide = () => {
 		setLoading(true);
 		setPending(true);
 
+		const handleContacting = () => {
+			Linking.openURL('tel:08100000000');
+		};
 		try {
 			const newRideId = await createRide({
 				customerId: currentUser.uid,
 				customerName: `${firstName} ${lastName}`,
 				customerPhone: phone,
+				customerPhotoURL: profileImageUrl,
 				pickupLocation,
 				destination: destinationCoords,
 				pickupAddress: location,
@@ -381,6 +386,7 @@ const ConfirmRide = () => {
 					</View>
 
 					{/* Promo link */}
+					{/* Promo link - Hidden for now
 					<TouchableOpacity
 						onPress={ToPromo}
 						activeOpacity={0.6}
@@ -393,6 +399,7 @@ const ConfirmRide = () => {
 							color={colors.primaryBlue}
 						/>
 					</TouchableOpacity>
+					*/}
 
 					{/* Buttons */}
 					<View style={styles.button}>

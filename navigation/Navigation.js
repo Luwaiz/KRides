@@ -29,13 +29,14 @@ const Navigation = () => {
 	const setAuthData = useAuthStore((state) => state.setAuthData);
 
 	// Get setters from useUserDetails store
-	const { setFirstName, setLastName, setEmail, setPhone, setUserId } =
+	const { setFirstName, setLastName, setEmail, setPhone, setUserId, setProfileImageUrl } =
 		useUserDetails((state) => ({
 			setFirstName: state.setFirstName,
 			setLastName: state.setLastName,
 			setEmail: state.setEmail,
 			setPhone: state.setPhone,
 			setUserId: state.setUserId,
+			setProfileImageUrl: state.setProfileImageUrl,
 		}));
 
 	// Get setter from useDriverDetails store
@@ -78,6 +79,7 @@ const Navigation = () => {
 							setUserId(currentUser.uid);
 							setEmail(profile.email || currentUser.email || "");
 							setPhone(profile.phone || "");
+							setProfileImageUrl(profile.profileImageUrl || profile.photoURL || null);
 
 							// Handle name - could be 'name' or split into firstName/lastName
 							if (profile.name) {

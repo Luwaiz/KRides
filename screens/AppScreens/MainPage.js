@@ -79,6 +79,16 @@ const MainPage = () => {
 		getLocationN();
 	}, []);
 
+	// Debug: Log pickup and destination from store
+	useEffect(() => {
+		console.log('🗺️ MainPage store values:', {
+			pickup: pickup,
+			destination: destination,
+			hasPickup: !!pickup,
+			hasDestination: !!destination
+		});
+	}, [pickup, destination]);
+
 	// Fit map to show route when pickup and destination are set
 	useEffect(() => {
 		if (pickup && destination && mapRef.current) {
@@ -121,7 +131,7 @@ const MainPage = () => {
 								{ latitude: destLat, longitude: destLng }
 							],
 							{
-								edgePadding: { top: 100, right: 50, bottom: 300, left: 50 },
+								edgePadding: { top: 50, right: 20, bottom: 50, left: 20 },
 								animated: true,
 							}
 						);
@@ -173,29 +183,40 @@ const MainPage = () => {
 					loadingEnabled={true}
 				>
 					{/* Route line - only visible when ride is active */}
-					{pickup && destination && (
-						<MapViewDirections
-							origin={{
-								latitude: parseFloat((pickup.coord || pickup).latitude),
-								longitude: parseFloat((pickup.coord || pickup).longitude)
-							}}
-							destination={{
-								latitude: parseFloat((destination.coord || destination).latitude),
-								longitude: parseFloat((destination.coord || destination).longitude)
-							}}
-							apikey={GOOGLE_MAPS_API_KEY || "AIzaSyB7fe6OfWqZs2BP0AoZS-2jLi5mIVbiYTM"}
-							strokeWidth={4}
-							strokeColor="#007AFF"
-							optimizeWaypoints={true}
-							onReady={(result) => {
-								console.log(`Distance: ${result.distance} km`);
-								console.log(`Duration: ${result.duration} min.`);
-							}}
-							onError={(errorMessage) => {
-								console.log('Directions error:', errorMessage);
-							}}
-						/>
-					)}
+					{pickup && destination && (() => {
+						const pickupCoords = pickup.coord || pickup;
+						const destCoords = destination.coord || destination;
+
+						console.log('🗺️ Rendering MapViewDirections with coords:', {
+							pickupCoords,
+							destCoords
+						});
+
+						return (
+							<MapViewDirections
+								origin={{
+									latitude: parseFloat(pickupCoords.latitude),
+									longitude: parseFloat(pickupCoords.longitude)
+								}}
+								destination={{
+									latitude: parseFloat(destCoords.latitude),
+									longitude: parseFloat(destCoords.longitude)
+								}}
+								apikey={GOOGLE_MAPS_API_KEY || "AIzaSyCPMwyZl3iso7lmMGhQt0QwGJXWdqxcqiw"}
+								strokeWidth={5}
+								strokeColor="#007AFF"
+								optimizeWaypoints={true}
+								onReady={(result) => {
+									console.log('✅ Route loaded successfully!');
+									console.log(`   Distance: ${result.distance} km`);
+									console.log(`   Duration: ${result.duration} min.`);
+								}}
+								onError={(errorMessage) => {
+									console.error('❌ MapViewDirections error:', errorMessage);
+								}}
+							/>
+						);
+					})()}
 
 					{/* Pickup marker - only visible when ride is active */}
 					{pickup && (

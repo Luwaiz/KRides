@@ -1,10 +1,9 @@
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View, Alert } from "react-native";
 import React, { useState } from "react";
 import { colors } from "../../constants/styling";
 import { SafeAreaView } from "react-native-safe-area-context";
 import TextInput1 from "../../components/TextInput1";
 import ActiveButton from "../../components/buttons/ActiveButton";
-import GoogleButton from "../../components/buttons/GoogleButton";
 import Terms from "../../components/Terms";
 import BackButton from "../../components/buttons/BackButton";
 import { useDriverDetails } from "../../constants/Store";
@@ -13,6 +12,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const DriverSignup = ({ navigation }) => {
 	const [vehicle_id, setVehicle_id] = useState("");
+	const [email, setEmail] = useState("");
 	const [password, setPass] = useState("");
 	const [phone, setPhoneNumber] = useState("");
 	const [fullName, setFull] = useState("");
@@ -25,14 +25,90 @@ const DriverSignup = ({ navigation }) => {
 		setFullName: state.setFullName,
 	}));
 
+	const isPhoneValid = (phone) => {
+		// Check if phone is exactly 11 digits
+		const phoneRegex = /^\d{11}$/;
+		return phoneRegex.test(phone);
+	};
+
+	const isNameValid = (name) => {
+		// Name should be at least 2 characters
+		return name && name.trim().length >= 2;
+	};
+
+	const isVehicleIdValid = (vehicleId) => {
+		// Vehicle ID should not be empty
+		return vehicleId && vehicleId.trim().length > 0;
+	};
+
+	const isPasswordValid = (password) => {
+		return password.length >= 8;
+	};
+
+	const isEmailValid = (email) => {
+		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+		return emailRegex.test(email);
+	};
+
 	const validateForm = () => {
-		if (!fullName || !vehicle_id || !phone || !password || !confirmPassword) {
-			alert("Please fill in all fields");
+		if (!fullName || !vehicle_id || !phone || !email || !password || !confirmPassword) {
+			Alert.alert(
+				"Oops! Missing Information",
+				"Please fill in all the fields to get started. We need your name, email, vehicle ID, phone number, and password to set up your driver account! 🚗"
+			);
+			return false;
+		}
+
+		// Validate full name
+		if (!isNameValid(fullName)) {
+			Alert.alert(
+				"Oops! Invalid Name",
+				"Please enter a valid full name (at least 2 characters) 😊"
+			);
+			return false;
+		}
+
+		// Validate vehicle ID
+		if (!isVehicleIdValid(vehicle_id)) {
+			Alert.alert(
+				"Oops! Invalid Vehicle ID",
+				"Please enter a valid vehicle ID 🚗"
+			);
+			return false;
+		}
+
+		// Validate phone number
+		if (!isPhoneValid(phone)) {
+			Alert.alert(
+				"Oops! Invalid Phone Number",
+				"Phone number must be exactly 11 digits (e.g., 08123456789) 📞"
+			);
+			return false;
+		}
+
+		// Validate email
+		if (!isEmailValid(email)) {
+			Alert.alert(
+				"Oops! Invalid Email",
+				"Please enter a valid email address (e.g., johndoe@gmail.com) 📧"
+			);
+			return false;
+		}
+
+		// Validate password strength
+		if (!isPasswordValid(password)) {
+			Alert.alert(
+				"Weak Password",
+				"Please choose a stronger password (at least 8 characters) 🔒"
+			);
 			return false;
 		}
 
 		if (password !== confirmPassword) {
-			alert("Passwords do not match");
+			Alert.alert(
+				"Password Mismatch",
+				"Passwords don't match. Please try again! 🔑"
+			);
 			return false;
 		}
 
@@ -50,6 +126,7 @@ const DriverSignup = ({ navigation }) => {
 
 		try {
 			const user = await Firebase.signUpDriver({
+				email,
 				phone,
 				password,
 				fullname: fullName,
@@ -86,7 +163,10 @@ const DriverSignup = ({ navigation }) => {
 
 	return (
 		<SafeAreaView style={styles.container}>
-			<ScrollView style={{ flex: 1 }}>
+			<ScrollView
+				style={{ flex: 1 }}
+				contentContainerStyle={{ flexGrow: 1 }}
+			>
 				<View style={styles.topCont}>
 					<BackButton text={<Text style={styles.headText}>Sign Up</Text>} />
 				</View>
@@ -97,47 +177,48 @@ const DriverSignup = ({ navigation }) => {
 								text={"Full Name"}
 								placeholder={"John Doe"}
 								onChangeText={(text) => setFull(text)}
+								value={fullName}
 							/>
 							<TextInput1
 								text={"Vehicle Id"}
 								placeholder={"e.g Z9"}
 								onChangeText={(text) => setVehicle_id(text)}
+								value={vehicle_id}
 							/>
 							<TextInput1
 								text={"Phone Number"}
 								placeholder={"08123456789"}
 								onChangeText={(text) => setPhoneNumber(text)}
+								value={phone}
+							/>
+							<TextInput1
+								text={"Email Address"}
+								placeholder={"johndoe@gmail.com"}
+								onChangeText={(text) => setEmail(text)}
+								value={email}
+								keyboardType="email-address"
+								autoCapitalize="none"
 							/>
 							<TextInput1
 								text={"Password"}
 								placeholder={"*************"}
 								password
 								onChangeText={(text) => setPass(text)}
+								value={password}
 							/>
 							<TextInput1
 								text={"Confirm Password"}
 								placeholder={"*************"}
 								password
 								onChangeText={(text) => setConfirmPassword(text)}
+								value={confirmPassword}
 							/>
 							<ActiveButton
 								title={"Sign up"}
 								onPress={() => handleSignUp(password, confirmPassword)}
-								disabled={
-									phone === "" ||
-									vehicle_id === "" ||
-									password === "" ||
-									confirmPassword === "" ||
-									loading
-								}
+								disabled={loading}
 								loading={loading}
 							/>
-							<View style={styles.OrContainer}>
-								<View style={styles.dash} />
-								<Text style={styles.OrText}>OR</Text>
-								<View style={styles.dash} />
-							</View>
-							<GoogleButton title={"Continue with Google"} />
 						</View>
 					</View>
 					<Terms />
@@ -194,8 +275,9 @@ const styles = StyleSheet.create({
 	bottomCont: {
 		backgroundColor: colors.secondary,
 		width: "100%",
-		marginTop: 20,
 		borderTopLeftRadius: 30,
 		borderTopRightRadius: 30,
+		flex: 1,
+		// minHeight: 500, // Ensure minimum height to cover screen
 	},
 });

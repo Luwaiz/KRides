@@ -114,7 +114,9 @@ const Settings = ({ navigation }) => {
 					<Ionicons name="settings" size={20} color="black" />
 					<Text style={styles.optionText}>Edit Profile</Text>
 				</Pressable>
-				<Pressable style={styles.options}>
+				<Pressable style={styles.options}
+					onPress={() => navigation.navigate("Support")}
+				>
 					<MaterialIcons name="support-agent" size={20} color="black" />
 					<Text style={styles.optionText}>Support</Text>
 				</Pressable>

@@ -10,12 +10,16 @@ import Terms from "../../components/Terms";
 import BackButton from "../../components/buttons/BackButton";
 import Firebase from "../../hooks/Firebase";
 import Toast from "react-native-toast-message";
+import { useGoogleAuth } from "../../hooks/useGoogleAuth";
+import useAuthStore from "../../constants/Store";
 const { height, width } = Dimensions.get('window');
 
 const Login = ({ navigation }) => {
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 	const [loading, setLoading] = useState(false);
+	const { signInWithGoogle, loading: googleLoading } = useGoogleAuth();
+	const setAuthData = useAuthStore((state) => state.setAuthData);
 
 	const handleLogin = async () => {
 		if (!email || !password) {
@@ -55,6 +59,35 @@ const Login = ({ navigation }) => {
 			alert(errorMessage);
 		}
 	}
+
+	const handleGoogleSignIn = async () => {
+		try {
+			console.log('🔐 Starting Google Sign-In for customer...');
+			const result = await signInWithGoogle('customer');
+
+			if (result && result.user) {
+				console.log('✅ Google Sign-In successful:', result.user.email);
+
+				// Handle user creation in Firestore
+				const { data: profile } = await Firebase.handleGoogleSignIn(result.user, result.googleUser, 'customer');
+
+				// Manually update store to ensure Navigation sees us as a customer immediately
+				setAuthData(result.user, profile, 'customer');
+
+				// Navigation handled automatically by Navigation.js
+				Toast.show({
+					type: "tomatoToast",
+					text1: "Welcome!",
+					text2: `Signed in with Google`,
+					position: "top",
+					visibilityTime: 2000,
+				});
+			}
+		} catch (error) {
+			console.error('❌ Google Sign-In Error:', error);
+			alert(error.message || 'Google Sign-In failed. Please try again.');
+		}
+	};
 
 	return (
 		<SafeAreaView style={styles.container}>
@@ -99,7 +132,10 @@ const Login = ({ navigation }) => {
 							<Text style={styles.OrText}>OR</Text>
 							<View style={styles.dash} />
 						</View>
-						<GoogleButton title={"Continue with Google"} />
+						<GoogleButton
+							title={googleLoading ? "Signing in..." : "Continue with Google"}
+							onPress={handleGoogleSignIn}
+						/>
 					</View>
 				</View>
 				<Terms />

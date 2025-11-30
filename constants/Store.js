@@ -21,6 +21,7 @@ export const useUserDetails = create((set) => ({
 	password: "",
 	UserId: "",
 	accessToken: "",
+	profileImageUrl: null,
 	setAccessToken: (accessToken) => set({ accessToken }),
 	setFirstName: (firstName) => set({ firstName }),
 	setLastName: (lastName) => set({ lastName }),
@@ -37,7 +38,9 @@ export const useUserDetails = create((set) => ({
 			password: "",
 			UserId: "",
 			accessToken: "",
+			profileImageUrl: null,
 		}),
+	setProfileImageUrl: (url) => set({ profileImageUrl: url }),
 }));
 
 export const useDriverDetails = create((set) => ({
@@ -178,9 +181,29 @@ export const useAcceptedRideStore = create((set) => ({
 	clearAcceptedRide: () => set({ acceptedRide: null, isRideActive: false }),
 	clearNextRide: () => set({ nextRide: null }),
 	// Move next ride to active when current ride completes
-	activateNextRide: () => set((state) => ({
-		acceptedRide: state.nextRide,
-		nextRide: null,
-		isRideActive: !!state.nextRide,
-	})),
+	activateNextRide: () => set((state) => {
+		console.log('🔄 activateNextRide called in Store');
+		console.log('   Current state:', {
+			hasAcceptedRide: !!state.acceptedRide,
+			acceptedRideId: state.acceptedRide?.rideId,
+			hasNextRide: !!state.nextRide,
+			nextRideId: state.nextRide?.rideId,
+			isRideActive: state.isRideActive
+		});
+
+		const newState = {
+			acceptedRide: state.nextRide,
+			nextRide: null,
+			isRideActive: !!state.nextRide,
+		};
+
+		console.log('   New state will be:', {
+			hasAcceptedRide: !!newState.acceptedRide,
+			acceptedRideId: newState.acceptedRide?.rideId,
+			hasNextRide: !!newState.nextRide,
+			isRideActive: newState.isRideActive
+		});
+
+		return newState;
+	}),
 }));

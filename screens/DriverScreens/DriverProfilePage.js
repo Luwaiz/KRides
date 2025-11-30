@@ -1,4 +1,4 @@
-import { StatusBar, StyleSheet, Text, ToastAndroid, View, Image, TouchableOpacity, ActivityIndicator } from "react-native";
+import { StatusBar, StyleSheet, Text, ToastAndroid, View, Image, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
 import React, { useState, useEffect } from "react";
 import { colors } from "../../constants/styling";
 import BackButton from "../../components/buttons/BackButton";
@@ -174,7 +174,56 @@ const DriverProfilePage = () => {
 		}));
 	};
 
+	const isPhoneValid = (phone) => {
+		// Check if phone is exactly 11 digits
+		const phoneRegex = /^\d{11}$/;
+		return phoneRegex.test(phone);
+	};
+
+	const isNameValid = (name) => {
+		// Name should be at least 2 characters
+		return name && name.trim().length >= 2;
+	};
+
+	const isVehicleIdValid = (vehicleId) => {
+		// Vehicle ID should not be empty
+		return vehicleId && vehicleId.trim().length > 0;
+	};
+
 	const handleEdit = async (field, value) => {
+		if (!value || value.trim() === "") {
+			Alert.alert(
+				"Oops! Empty Field",
+				"This field cannot be empty. Please enter a valid value 📝"
+			);
+			return;
+		}
+
+		// Validate based on field type
+		if ((field === "fullName" || field === "name") && !isNameValid(value)) {
+			Alert.alert(
+				"Oops! Invalid Name",
+				"Please enter a valid name (at least 2 characters) 😊"
+			);
+			return;
+		}
+
+		if (field === "phone" && !isPhoneValid(value)) {
+			Alert.alert(
+				"Oops! Invalid Phone Number",
+				"Phone number must be exactly 11 digits (e.g., 08123456789) 📞"
+			);
+			return;
+		}
+
+		if (field === "vehicle_id" && !isVehicleIdValid(value)) {
+			Alert.alert(
+				"Oops! Invalid Vehicle ID",
+				"Please enter a valid vehicle ID 🚗"
+			);
+			return;
+		}
+
 		setLoading(true);
 		try {
 			// Get the current user's UID from profile

@@ -7,6 +7,7 @@ import {
 	ActivityIndicator,
 	Image,
 	TouchableOpacity,
+	Alert,
 } from "react-native";
 import React, { useState, useEffect } from "react";
 import { colors } from "../../constants/styling";
@@ -80,6 +81,23 @@ const ProfilePage = () => {
 		} finally {
 			setLoading(false);
 		}
+	};
+
+	const isPhoneValid = (phone) => {
+		// Check if phone is exactly 11 digits
+		const phoneRegex = /^\d{11}$/;
+		return phoneRegex.test(phone);
+	};
+
+	const isEmailValid = (email) => {
+		// Basic email validation
+		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+		return emailRegex.test(email);
+	};
+
+	const isNameValid = (name) => {
+		// Name should be at least 2 characters
+		return name && name.trim().length >= 2;
 	};
 
 	const pickImage = async () => {
@@ -185,7 +203,35 @@ const ProfilePage = () => {
 
 	const handleEdit = async (field, value) => {
 		if (!value || value.trim() === "") {
-			alert("Field cannot be empty");
+			Alert.alert(
+				"Oops! Empty Field",
+				"This field cannot be empty. Please enter a valid value 📝"
+			);
+			return;
+		}
+
+		// Validate based on field type
+		if (field === "name" && !isNameValid(value)) {
+			Alert.alert(
+				"Oops! Invalid Name",
+				"Please enter a valid name (at least 2 characters) 😊"
+			);
+			return;
+		}
+
+		if (field === "phone" && !isPhoneValid(value)) {
+			Alert.alert(
+				"Oops! Invalid Phone Number",
+				"Phone number must be exactly 11 digits (e.g., 08123456789) 📞"
+			);
+			return;
+		}
+
+		if (field === "email" && !isEmailValid(value)) {
+			Alert.alert(
+				"Oops! Invalid Email",
+				"Please enter a valid email address (e.g., johndoe@gmail.com) 📧"
+			);
 			return;
 		}
 

@@ -4,6 +4,7 @@ import {
 	Text,
 	TouchableOpacity,
 	View,
+	PermissionsAndroid,
 } from "react-native";
 import React, { useEffect, useState, useMemo, useRef } from "react";
 import { colors } from "../../constants/styling";
@@ -17,6 +18,7 @@ import { GOOGLE_MAPS_API_KEY } from "@env";
 import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import MapViewDirections from "react-native-maps-directions";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Geolocation from "@react-native-community/geolocation";
 
 const HomePage = () => {
 	const Accept = useBottomTabStore((state) => state.AcceptRidePage);
@@ -25,6 +27,37 @@ const HomePage = () => {
 	const isRideActive = useAcceptedRideStore((state) => state.isRideActive);
 	const navigation = useNavigation();
 	const mapRef = useRef(null);
+
+	// Request location permissions
+	const requestLocationPermissions = async () => {
+		try {
+			const permission = await PermissionsAndroid.request(
+				PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+				{
+					title: "Location Permission",
+					message: "This app needs access to your location to show your position on the map",
+					buttonNeutral: "Ask Me Later",
+					buttonNegative: "Cancel",
+					buttonPositive: "OK",
+				}
+			);
+			if (permission === PermissionsAndroid.RESULTS.GRANTED) {
+				console.log("✅ Location permission granted");
+				return true;
+			} else {
+				console.log("❌ Location permission denied");
+				return false;
+			}
+		} catch (err) {
+			console.warn("Error requesting location permission:", err);
+			return false;
+		}
+	};
+
+	// Request permissions on mount
+	useEffect(() => {
+		requestLocationPermissions();
+	}, []);
 
 	// Check if new driver and redirect to bank details
 	useEffect(() => {
@@ -98,7 +131,7 @@ const HomePage = () => {
 								{ latitude: destLat, longitude: destLng }
 							],
 							{
-								edgePadding: { top: 100, right: 50, bottom: 300, left: 50 },
+								edgePadding: { top: 50, right: 20, bottom: 50, left: 20 },
 								animated: true,
 							}
 						);
@@ -137,8 +170,8 @@ const HomePage = () => {
 								latitude: parseFloat(acceptedRide.destinationCoords.latitude),
 								longitude: parseFloat(acceptedRide.destinationCoords.longitude)
 							}}
-							apikey={GOOGLE_MAPS_API_KEY || "AIzaSyB7fe6OfWqZs2BP0AoZS-2jLi5mIVbiYTM"}
-							strokeWidth={4}
+							apikey={GOOGLE_MAPS_API_KEY || "AIzaSyCPMwyZl3iso7lmMGhQt0QwGJXWdqxcqiw"}
+							strokeWidth={5}
 							strokeColor="#007AFF"
 							optimizeWaypoints={true}
 							onReady={(result) => {
@@ -159,7 +192,11 @@ const HomePage = () => {
 								longitude: parseFloat(acceptedRide.pickupCoords.longitude),
 							}}
 							title="Pickup Location"
-							description={acceptedRide.pickupLocation || "Pickup"}
+							description={
+								typeof acceptedRide.pickupLocation === 'object'
+									? (acceptedRide.pickupLocation?.name || acceptedRide.pickupLocation?.address || "Pickup")
+									: (acceptedRide.pickupLocation || "Pickup")
+							}
 							pinColor="#4caf50"
 						/>
 					)}
@@ -172,7 +209,11 @@ const HomePage = () => {
 								longitude: parseFloat(acceptedRide.destinationCoords.longitude),
 							}}
 							title="Destination"
-							description={acceptedRide.destination || "Destination"}
+							description={
+								typeof acceptedRide.destination === 'object'
+									? (acceptedRide.destination?.name || acceptedRide.destination?.address || "Destination")
+									: (acceptedRide.destination || "Destination")
+							}
 							pinColor="#1976D2"
 						/>
 					)}
@@ -202,7 +243,10 @@ const styles = StyleSheet.create({
 		height: "60%",
 	},
 	head: {
-		flex: 0.1,
 		zIndex: 999,
+		position: "absolute",
+		top: 0,
+		left: 0,
+		right: 0,
 	},
 });

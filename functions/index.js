@@ -1,15 +1,64 @@
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
+const axios = require("axios");
 
 // Initialize admin SDK (uses default credentials in Cloud; locally use
 // GOOGLE_APPLICATION_CREDENTIALS env var or the emulator)
 admin.initializeApp();
 const db = admin.firestore();
-const fcm = admin.messaging();
+
+/**
+ * Helper function to send Expo Push Notification
+ * @param {string} expoPushToken - The Expo push token
+ * @param {string} title - Notification title
+ * @param {string} body - Notification body
+ * @param {object} data - Optional data payload
+ */
+async function sendExpoPushNotification(expoPushToken, title, body, data = {}) {
+	if (!expoPushToken) {
+		console.warn("No push token provided");
+		return null;
+	}
+
+	// Skip if not an Expo token
+	if (!expoPushToken.startsWith("ExponentPushToken[")) {
+		console.warn("Invalid Expo token format:", expoPushToken);
+		return null;
+	}
+
+	const message = {
+		to: expoPushToken,
+		sound: "default",
+		title: title,
+		body: body,
+		data: data,
+	};
+
+	try {
+		console.log(`📤 Sending Expo notification to ${expoPushToken}: ${title}`);
+		const response = await axios.post(
+			"https://exp.host/--/api/v2/push/send",
+			message,
+			{
+				headers: {
+					Accept: "application/json",
+					"Accept-encoding": "gzip, deflate",
+					"Content-Type": "application/json",
+				},
+			}
+		);
+
+		console.log("✅ Expo notification sent:", response.data);
+		return response.data;
+	} catch (error) {
+		console.error("❌ Error sending Expo notification:", error.message);
+		return null;
+	}
+}
 
 /**
  * onRideCreated - Firestore trigger when a ride document is created.
- * Notifies drivers (broadly) via FCM and writes driver_inbox documents as a fallback.
+ * Notifies drivers via Expo Push Notifications.
  */
 exports.onRideCreated = functions.firestore
 	.document("rides/{rideId}")
@@ -19,7 +68,7 @@ exports.onRideCreated = functions.firestore
 		console.log("onRideCreated:", rideId, ride);
 
 		try {
-			// Find all drivers who have tokens. For scaling, replace this by geo queries
+			// Find all drivers who have push tokens
 			const driversSnap = await db
 				.collection("users")
 				.where("role", "==", "driver")
@@ -29,9 +78,9 @@ exports.onRideCreated = functions.firestore
 			driversSnap.forEach((doc) => {
 				const driver = doc.data();
 				const driverUid = driver.uid;
-				const tokens = driver.fcmTokens ? Object.keys(driver.fcmTokens) : [];
+				const pushToken = driver.pushToken;
 
-				// write a driver_inbox fallback doc
+				// Write a driver_inbox fallback doc
 				const inboxRef = db
 					.collection("driver_inbox")
 					.doc(driverUid)
@@ -45,33 +94,28 @@ exports.onRideCreated = functions.firestore
 					})
 				);
 
-				if (tokens.length > 0) {
-					const payload = {
-						notification: {
-							title: "New Ride Request",
-							body: `${ride.rider_name || "Customer"} requested a ride`,
-						},
-						data: {
-							type: "ride_booked",
-							rideId: String(rideId),
-						},
-					};
+				// Send Expo push notification if token exists
+				if (pushToken) {
 					promises.push(
-						fcm.sendToDevice(tokens, payload).catch((e) => {
-							console.warn(
-								"FCM sendToDevice failed for driver",
-								driverUid,
-								e.message || e
-							);
-						})
+						sendExpoPushNotification(
+							pushToken,
+							"New Ride Request 🚗",
+							`${ride.customerName || "A customer"} requested a ride from ${ride.pickupLocation || "nearby"}`,
+							{
+								type: "ride_booked",
+								rideId: String(rideId),
+							}
+						)
 					);
+				} else {
+					console.log(`⚠️ Driver ${driverUid} has no push token`);
 				}
 			});
 
 			await Promise.all(promises);
-			console.log("Notified drivers about ride", rideId);
+			console.log("✅ Notified drivers about ride", rideId);
 		} catch (err) {
-			console.error("Error in onRideCreated:", err);
+			console.error("❌ Error in onRideCreated:", err);
 		}
 		return null;
 	});
@@ -128,31 +172,27 @@ exports.acceptRide = functions.https.onCall(async (data, context) => {
 			});
 		});
 
-		// Fetch customer tokens to notify
+		// Fetch customer push token to notify
 		const rideSnap2 = await rideRef.get();
 		const ride2 = rideSnap2.data();
-		const customerUid = ride2.customerUid;
+		const customerUid = ride2.customerId;
 		const customerDoc = await db.collection("users").doc(customerUid).get();
 		const customer = customerDoc.exists ? customerDoc.data() : null;
-		const tokens =
-			customer && customer.fcmTokens ? Object.keys(customer.fcmTokens) : [];
+		const pushToken = customer?.pushToken;
 
-		if (tokens.length > 0) {
-			const payload = {
-				notification: {
-					title: "Ride Accepted",
-					body: `Driver accepted your ride request`,
-				},
-				data: {
+		// Send Expo push notification to customer
+		if (pushToken) {
+			await sendExpoPushNotification(
+				pushToken,
+				"Ride Accepted! 🚗",
+				`${ride2.driverName || "A driver"} is on the way to pick you up!`,
+				{
 					type: "ride_accepted",
 					rideId: String(rideId),
-				},
-			};
-			await fcm
-				.sendToDevice(tokens, payload)
-				.catch((e) =>
-					console.warn("FCM send to customer failed", e.message || e)
-				);
+				}
+			);
+		} else {
+			console.log("⚠️ Customer has no push token");
 		}
 
 		// Write a notification doc for customer
@@ -179,6 +219,69 @@ exports.acceptRide = functions.https.onCall(async (data, context) => {
 		);
 	}
 });
+
+/**
+ * onRideCompleted - Firestore trigger when a ride is completed.
+ * Notifies customer via Expo Push Notifications.
+ */
+exports.onRideCompleted = functions.firestore
+	.document("rides/{rideId}")
+	.onUpdate(async (change, context) => {
+		const before = change.before.data();
+		const after = change.after.data();
+		const rideId = context.params.rideId;
+
+		// Only trigger if status changed to "completed"
+		if (before.status !== "completed" && after.status === "completed") {
+			console.log("onRideCompleted:", rideId);
+
+			try {
+				const customerUid = after.customerId;
+				if (!customerUid) {
+					console.warn("No customer ID found for ride", rideId);
+					return null;
+				}
+
+				// Get customer push token
+				const customerDoc = await db.collection("users").doc(customerUid).get();
+				const customer = customerDoc.exists ? customerDoc.data() : null;
+				const pushToken = customer?.pushToken;
+
+				// Send Expo push notification
+				if (pushToken) {
+					await sendExpoPushNotification(
+						pushToken,
+						"Ride Completed! ✅",
+						`Your ride has been completed. How was your experience?`,
+						{
+							type: "ride_completed",
+							rideId: String(rideId),
+						}
+					);
+					console.log("✅ Sent completion notification to customer");
+				} else {
+					console.log("⚠️ Customer has no push token");
+				}
+
+				// Write a notification doc for customer
+				const notifRef = db
+					.collection("notifications")
+					.doc(customerUid)
+					.collection("items")
+					.doc();
+				await notifRef.set({
+					type: "ride_completed",
+					rideId,
+					createdAt: admin.firestore.FieldValue.serverTimestamp(),
+					read: false,
+				});
+			} catch (err) {
+				console.error("❌ Error in onRideCompleted:", err);
+			}
+		}
+
+		return null;
+	});
 
 /**
  * createDriverSubAccount - Callable function to create a Flutterwave sub-account for a driver.
@@ -221,7 +324,6 @@ exports.createDriverSubAccount = functions.https.onCall(async (data, context) =>
 	}
 
 	try {
-		const axios = require("axios");
 		const FLUTTERWAVE_SECRET_KEY = "FLWSECK_TEST-f3c5c2ad9a10329d839b64ba46d167bd-X"; // Provided by user
 
 		console.log(`Creating sub-account for driver: ${driverId}, Bank: ${accountBank}, Account: ${accountNumber}`);
