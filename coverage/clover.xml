@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<coverage generated="1764669060328" clover="3.2.0">
+  <project timestamp="1764669060328" name="All files">
+    <metrics statements="38" coveredstatements="38" conditionals="24" coveredconditionals="24" methods="6" coveredmethods="6" elements="68" coveredelements="68" complexity="0" loc="38" ncloc="38" packages="1" files="1" classes="1"/>
+    <file name="rideCalculations.js" path="C:\Users\Administrator\Documents\REACTNATIVE\KRides\helpers\rideCalculations.js">
+      <metrics statements="38" coveredstatements="38" conditionals="24" coveredconditionals="24" methods="6" coveredmethods="6"/>
+      <line num="7" count="1" type="stmt"/>
+      <line num="8" count="3" type="cond" truecount="4" falsecount="0"/>
+      <line num="10" count="2" type="stmt"/>
+      <line num="11" count="2" type="stmt"/>
+      <line num="12" count="2" type="stmt"/>
+      <line num="15" count="2" type="stmt"/>
+      <line num="21" count="2" type="stmt"/>
+      <line num="22" count="2" type="stmt"/>
+      <line num="24" count="2" type="stmt"/>
+      <line num="30" count="1" type="stmt"/>
+      <line num="31" count="8" type="stmt"/>
+      <line num="40" count="1" type="stmt"/>
+      <line num="41" count="3" type="cond" truecount="4" falsecount="0"/>
+      <line num="43" count="2" type="stmt"/>
+      <line num="44" count="2" type="stmt"/>
+      <line num="45" count="2" type="stmt"/>
+      <line num="48" count="2" type="stmt"/>
+      <line num="56" count="1" type="stmt"/>
+      <line num="57" count="3" type="cond" truecount="4" falsecount="0"/>
+      <line num="59" count="2" type="cond" truecount="2" falsecount="0"/>
+      <line num="60" count="1" type="stmt"/>
+      <line num="61" count="1" type="stmt"/>
+      <line num="64" count="1" type="stmt"/>
+      <line num="72" count="1" type="stmt"/>
+      <line num="73" count="4" type="cond" truecount="4" falsecount="0"/>
+      <line num="75" count="3" type="cond" truecount="2" falsecount="0"/>
+      <line num="76" count="1" type="stmt"/>
+      <line num="79" count="2" type="stmt"/>
+      <line num="80" count="2" type="stmt"/>
+      <line num="82" count="2" type="cond" truecount="2" falsecount="0"/>
+      <line num="83" count="1" type="stmt"/>
+      <line num="86" count="1" type="stmt"/>
+      <line num="96" count="1" type="stmt"/>
+      <line num="97" count="4" type="stmt"/>
+      <line num="99" count="4" type="cond" truecount="2" falsecount="0"/>
+      <line num="100" count="2" type="stmt"/>
+      <line num="102" count="2" type="stmt"/>
+      <line num="104" count="4" type="stmt"/>
+    </file>
+  </project>
+</coverage>

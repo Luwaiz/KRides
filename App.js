@@ -4,7 +4,6 @@ import { StatusBar } from "expo-status-bar";
 import { enableScreens } from "react-native-screens";
 import { StyleSheet, Text, View, Alert } from "react-native";
 import Navigation from "./navigation/Navigation";
-import BaseUrlBanner from "./components/BaseUrlBanner";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import FontResources from "./react-native-config";
 import { PaperProvider } from "react-native-paper";
