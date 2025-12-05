@@ -24,7 +24,7 @@ async function getUserById(userId) {
             }
         }
         return {
-            id: userDoc.id,
+            uid: userDoc.id, // Use 'uid' to match user object structure
             ...userData,
             fcmToken: fcmToken || userData.fcmToken, // Fallback to direct fcmToken field
         };
@@ -47,7 +47,22 @@ async function getAllDrivers() {
 
         const drivers = [];
         driversSnapshot.forEach((doc) => {
-            drivers.push({ id: doc.id, ...doc.data() });
+            const driverData = doc.data();
+
+            // Extract FCM token from fcmTokens object (same as getUserById)
+            let fcmToken = null;
+            if (driverData.fcmTokens) {
+                const tokens = Object.keys(driverData.fcmTokens);
+                if (tokens.length > 0) {
+                    fcmToken = tokens[0]; // Use the first token
+                }
+            }
+
+            drivers.push({
+                uid: doc.id, // Use 'uid' to match user object structure
+                ...driverData,
+                fcmToken: fcmToken || driverData.fcmToken, // Fallback to direct fcmToken field
+            });
         });
 
         console.log(`✅ Found ${drivers.length} drivers`);

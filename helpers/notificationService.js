@@ -224,3 +224,99 @@ export async function sendCustomNotification(userId, title, body, data = {}) {
         return null;
     }
 }
+
+// ==================== DRIVER NOTIFICATIONS ====================
+
+/**
+ * Notify all available drivers about a new ride request
+ * @param {string} rideId - Ride ID
+ * @param {string} pickupLocation - Pickup location
+ * @param {string} destination - Destination
+ * @param {number} amount - Ride amount (optional)
+ * @param {string} customerName - Customer name (optional)
+ */
+export async function notifyNewRideRequest(rideId, pickupLocation, destination, amount = null, customerName = null) {
+    try {
+        console.log('📤 Sending new ride request notification to all drivers...');
+
+        const response = await makeRequestWithRetry(`${NOTIFICATION_SERVER_URL}/new-ride-request`, {
+            rideId,
+            pickupLocation,
+            destination,
+            amount,
+            customerName,
+        });
+
+        console.log('✅ New ride request notification sent:', response.data);
+        return response.data;
+    } catch (error) {
+        console.error('❌ Failed to send new ride request notification:', error.message);
+        if (error.response) {
+            console.error('   Server response:', error.response.data);
+        }
+        // Don't throw - notification failure shouldn't block ride booking
+        return null;
+    }
+}
+
+/**
+ * Notify driver that customer cancelled the ride
+ * @param {string} driverId - Driver user ID
+ * @param {string} rideId - Ride ID
+ * @param {string} pickupLocation - Pickup location (optional)
+ * @param {string} destination - Destination (optional)
+ * @param {string} cancellationReason - Reason for cancellation (optional)
+ */
+export async function notifyDriverRideCancelled(driverId, rideId, pickupLocation = null, destination = null, cancellationReason = null) {
+    try {
+        console.log('📤 Sending ride cancellation notification to driver...');
+
+        const response = await makeRequestWithRetry(`${NOTIFICATION_SERVER_URL}/ride-cancelled-by-customer`, {
+            driverId,
+            rideId,
+            pickupLocation,
+            destination,
+            cancellationReason,
+        });
+
+        console.log('✅ Ride cancellation notification sent to driver:', response.data);
+        return response.data;
+    } catch (error) {
+        console.error('❌ Failed to send ride cancellation notification to driver:', error.message);
+        if (error.response) {
+            console.error('   Server response:', error.response.data);
+        }
+        return null;
+    }
+}
+
+/**
+ * Notify driver about payment received for completed ride
+ * @param {string} driverId - Driver user ID
+ * @param {string} rideId - Ride ID
+ * @param {number} amount - Total ride amount
+ * @param {number} netAmount - Driver's net earnings (after commission)
+ * @param {string} rideDate - Date of the ride (optional)
+ */
+export async function notifyDriverPaymentReceived(driverId, rideId, amount, netAmount, rideDate = null) {
+    try {
+        console.log('📤 Sending payment received notification to driver...');
+
+        const response = await makeRequestWithRetry(`${NOTIFICATION_SERVER_URL}/payment-received`, {
+            driverId,
+            rideId,
+            amount,
+            netAmount,
+            rideDate,
+        });
+
+        console.log('✅ Payment received notification sent to driver:', response.data);
+        return response.data;
+    } catch (error) {
+        console.error('❌ Failed to send payment received notification to driver:', error.message);
+        if (error.response) {
+            console.error('   Server response:', error.response.data);
+        }
+        return null;
+    }
+}

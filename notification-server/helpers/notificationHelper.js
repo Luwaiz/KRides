@@ -34,6 +34,9 @@ async function sendFCMNotification(fcmToken, title, body, data = {}) {
             notification: {
                 sound: 'default',
                 channelId: 'default',
+                // Add app icon to notification
+                icon: 'ic_notification', // Uses the notification icon from Android resources
+                color: '#4CAF50', // KRides brand color (green)
             },
         },
         apns: {
