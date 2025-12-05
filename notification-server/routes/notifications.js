@@ -328,6 +328,7 @@ router.post('/ride-cancelled', async (req, res) => {
     }
 });
 
+
 /**
  * POST /api/notifications/send-custom
  * Send custom notification to a user (admin use)
@@ -367,4 +368,183 @@ router.post('/send-custom', async (req, res) => {
     }
 });
 
+// ==================== DRIVER NOTIFICATIONS ====================
+
+/**
+ * POST /api/notifications/new-ride-request
+ * Notify all available drivers about a new ride request
+ * Body: { rideId, pickupLocation, destination, amount, customerName }
+ */
+router.post('/new-ride-request', async (req, res) => {
+    try {
+        const { rideId, pickupLocation, destination, amount, customerName } = req.body;
+
+        if (!rideId || !pickupLocation || !destination) {
+            return res.status(400).json({
+                error: 'Missing required fields: rideId, pickupLocation, destination',
+            });
+        }
+
+        // Get all available drivers
+        const drivers = await getAllDrivers();
+
+        if (!drivers || drivers.length === 0) {
+            return res.json({
+                success: true,
+                message: 'No drivers available',
+                notificationsSent: 0,
+            });
+        }
+
+        const title = 'New Ride Request! 🚗';
+        const body = `Pickup: ${pickupLocation} → ${destination}${amount ? ` | ₦${amount}` : ''}`;
+        const data = {
+            type: 'new_ride_request',
+            rideId: String(rideId),
+            pickupLocation,
+            destination,
+            amount: amount ? String(amount) : '',
+            customerName: customerName || '',
+        };
+
+        // Send notifications to all drivers
+        const results = [];
+        for (const driver of drivers) {
+            if (isNotificationEnabled(driver, 'rideUpdates')) {
+                const result = await sendDualNotification(driver, title, body, data);
+                results.push(result);
+
+                // Save to driver's notification history
+                await saveNotificationHistory(driver.uid, {
+                    type: 'new_ride_request',
+                    rideId,
+                    title,
+                    body,
+                });
+            }
+        }
+
+        res.json({
+            success: true,
+            message: 'New ride request notifications sent',
+            notificationsSent: results.length,
+            results,
+        });
+    } catch (error) {
+        console.error('Error in new-ride-request notification:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * POST /api/notifications/ride-cancelled-by-customer
+ * Notify driver that customer cancelled the ride
+ * Body: { driverId, rideId, pickupLocation, destination, cancellationReason }
+ */
+router.post('/ride-cancelled-by-customer', async (req, res) => {
+    try {
+        const { driverId, rideId, pickupLocation, destination, cancellationReason } = req.body;
+
+        if (!driverId || !rideId) {
+            return res.status(400).json({
+                error: 'Missing required fields: driverId, rideId',
+            });
+        }
+
+        const driver = await getUserById(driverId);
+        if (!driver) {
+            return res.status(404).json({ error: 'Driver not found' });
+        }
+
+        if (!isNotificationEnabled(driver, 'rideUpdates')) {
+            return res.json({ message: 'Notification disabled by user preferences' });
+        }
+
+        const title = 'Ride Cancelled ❌';
+        const body = cancellationReason
+            ? `Customer cancelled the ride. Reason: ${cancellationReason}`
+            : `Customer cancelled the ride from ${pickupLocation || 'pickup'} to ${destination || 'destination'}`;
+        const data = {
+            type: 'ride_cancelled_by_customer',
+            rideId: String(rideId),
+            pickupLocation: pickupLocation || '',
+            destination: destination || '',
+            cancellationReason: cancellationReason || '',
+        };
+
+        const result = await sendDualNotification(driver, title, body, data);
+
+        await saveNotificationHistory(driverId, {
+            type: 'ride_cancelled_by_customer',
+            rideId,
+            title,
+            body,
+        });
+
+        res.json({
+            success: true,
+            message: 'Ride cancellation notification sent to driver',
+            result,
+        });
+    } catch (error) {
+        console.error('Error in ride-cancelled-by-customer notification:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * POST /api/notifications/payment-received
+ * Notify driver about payment received for completed ride
+ * Body: { driverId, rideId, amount, netAmount, rideDate }
+ */
+router.post('/payment-received', async (req, res) => {
+    try {
+        const { driverId, rideId, amount, netAmount, rideDate } = req.body;
+
+        if (!driverId || !rideId || !netAmount) {
+            return res.status(400).json({
+                error: 'Missing required fields: driverId, rideId, netAmount',
+            });
+        }
+
+        const driver = await getUserById(driverId);
+        if (!driver) {
+            return res.status(404).json({ error: 'Driver not found' });
+        }
+
+        if (!isNotificationEnabled(driver, 'rideUpdates')) {
+            return res.json({ message: 'Notification disabled by user preferences' });
+        }
+
+        const title = 'Payment Received! 💰';
+        const body = `You earned ₦${netAmount} from your completed ride${rideDate ? ` on ${rideDate}` : ''}`;
+        const data = {
+            type: 'payment_received',
+            rideId: String(rideId),
+            amount: amount ? String(amount) : '',
+            netAmount: String(netAmount),
+            rideDate: rideDate || '',
+        };
+
+        const result = await sendDualNotification(driver, title, body, data);
+
+        await saveNotificationHistory(driverId, {
+            type: 'payment_received',
+            rideId,
+            title,
+            body,
+        });
+
+        res.json({
+            success: true,
+            message: 'Payment notification sent to driver',
+            result,
+        });
+    } catch (error) {
+        console.error('Error in payment-received notification:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 module.exports = router;
+

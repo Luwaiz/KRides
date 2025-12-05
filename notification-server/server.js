@@ -50,13 +50,20 @@ app.get('/', (req, res) => {
         version: '1.0.0',
         endpoints: {
             health: '/health',
-            notifications: {
+            customerNotifications: {
                 rideBooked: 'POST /api/notifications/ride-booked',
                 rideAccepted: 'POST /api/notifications/ride-accepted',
                 driverArrived: 'POST /api/notifications/driver-arrived',
                 rideStarted: 'POST /api/notifications/ride-started',
                 rideCompleted: 'POST /api/notifications/ride-completed',
                 rideCancelled: 'POST /api/notifications/ride-cancelled',
+            },
+            driverNotifications: {
+                newRideRequest: 'POST /api/notifications/new-ride-request',
+                rideCancelledByCustomer: 'POST /api/notifications/ride-cancelled-by-customer',
+                paymentReceived: 'POST /api/notifications/payment-received',
+            },
+            admin: {
                 custom: 'POST /api/notifications/send-custom',
             },
         },
