@@ -11,8 +11,8 @@ const axios = require('axios');
  */
 async function sendFCMNotification(fcmToken, title, body, data = {}) {
     if (!fcmToken) {
-        console.warn('⚠️ No FCM token provided');
-        return null;
+        console.log('ℹ️ No FCM token - skipping FCM notification (normal for development builds)');
+        return { success: false, reason: 'no_token' };
     }
 
     const message = {
@@ -55,6 +55,13 @@ async function sendFCMNotification(fcmToken, title, body, data = {}) {
         console.log('✅ FCM notification sent successfully:', response);
         return { success: true, messageId: response };
     } catch (error) {
+        // Handle "entity not found" error gracefully (expired/invalid token)
+        if (error.code === 'messaging/registration-token-not-registered' ||
+            error.message?.includes('Requested entity was not found')) {
+            console.log('ℹ️ FCM token invalid/expired - user may be on development build');
+            return { success: false, reason: 'invalid_token', error: error.message };
+        }
+
         console.error('❌ Error sending FCM notification:', error.message);
         return { success: false, error: error.message };
     }

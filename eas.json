@@ -10,6 +10,7 @@
       "env": {
         "API_URL": "https://krides.olaoluwaeyeclinic.com/api",
         "DEV_API_URL": "https://krides.olaoluwaeyeclinic.com/api",
+        "NOTIFICATION_SERVER_URL": "https://krides.onrender.com/api/notifications",
         "FIREBASE_API_KEY": "AIzaSyA2EsyMXZlABPA1ZJ06Y9S6VOsKR62EQkA",
         "FIREBASE_AUTH_DOMAIN": "kampusride.firebaseapp.com",
         "FIREBASE_PROJECT_ID": "kampusride",
@@ -28,6 +29,7 @@
       "env": {
         "API_URL": "https://krides.olaoluwaeyeclinic.com/api",
         "DEV_API_URL": "https://krides.olaoluwaeyeclinic.com/api",
+        "NOTIFICATION_SERVER_URL": "https://krides.onrender.com/api/notifications",
         "FIREBASE_API_KEY": "AIzaSyA2EsyMXZlABPA1ZJ06Y9S6VOsKR62EQkA",
         "FIREBASE_AUTH_DOMAIN": "kampusride.firebaseapp.com",
         "FIREBASE_PROJECT_ID": "kampusride",
