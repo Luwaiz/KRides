@@ -1,5 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import React, { useState } from "react";
+import { Pressable, StyleSheet, Text, View, Image } from "react-native";
+import React, { useState, useEffect } from "react";
 import { useUserDetails } from "../../constants/Store";
 import Avatar from "../../assets/svg/Frame 91profile.svg";
 import Entypo from "@expo/vector-icons/Entypo";
@@ -10,14 +10,40 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors } from "../../constants/styling";
 import Confirmation1 from "../../components/modals/Confirmation1";
+import { FIREBASE_AUTH, FIREBASE_DB } from "../../firebaseConfig";
+import { doc, onSnapshot } from "firebase/firestore";
 
 const DriverSettings = ({ navigation }) => {
 	const [modal, setModal] = useState(false);
-	const { firstName, lastName } = useUserDetails((state) => ({
+	const [profileUrl, setProfileUrl] = useState(null);
+	const { firstName, lastName, uid } = useUserDetails((state) => ({
 		firstName: state.firstName,
 		lastName: state.lastName,
+		uid: state.uid,
 	}));
 	const [modalTitle, setModalTitle] = useState("");
+
+	useEffect(() => {
+		const fetchProfile = async () => {
+			try {
+				const auth = FIREBASE_AUTH;
+				const db = FIREBASE_DB;
+				const user = auth.currentUser;
+
+				if (user) {
+					const unsub = onSnapshot(doc(db, "drivers", user.uid), (doc) => {
+						if (doc.exists()) {
+							setProfileUrl(doc.data()?.profileUrl || null);
+						}
+					});
+					return unsub;
+				}
+			} catch (error) {
+				console.error("Error fetching driver profile:", error);
+			}
+		};
+		fetchProfile();
+	}, []);
 
 	const openModal = (title) => {
 		setModalTitle(title);
@@ -27,7 +53,14 @@ const DriverSettings = ({ navigation }) => {
 		<SafeAreaView style={styles.container}>
 			<View style={styles.topContainer}>
 				<Text style={styles.name}>{firstName + " " + lastName}</Text>
-				<Avatar height={80} width={80} />
+				{profileUrl ? (
+					<Image
+						source={{ uri: profileUrl }}
+						style={{ width: 80, height: 80, borderRadius: 40 }}
+					/>
+				) : (
+					<Avatar height={80} width={80} />
+				)}
 			</View>
 			<View style={styles.middleContainer}>
 				<Pressable

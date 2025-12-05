@@ -7,6 +7,7 @@ import Signup from "../screens/AuthScreens/Signup";
 import DriverSignup from "../screens/AuthScreens/DriverSignUp";
 import DriverLogin from "../screens/AuthScreens/DriverLogin";
 import ForgetPass from "../screens/AuthScreens/ForgetPass";
+import BankAccountDetails from "../screens/AuthScreens/BankAccountDetails";
 
 const Stack = createNativeStackNavigator();
 
@@ -19,6 +20,7 @@ const AuthStack = () => {
 			<Stack.Screen component={DriverSignup} name="DriverSignup" />
 			<Stack.Screen component={DriverLogin} name="DriverLogin" />
 			<Stack.Screen component={ForgetPass} name="ForgetPass" />
+			<Stack.Screen component={BankAccountDetails} name="BankAccountDetails" />
 		</Stack.Navigator>
 	);
 };

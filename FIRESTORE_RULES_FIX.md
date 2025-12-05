@@ -1,163 +1,120 @@
-# 🔥 FIRESTORE SECURITY RULES - URGENT FIX
+# � Firestore Rules Fix - Ride Creation
 
-## Problem
-
-You're getting "Missing or insufficient permissions" when creating rides even though:
-
-- ✅ User is authenticated
-- ✅ CustomerId matches Firebase Auth UID
-- ✅ All data is correct
-
-## Root Cause
-
-**Your Firestore Security Rules in Firebase Console are not set correctly or not published.**
+**Issue:** Firestore rules blocking ride creation  
+**Root Cause:** Field name mismatch between app code and Firestore rules  
+**Status:** ✅ FIXED
 
 ---
 
-## ⚡ IMMEDIATE FIX
+## 🔍 Problem Identified
 
-### Step 1: Go to Firebase Console
+The app creates rides with these fields (from `ConfirmRide.js` line 224):
+```javascript
+const rideData = {
+  customerId: UserId,        // ← Uses customerId
+  customerName: "...",
+  customerPhone: "...",
+  // ... other fields
+};
+```
 
-1. Open: https://console.firebase.google.com
-2. Select your project: **KRides** (or kampusride)
-3. Click **"Firestore Database"** in left menu
-4. Click **"Rules"** tab at the top
+But the Firestore rules were checking for different field names:
+```javascript
+// ❌ OLD (WRONG)
+allow create: if request.resource.data.customerUid == request.auth.uid;
+allow update: if resource.data.customerUid == request.auth.uid ||
+                 resource.data.assignedDriverUid == request.auth.uid;
+```
 
-### Step 2: Check Current Rules
+---
 
-Your current rules might be too restrictive or have a syntax error.
+## ✅ Solution Applied
 
-### Step 3: Replace with Correct Rules
-
-**Copy and paste these EXACT rules:**
+Updated `firestore.rules` to use the correct field names:
 
 ```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-
-    // Users collection
-    match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == userId;
-    }
-
-    // Drivers collection
-    match /drivers/{driverId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == driverId;
-    }
-
-    // Locations collection - Anyone can read, only admins can write
-    match /locations/{locationId} {
-      allow read: if true;
-      allow write: if false;
-    }
-
-    // Rides collection - THE IMPORTANT ONE
-    match /rides/{rideId} {
-      // Anyone authenticated can read any ride
-      allow read: if request.auth != null;
-
-      // Customers can create rides if customerId matches their UID
-      allow create: if request.auth != null &&
-                      request.resource.data.customerId == request.auth.uid;
-
-      // Customers can update their own rides OR drivers can update assigned rides
-      allow update: if request.auth != null && (
-        resource.data.customerId == request.auth.uid ||
-        request.resource.data.driverId == request.auth.uid
-      );
-
-      // Only the customer who created the ride can delete it
-      allow delete: if request.auth != null &&
-                      resource.data.customerId == request.auth.uid;
-    }
-  }
+// ✅ NEW (CORRECT)
+match /rides/{rideId} {
+  // Any authenticated user can read rides
+  allow read: if request.auth != null;
+  
+  // Only authenticated users can create rides
+  allow create: if request.auth != null 
+                  && request.resource.data.customerId == request.auth.uid;
+  
+  // Customer or assigned driver can update
+  allow update: if request.auth != null && (
+    resource.data.customerId == request.auth.uid ||
+    resource.data.driverId == request.auth.uid
+  );
+  
+  // Only customer can delete their ride
+  allow delete: if request.auth != null 
+                  && resource.data.customerId == request.auth.uid;
 }
 ```
 
-### Step 4: Publish Rules
-
-1. Click the **"Publish"** button at the top right
-2. Wait for "Rules published successfully" message
-
-### Step 5: Test Immediately
-
-Try booking a ride again. It should work now!
+### Changes Made:
+- `customerUid` → `customerId`
+- `assignedDriverUid` → `driverId`
 
 ---
 
-## 🚨 Quick Test Rules (TEMPORARY ONLY)
+## � Next Steps
 
-If you just want to test quickly, use these **OPEN RULES** (NOT SECURE - TESTING ONLY):
+### 1. Deploy Updated Rules to Firebase
+```bash
+firebase deploy --only firestore:rules
+```
 
+### 2. Test Ride Creation
+1. Open the app
+2. Select pickup and destination
+3. Choose number of passengers
+4. Tap "Book Ride"
+5. Should create successfully! ✅
+
+---
+
+## � Field Names Reference
+
+For future reference, here are the actual field names used in the app:
+
+### Ride Document Structure:
 ```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if request.auth != null;
-    }
-  }
+{
+  customerId: "user_uid",           // Customer's Firebase Auth UID
+  customerName: "John Doe",
+  customerPhone: "+1234567890",
+  pickupLocation: "Main Gate",
+  pickupCoords: { latitude: 6.89, longitude: 3.72 },
+  destination: "Library",
+  destinationCoords: { latitude: 6.90, longitude: 3.73 },
+  numberOfPassengers: 2,
+  amount: 400,
+  paymentMethod: "flutterwave",
+  status: "pending",                // pending, accepted, completed, cancelled
+  driverId: "driver_uid",           // Set when driver accepts
+  driverName: "Driver Name",        // Set when driver accepts
+  createdAt: timestamp,
+  updatedAt: timestamp
 }
 ```
 
-**⚠️ WARNING:** These rules allow any authenticated user to read/write EVERYTHING. Only use for testing, then switch back to the secure rules above!
-
 ---
 
-## 🔍 How to Verify Rules Are Working
+## ✅ Expected Result
 
-After publishing rules, check the Firebase Console:
-
-1. Go to **Firestore Database** → **Rules**
-2. You should see "Last published: a few seconds ago"
-3. Click **"Rules Playground"** to test
-4. Set **Authenticated** to YES
-5. Set **UID** to: `xqPJkZCEqyYh3m2yChottlfinW33`
-6. Test path: `/rides/test123`
-7. Set **customerId** field to: `xqPJkZCEqyYh3m2yChottlfinW33`
-8. Should show "✅ Allowed"
-
----
-
-## 📋 Checklist
-
-- [ ] Logged into Firebase Console
-- [ ] Opened Firestore Database → Rules
-- [ ] Copied and pasted the correct rules
-- [ ] Clicked "Publish" button
-- [ ] Saw "Rules published successfully" message
-- [ ] Tested ride booking in app
-- [ ] Verified ride was created in Firestore
-
----
-
-## 🆘 Still Not Working?
-
-If you still get permission denied after updating rules:
-
-1. **Check Firebase Project**: Make sure you're editing rules for the correct Firebase project
-2. **Wait 30 seconds**: Sometimes rules take a moment to propagate
-3. **Force Refresh**: Log out and log back in to the app
-4. **Check Firestore Collection Name**: Verify you're writing to "rides" (not "Rides" or "ride")
-5. **Check Firebase Auth**: Verify user is authenticated in Firebase Console → Authentication
-
----
-
-## 📱 Expected Behavior After Fix
-
-When you book a ride:
-
+**Before fix:**
 ```
-✅ Payment successful
-✅ Creating ride...
-✅ Ride created: <ride-id>
-✅ Listening for ride updates
+User taps "Book Ride" → Permission denied error
 ```
 
-The ride should appear in:
+**After fix:**
+```
+User taps "Book Ride" → Ride created successfully! 🎉
+```
 
-- Firebase Console → Firestore → rides collection
-- Driver's pending rides list
+---
+
+**Status:** Ready to deploy! 🚀

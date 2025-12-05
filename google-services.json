@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "1054058095059",
+    "project_id": "kampusride",
+    "storage_bucket": "kampusride.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1054058095059:android:458d5ea928be9722818f26",
+        "android_client_info": {
+          "package_name": "com.eluwaiz.KRides"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1054058095059-a4tu89m6mmrvl3jincq1sth8gfloknnt.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.eluwaiz.KRides",
+            "certificate_hash": "7bbd3687f141083bd01909e74bfe3db65e470ccd"
+          }
+        },
+        {
+          "client_id": "1054058095059-6j788gaiqicduqgt1jo322hsvb7ums7b.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAaJdJ1uQv2c9WIZ4-NhkNcgCJ01n9Nkdo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1054058095059-6j788gaiqicduqgt1jo322hsvb7ums7b.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

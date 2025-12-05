@@ -1,30 +1,20 @@
 import { Dimensions, StyleSheet, Text, View } from "react-native";
 import React, { useState } from "react";
-import BottomSheet from "@gorhom/bottom-sheet";
 import { colors } from "../../constants/styling";
 import { SafeAreaView } from "react-native-safe-area-context";
 import TextInput1 from "../../components/TextInput1";
 import ActiveButton from "../../components/buttons/ActiveButton";
-import GoogleButton from "../../components/buttons/GoogleButton";
 import Terms from "../../components/Terms";
 import BackButton from "../../components/buttons/BackButton";
-import { useDriverDetails, useUserDetails } from "../../constants/Store";
-import axios from "axios";
-import API from "../../hooks/API";
-const {height,width} = Dimensions.get('window');
+import { useDriverDetails } from "../../constants/Store";
+import Firebase from "../../hooks/Firebase";
 
+const { height, width } = Dimensions.get('window');
 
 const DriverLogin = ({ navigation }) => {
 	const [phone, set_phone] = useState();
 	const [password, set_password] = useState();
-
-	const ToHome = () => {
-		navigation.replace("DriverStack", {
-			params: {
-				params: "DriverHome",
-			},
-		});
-	};
+	const [loading, setLoading] = useState(false);
 
 	const { setAccessToken, setPhone, setFullName, setVehicleId } =
 		useDriverDetails((state) => ({
@@ -33,55 +23,39 @@ const DriverLogin = ({ navigation }) => {
 			setFullName: state.setFullName,
 			setVehicleId: state.setVehicleId,
 		}));
-	const [loading, setLoading] = useState(false);
 
-	const loginUser = async (request) => {
-		try {
-			const response = await axios.post(API.DriverLogin, request);
-			console.log("loggeed in Access Token:", response?.data);
-
-			if (response?.data?.access_token) {
-				setAccessToken(response.data.access_token);
-				fetchUserProfile(response.data.access_token); // Call the next function
-			} else {
-				console.error("Access token not found.");
-			}
-		} catch (error) {
-			setLoading(false);
-			console.log("Login Error:", error?.response?.data || error?.message);
-			alert("Login failed. Please check your credentials and try again.");
+	const handleLogin = async () => {
+		if (!phone || !password) {
+			alert("Please enter both phone number and password");
+			return;
 		}
-	};
 
-	const fetchUserProfile = async (accessToken) => {
-		try {
-			const userResponse = await axios.get(API.DriverProfile, {
-				headers: { Authorization: `Bearer ${accessToken}` },
-			});
-
-			console.log("User Response:", userResponse?.data?.data);
-			setPhone(userResponse?.data?.data?.phone);
-			setFullName(userResponse?.data?.data?.fullName);
-			setVehicleId(userResponse?.data?.data?.vehicle_id);
-			setLoading(false);
-			ToHome();
-		} catch (error) {
-			setLoading(false);
-			console.error(
-				"User Profile Error:",
-				error.response?.data || error.message
-			);
-			alert("Failed to fetch user profile. Please try again.");
-		}
-	};
-
-	const handleLogin = () => {
 		setLoading(true);
-		const request = {
-			phone,
-			password,
-		};
-		loginUser(request);
+		try {
+			// Construct email from phone number
+			const email = `${phone}@rideapp.com`;
+			await Firebase.signInWithEmail(email, password);
+
+			// Navigation.js will automatically handle routing based on Firebase Auth
+			console.log("✅ Driver logged in successfully");
+		} catch (error) {
+			setLoading(false);
+			console.log("Login Error:", error);
+
+			let errorMessage = "Login failed. Please try again.";
+			if (
+				error.code === "auth/invalid-credential" ||
+				error.code === "auth/wrong-password" ||
+				error.code === "auth/user-not-found" ||
+				error.code === "auth/invalid-email"
+			) {
+				errorMessage = "Invalid phone number or password";
+			} else if (error.code === "auth/too-many-requests") {
+				errorMessage = "Too many failed attempts. Please try again later.";
+			}
+
+			alert(errorMessage);
+		}
 	};
 
 	return (
@@ -103,7 +77,12 @@ const DriverLogin = ({ navigation }) => {
 							password
 							onChangeText={(text) => set_password(text)}
 						/>
-						<Text style={styles.forgot}>Forgot password?</Text>
+						<Text
+							style={styles.forgot}
+							onPress={() => navigation.navigate("ForgetPass")}
+						>
+							Forgot password?
+						</Text>
 						<View style={styles.buttons}>
 							<View style={styles.logInButton}>
 								<ActiveButton
@@ -113,12 +92,6 @@ const DriverLogin = ({ navigation }) => {
 								/>
 							</View>
 						</View>
-						<View style={styles.OrContainer}>
-							<View style={styles.dash} />
-							<Text style={styles.OrText}>OR</Text>
-							<View style={styles.dash} />
-						</View>
-						<GoogleButton title={"Continue with Google"} />
 					</View>
 				</View>
 				<Terms />
@@ -145,7 +118,7 @@ const styles = StyleSheet.create({
 		marginTop: 20,
 		borderTopLeftRadius: 30,
 		borderTopRightRadius: 30,
-		height: height - 140,
+		height: height - 100,
 	},
 	headText: {
 		color: colors.secondary,
@@ -167,25 +140,8 @@ const styles = StyleSheet.create({
 		marginTop: -10,
 		marginBottom: 16,
 	},
-	OrContainer: {
-		flexDirection: "row",
-		alignItems: "center",
-		width: "100%",
-		height: 40,
-		justifyContent: "space-between",
-	},
-	dash: {
-		width: "47%",
-		height: 1,
-		backgroundColor: "black",
-	},
-	OrText: {
-		color: "black",
-		fontSize: 16,
-		fontWeight: "700",
-	},
 	logInButton: {
-		width: "85%",
+		width: "100%",
 	},
 	buttons: {
 		flexDirection: "row",

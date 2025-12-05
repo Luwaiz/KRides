@@ -9,6 +9,7 @@ import {
 	signInWithEmailAndPassword,
 	signOut as firebaseSignOut,
 	onAuthStateChanged as firebaseOnAuthStateChanged,
+	sendPasswordResetEmail,
 } from "firebase/auth";
 import {
 	getFirestore,
@@ -32,6 +33,73 @@ export async function signInWithEmail(email, password) {
 		password
 	);
 	return credential.user;
+}
+
+// Sign in with Google (already authenticated with Firebase)
+export async function handleGoogleSignIn(firebaseUser, googleUser, role = 'customer') {
+	const { uid, email, displayName, photoURL } = firebaseUser;
+
+	console.log('🔐 handleGoogleSignIn called:', { uid, email, role });
+
+	// Determine collection based on role
+	const collectionName = role === 'driver' ? 'drivers' : 'users';
+	const userRef = doc(FIREBASE_DB, collectionName, uid);
+
+	// Check if user already exists
+	const userSnap = await getDoc(userRef);
+
+	if (userSnap.exists()) {
+		console.log('✅ User already exists in', collectionName);
+		return { user: firebaseUser, isNew: false, data: userSnap.data() };
+	}
+
+	// Create new user document
+	const nameField = role === 'driver' ? 'fullname' : 'name';
+	const userData = {
+		uid,
+		[nameField]: displayName || googleUser?.name || 'User',
+		email,
+		photoURL: photoURL || googleUser?.photo || null,
+		role,
+		authProvider: 'google',
+		// Phone will be added later for drivers
+		phone: null,
+		createdAt: serverTimestamp(),
+	};
+
+	console.log(`📝 Creating new user in ${collectionName}:`, userData);
+
+	try {
+		await setDoc(userRef, userData);
+		console.log(`✅ User created successfully in ${collectionName}`);
+		return { user: firebaseUser, isNew: true, data: userData };
+	} catch (error) {
+		console.error('❌ Error creating user document:', error);
+		throw error;
+	}
+}
+
+// Update driver phone number after Google Sign-In
+export async function updateDriverPhone(uid, phone) {
+	if (!uid || !phone) {
+		throw new Error('UID and phone are required');
+	}
+
+	console.log('📞 Updating driver phone:', { uid, phone });
+
+	const driverRef = doc(FIREBASE_DB, 'drivers', uid);
+
+	try {
+		await updateDoc(driverRef, {
+			phone,
+			updatedAt: serverTimestamp(),
+		});
+		console.log('✅ Driver phone updated successfully');
+		return { success: true };
+	} catch (error) {
+		console.error('❌ Error updating driver phone:', error);
+		throw error;
+	}
 }
 
 // Sign up (for both users and drivers)
@@ -77,20 +145,37 @@ export async function signUpWithEmail({
 
 	console.log(`📝 Creating document in ${collectionName}/${uid}:`, userData);
 
-	await setDoc(userRef, userData);
+	try {
+		await setDoc(userRef, userData);
+		console.log(
+			`✅ User document created successfully in ${collectionName}/${uid}`
+		);
+	} catch (firestoreError) {
+		console.error(`❌ Failed to create user document in ${collectionName}/${uid}:`, firestoreError);
+		console.error("Error code:", firestoreError.code);
+		console.error("Error message:", firestoreError.message);
 
-	console.log(
-		`✅ User document created successfully in ${collectionName}/${uid}`
-	);
+		// If Firestore write fails due to permission-denied, log but don't throw
+		// The user account is still created in Auth, Navigation will handle the read error
+		if (firestoreError.code === "permission-denied") {
+			console.error("🚨 CRITICAL: Firestore permission denied on user creation!");
+			console.error("User auth account created, but Firestore document failed.");
+			console.error("Please update Firestore security rules to allow user creation.");
+		} else {
+			// For other errors, throw so the signup flow knows it failed
+			throw firestoreError;
+		}
+	}
 
 	return credential.user;
 }
 
 // Sign up driver specifically
-export async function signUpDriver({ phone, password, fullname, vehicle_id }) {
-	const email = `${phone}@rideapp.com`;
+export async function signUpDriver({ phone, email, password, fullname, vehicle_id }) {
+	// Use provided email or fallback to generated one (though UI enforces email now)
+	const driverEmail = email || `${phone}@rideapp.com`;
 	return signUpWithEmail({
-		email,
+		email: driverEmail,
 		password,
 		name: fullname,
 		phone,
@@ -149,7 +234,7 @@ export function setupNotificationHandlers(onNotification) {
 		"Notification handlers skipped - Web SDK messaging not supported in React Native"
 	);
 	// To implement: use @react-native-firebase/messaging or Expo notifications
-	return () => {}; // Return empty cleanup function
+	return () => { }; // Return empty cleanup function
 }
 
 /** ---------- LOGOUT / AUTH CHANGE ---------- **/
@@ -164,6 +249,19 @@ export async function signOut() {
 
 export function onAuthStateChanged(cb) {
 	return firebaseOnAuthStateChanged(FIREBASE_AUTH, cb);
+}
+
+/** ---------- PASSWORD RESET ---------- **/
+
+export async function resetPassword(email) {
+	if (!email) throw new Error("Email is required");
+	try {
+		await sendPasswordResetEmail(FIREBASE_AUTH, email);
+		return { success: true };
+	} catch (error) {
+		console.error("Password reset error:", error);
+		throw error;
+	}
 }
 
 /** ---------- USER DOC FETCH ---------- **/
@@ -195,11 +293,14 @@ export default {
 	signInWithEmail,
 	signUpWithEmail,
 	signUpDriver,
+	handleGoogleSignIn,
+	updateDriverPhone,
 	createUserDocIfMissing,
 	registerFcmToken,
 	unregisterFcmToken,
 	setupNotificationHandlers,
 	signOut,
 	onAuthStateChanged,
+	resetPassword,
 	getUserDoc,
 };

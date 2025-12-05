@@ -14,9 +14,9 @@ export const calculateDistance = (coord1, coord2) => {
 	const a =
 		Math.sin(dLat / 2) * Math.sin(dLat / 2) +
 		Math.cos(toRadians(coord1.latitude)) *
-			Math.cos(toRadians(coord2.latitude)) *
-			Math.sin(dLon / 2) *
-			Math.sin(dLon / 2);
+		Math.cos(toRadians(coord2.latitude)) *
+		Math.sin(dLon / 2) *
+		Math.sin(dLon / 2);
 
 	const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 	const distance = R * c;
@@ -89,23 +89,17 @@ export const formatTime = (minutes) => {
 /**
  * Calculate ride fare based on distance and number of passengers
  * Base fare: ₦200 per passenger
- * Distance multiplier: Additional ₦50 per km beyond 1km
  * @param {number} distanceKm - Distance in kilometers
  * @param {number} passengers - Number of passengers
- * @returns {number} Total fare
+ * @returns {number} Fare in Naira
  */
-export const calculateFare = (distanceKm, passengers = 1) => {
-	const baseFarePerPassenger = 200;
-	const distanceRatePerKm = 50;
-	const freeDistanceKm = 1;
-
-	let fare = baseFarePerPassenger * passengers;
-
-	// Add distance-based fare for distances beyond 1km
-	if (distanceKm > freeDistanceKm) {
-		const chargeableDistance = distanceKm - freeDistanceKm;
-		fare += Math.ceil(chargeableDistance) * distanceRatePerKm;
+export const calculateFare = (distanceKm, passengers) => {
+	const baseFare = 200;
+	let fare;
+	if (passengers >= 3) {
+		fare = baseFare * passengers + 100;
+	} else {
+		fare = baseFare * passengers + 50;
 	}
-
 	return fare;
 };

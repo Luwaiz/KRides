@@ -2,21 +2,33 @@ import { StyleSheet, Text, View, TouchableOpacity } from "react-native";
 import { PayWithFlutterwave } from "flutterwave-react-native";
 import React from "react";
 
-const Payment = ({ email, amount, name, phoneNumber, BookRide }) => {
+const Payment = ({ email, amount, name, phoneNumber, BookRide, subaccountId }) => {
 	console.log("💳 Payment component rendered with:");
 	console.log("   - Email:", email || "MISSING");
 	console.log("   - Amount:", amount);
 	console.log("   - Name:", name || "MISSING");
 	console.log("   - Phone:", phoneNumber || "MISSING");
 
+	// Safety check for required data
+	if (!amount || amount <= 0) {
+		console.error("❌ Invalid amount for payment:", amount);
+		return (
+			<View style={styles.container}>
+				<Text style={styles.errorText}>Unable to process payment: Invalid amount</Text>
+			</View>
+		);
+	}
+
 	const handleOnRedirect = (data) => {
 		console.log("💳 Payment redirect data:", data);
 		console.log("💳 Payment status:", data?.status);
+		console.log("💳 Transaction ID:", data?.transaction_id);
 
 		if (data.status === "completed" || data.status === "successful") {
 			// Handle successful payment
 			console.log("✅ Payment successful! Creating ride...");
-			BookRide();
+			// Pass transaction data to BookRide for saving
+			BookRide(data.transaction_id, data);
 		} else {
 			console.log("❌ Payment was not completed. Status:", data.status);
 		}
@@ -56,8 +68,8 @@ const Payment = ({ email, amount, name, phoneNumber, BookRide }) => {
 					{isInitializing
 						? "Initializing..."
 						: disabled
-						? "Processing..."
-						: `Pay ₦${amount}`}
+							? "Processing..."
+							: `Pay ₦${amount}`}
 				</Text>
 			</TouchableOpacity>
 		);
@@ -81,6 +93,15 @@ const Payment = ({ email, amount, name, phoneNumber, BookRide }) => {
 					amount: amount,
 					currency: "NGN",
 					payment_options: "card,banktransfer,ussd",
+					...(subaccountId && {
+						subaccounts: [
+							{
+								id: subaccountId,
+								transaction_split_ratio: amount - 50, // Driver gets amount minus 50 naira fee
+								transaction_charge_type: "flat_subaccount",
+							},
+						],
+					}),
 				}}
 				customButton={CustomButton}
 			/>
@@ -110,5 +131,11 @@ const styles = StyleSheet.create({
 		color: "#FFFFFF",
 		fontSize: 18,
 		fontWeight: "bold",
+	},
+	errorText: {
+		color: "#FF3B30",
+		fontSize: 14,
+		textAlign: "center",
+		padding: 16,
 	},
 });

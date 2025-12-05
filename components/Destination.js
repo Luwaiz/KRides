@@ -39,8 +39,10 @@ const Destination = ({
 						onPress={() => setShowPickupPicker(true)}
 					>
 						<View style={styles.destination}>
-							<Text style={styles.destinationText}>
-								{location || "Select pickup location"}
+							<Text style={styles.destinationText} numberOfLines={1}>
+								{typeof location === "object"
+									? location?.name || location?.address || "Select pickup location"
+									: location || "Select pickup location"}
 							</Text>
 						</View>
 					</TouchableOpacity>
@@ -49,8 +51,12 @@ const Destination = ({
 						onPress={() => setShowDestinationPicker(true)}
 					>
 						<View style={styles.destination}>
-							<Text style={styles.destinationText}>
-								{destination || "Select destination"}
+							<Text style={styles.destinationText} numberOfLines={1}>
+								{typeof destination === "object"
+									? destination?.name ||
+									destination?.address ||
+									"Select destination"
+									: destination || "Select destination"}
 							</Text>
 						</View>
 					</TouchableOpacity>

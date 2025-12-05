@@ -10,9 +10,15 @@ import { colors } from "../constants/styling";
 import Direction from "../assets/svg/Frame 34direction.svg";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import { format } from "date-fns";
+import { useUserDetails, useDriverDetails } from "../constants/Store";
 
 const HistoryCard = ({ history }) => {
 	const [selected, setSelected] = useState(null);
+	const UserId = useUserDetails((state) => state?.UserId);
+	const driverUid = useDriverDetails((state) => state?.uid);
+
+	// Determine if current user is a driver
+	const isDriver = !!driverUid && !UserId;
 
 	if (!history) {
 		return null;
@@ -64,22 +70,43 @@ const HistoryCard = ({ history }) => {
 						<Direction width={40} height={80} />
 						<View style={styles.places}>
 							<View style={styles.location}>
-								<Text style={styles.locationText}>
-									{history?.pickupLocation || "Pickup location"}
+								<Text style={styles.locationText} numberOfLines={2}>
+									{typeof history?.pickupLocation === "object"
+										? history?.pickupLocation?.name ||
+										history?.pickupLocation?.address ||
+										"Pickup location"
+										: history?.pickupLocation || "Pickup location"}
 								</Text>
 							</View>
 							<View style={styles.location}>
-								<Text style={styles.locationText}>
-									{history?.destination || "Destination"}
+								<Text style={styles.locationText} numberOfLines={2}>
+									{typeof history?.destination === "object"
+										? history?.destination?.name ||
+										history?.destination?.address ||
+										"Destination"
+										: history?.destination || "Destination"}
 								</Text>
 							</View>
 						</View>
 					</View>
 
 					<View style={styles.dateContainer}>
-						<Text style={styles.dayDate}>Driver</Text>
+						<Text style={styles.dayDate}>
+							{isDriver ? "Customer" : "Driver"}
+						</Text>
 						<Text style={styles.time}>
-							{history?.driverName || "No driver assigned"}
+							{isDriver
+								? history?.customerName || "Unknown"
+								: history?.driverName || "No driver assigned"}
+						</Text>
+					</View>
+
+					<View style={styles.dateContainer}>
+						<Text style={styles.dayDate}>Phone</Text>
+						<Text style={styles.time} selectable>
+							{isDriver
+								? history?.customerPhone || "N/A"
+								: history?.driverPhone || "N/A"}
 						</Text>
 					</View>
 
@@ -134,6 +161,7 @@ const styles = StyleSheet.create({
 		justifyContent: "center",
 		marginLeft: 10,
 		marginTop: 10,
+		flex: 1,
 	},
 	location: {
 		width: "100%",
