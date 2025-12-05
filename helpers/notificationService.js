@@ -1,8 +1,8 @@
 import axios from 'axios';
 
-// Notification server URL
-// Using live backend on Render
-const NOTIFICATION_SERVER_URL = 'https://krides.onrender.com/api/notifications';
+// Notification server URL from environment variables
+// Falls back to Render URL if not set
+const NOTIFICATION_SERVER_URL = process.env.NOTIFICATION_SERVER_URL || 'https://krides.onrender.com/api/notifications';
 
 // Increased timeout for Render cold starts (free tier spins down after 15 min)
 const REQUEST_TIMEOUT = 15000; // 15 seconds

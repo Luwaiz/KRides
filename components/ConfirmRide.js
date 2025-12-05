@@ -20,6 +20,7 @@ import {
 	useRideDetailsStore,
 	useBottomTabStore,
 } from "../constants/Store";
+import TestNotifications from '../components/TestNotifications';
 import InActiveButton from "./buttons/InActiveButton";
 import DangerButton from "./buttons/DangerButton";
 import Payment from "../screens/AppScreens/Payment";
@@ -429,6 +430,7 @@ const ConfirmRide = () => {
 								subaccountId={driverSubaccountId}
 							/>
 						)}
+						<TestNotifications />
 					</View>
 				</View>
 			</BottomSheet>
