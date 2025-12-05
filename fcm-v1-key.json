@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "kampusride",
+  "private_key_id": "9958d3545f16fdf57a71993f37330a17277a5e86",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCaC07kfjR35422\n7y5DVb81kOPPPHO4H+IGLnY0H7TLE77t9/sRH85jO9ec3VLXCklWDnM/1v3emGx2\n2fMZzpwfbhBUoOJvIJA4+iD0/+Klf8vKE1xvwHLkeSzf+4m7w+bDf8pl+cbUXlhF\n823eCkaEw8fVEYOeMoHLzrWV4yR12ziUrRP7VvKP/iS99m7TwmZhMOQ7qqXsiqan\n6vaYD8ENn3nqEBNRZn2lkZ2uClM/3yBykZJjOwaDnnbqZdUCk9GSLrxN8GwByZ2c\n2kt4ALsEib86bt5O1NiritF7GtFJoe2+Jjz/EqtAJFj2E3TIZIq/uIx9LanYZcBL\njL3f/OsfAgMBAAECggEAMwUPyinqotP0YeRyBCdAPzOP4DF7ej5FFBsLV1QxAxm1\nIQgDBbbtGnzVesTrDQIBLBl5HmnMh48gTXT+SUve9aH0krL+jCPS4Kwngj3GCV58\nVp92/CRXaUihDkY3ZhMKOTH4DTJfIjNlNTXc66+nj41wgCde2mSMDL6X8d7bUpUX\nauP/1Fz/o+81WFZQrdiC/4VCFrPbLv/DhJJBR/aSLiWTBOuSCeT0rMzZfrvNx9zs\nm9dZhaSDgQOFmFcj8DPOLmqlcZZoiq6m2RX3CgyIALFtIUfA/nb+hfwZNxS4Iq87\ndaFWIhVsIaCGvDlbtKgtzk1cHWVXeAD2561GPKNGsQKBgQDG/tSpnOrP2QSntxMi\nKZS5aLbqSgxWdsbFlkaysiU+CefhoP3+XimmPuqxx9LGeuzzoEnqMdqd/cx6WKjM\nofo1A+FICIp/P8y+GEXiftvr6MXoFFqc1BkX7t9MsPEhGDUjUV396jTJ3irQiVCd\nOsdXI7p1h2J1cCNLSHbg+NDmbQKBgQDGLANcVGlOFPxyBEYM24KnMPFoH6OeeDUG\nQ14j1up2gSMeWn7Dh+aY30lSLnmjInbB42G0orddEIdk8pT0GXY5oBoIuxqPUCNl\n1KzAV8KWk8mG9wjJ7uFvTMLtaXP513fN+f5uQ6WY1l+eBcZnlL0ucBruzfXLWrEA\nyWMdTJUQOwKBgH1qLe2YEAVe6SgqocxuGGWiMWYHtS7pPO1agMQusnofFB2HsYyX\nG/jCvne9UIH3B0+kPfFz6iyYwD57kicmDuNKxrj3aRI5y3gjJChTe5d65QAXk+Qz\naH1E90cGXXJWJ2dS6MIW0Z5IfwNfB4eQfAHXarSX1t3dBuFzkjjHmCEhAoGAWOc7\n5rrztxTRH/Fs363GkmzxkA3JoHk7CIFGhXuQGfPbJm3guqWIPQLG6Phyl04JyvfQ\nSHJLIpQcuZveWRfnIvkBVPNjefGwv6lGis+UO2s3mLXQmo7xUbY1KL8LSYVxeNVz\nYFI2wzdBFCpxFNz0dhXS71k0sLMR/1FZhrZplSsCgYBC/yLKun7gXc69qbew/N2I\nwEfXRay6lKC/Gf7beNBIGELWm7Km9hpKynWXknxfzlmy8AmNSp+fS8XZFu9BAQXk\nAAsjox/0kbYMN/H9UZWx1BnPLl9M3GhCRFdWQJAcBkHUqt6VvvVHuhXPEte/i+2e\nl3sGHfUc8aCKKvJmmDWFtA==\n-----END PRIVATE KEY-----\n",
+  "client_email": "firebase-adminsdk-fbsvc@kampusride.iam.gserviceaccount.com",
+  "client_id": "117667893797713743782",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40kampusride.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}

@@ -45,18 +45,26 @@ export async function registerForPushNotificationsAsync() {
     }
 
     if (Device.isDevice) {
+        console.log('📱 Checking notification permissions...');
         const { status: existingStatus } = await Notifications.getPermissionsAsync();
+        console.log('📱 Current permission status:', existingStatus);
+
         let finalStatus = existingStatus;
 
         if (existingStatus !== 'granted') {
+            console.log('📱 Requesting permissions...');
             const { status } = await Notifications.requestPermissionsAsync();
             finalStatus = status;
+            console.log('📱 Permission request result:', status);
+        } else {
+            console.log('✅ Permissions already granted');
         }
 
         if (finalStatus !== 'granted') {
-            console.log('Failed to get push token for push notification!');
+            console.log('❌ Failed to get push token for push notification! Permission denied.');
             return null;
         }
+        console.log('✅ Permissions confirmed, getting token...');
 
         // Get the token
         try {

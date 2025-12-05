@@ -12,7 +12,13 @@ import {
 	getDocs,
 	getDoc,
 } from "firebase/firestore";
-
+import {
+	notifyRideBooked,
+	notifyRideAccepted,
+	notifyRideStarted,
+	notifyRideCompleted,
+	notifyRideCancelled,
+} from "./notificationService";
 /**
  * Firestore Collections Structure:
  *
@@ -96,6 +102,18 @@ export const createRide = async (rideData) => {
 
 		await setDoc(rideDoc, ride);
 		console.log("✅ Ride created:", rideId);
+		// Send ride booked notification with payment confirmation
+		// Extract name/address if location is an object
+		const pickupName = rideData.pickupLocation?.name || rideData.pickupLocation?.address || rideData.pickupLocation || 'Pickup';
+		const destName = rideData.destination?.name || rideData.destination?.address || rideData.destination || 'Destination';
+
+		await notifyRideBooked(rideData.customerId, {
+			id: rideId,
+			price: rideData.amount,
+			pickupLocation: pickupName,
+			destination: destName,
+		});
+
 
 		return rideId;
 	} catch (error) {
@@ -123,6 +141,11 @@ export const acceptRide = async (rideId, driverData) => {
 			acceptedAt: serverTimestamp(),
 		});
 
+		const rideDoc = await getDoc(rideRef);
+		if (rideDoc.exists()) {
+			const customerId = rideDoc.data().customerId;
+			await notifyRideAccepted(customerId, rideId, driverData);
+		}
 		console.log("✅ Ride accepted:", rideId);
 	} catch (error) {
 		console.error("❌ Error accepting ride:", error);
@@ -147,6 +170,18 @@ export const updateRideStatus = async (rideId, status) => {
 
 		await updateDoc(rideRef, updates);
 		console.log(`✅ Ride status updated to ${status}:`, rideId);
+		const rideDoc = await getDoc(rideRef);
+		if (rideDoc.exists()) {
+			const rideData = rideDoc.data();
+			const customerId = rideData.customerId;
+			if (status === "in_progress") {
+				// Ride started
+				await notifyRideStarted(customerId, rideId, rideData.destination);
+			} else if (status === "completed") {
+				// Ride completed
+				await notifyRideCompleted(customerId, rideId, rideData.amount);
+			}
+		}
 	} catch (error) {
 		console.error("❌ Error updating ride status:", error);
 		throw error;
@@ -175,6 +210,20 @@ export const cancelRide = async (rideId, cancelledBy = 'customer', reason = '') 
 
 		await updateDoc(rideRef, updates);
 		console.log(`✅ Ride cancelled by ${cancelledBy}:`, rideId);
+
+		// Get customer ID for notification
+		const rideDoc = await getDoc(rideRef);
+		if (rideDoc.exists()) {
+			const rideData = rideDoc.data();
+			const refundAmount = updates.refundAmount || null;
+			await notifyRideCancelled(
+				rideData.customerId,
+				rideId,
+				refundAmount,
+				updates.cancellationReason || reason
+			);
+		}
+		return updates;
 	} catch (error) {
 		console.error("❌ Error cancelling ride:", error);
 		throw error;
@@ -248,6 +297,15 @@ export const cancelRideWithRefund = async (rideId, cancelledBy = 'customer', rea
 		// Update ride document
 		await updateDoc(rideRef, updates);
 		console.log(`✅ Ride cancelled by ${cancelledBy}:`, rideId);
+
+		// Send cancellation notification with refund info
+		const refundAmount = updates.refundAmount || null;
+		await notifyRideCancelled(
+			rideData.customerId,
+			rideId,
+			refundAmount,
+			updates.cancellationReason || reason
+		);
 
 		return updates;
 	} catch (error) {
