@@ -1,8 +1,8 @@
 import { io } from "socket.io-client";
 
-// Use your machine's LAN IP if you're testing on a real device
+// Using live backend on Render
 // If websocket transport is blocked on your network, allow polling as a fallback.
-const SOCKET_HOST = "http://192.168.193.60:3001";
+const SOCKET_HOST = "https://krides.onrender.com";
 
 const socket = io(SOCKET_HOST, {
 	// try polling first, then upgrade to websocket when possible
