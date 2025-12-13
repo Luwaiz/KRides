@@ -9,6 +9,7 @@ import useAuthStore, {
 	useUserDetails,
 	useDriverDetails,
 } from "../constants/Store"; // Import stores
+import notificationManager from "../helpers/notificationManager";
 
 // Screens and Navigators
 import OnBoarding from "../screens/OnBoarding";
@@ -90,6 +91,9 @@ const Navigation = () => {
 								setFirstName(profile.firstName || "");
 								setLastName(profile.lastName || "");
 							}
+
+							// Initialize notifications for customer
+							await notificationManager.initialize(currentUser.uid, role);
 						} else {
 							console.log("🔍 Not found in users, checking drivers...");
 							// Otherwise check in "drivers"
@@ -113,6 +117,9 @@ const Navigation = () => {
 									...profile,
 									uid: currentUser.uid,
 								});
+
+								// Initialize notifications for driver
+								await notificationManager.initialize(currentUser.uid, role);
 							} else {
 								console.log("⚠️ User not found in any collection, using defaults");
 								setAuthData(currentUser, {
@@ -179,6 +186,12 @@ const Navigation = () => {
 					}
 				} else if (!currentUser) {
 					if (mounted) {
+						// Cleanup notifications on logout
+						const prevRole = useAuthStore.getState().role;
+						const prevUser = useAuthStore.getState().user;
+						if (prevUser?.uid && prevRole) {
+							await notificationManager.cleanup(prevUser.uid, prevRole);
+						}
 						setAuthData(null, null, null);
 					}
 				}
