@@ -139,7 +139,7 @@ export async function signUpWithEmail({
 		phone: phone || null,
 		role,
 		...(vehicle_id && { vehicle_id }),
-		fcmTokens: {},
+		pushToken: null,
 		createdAt: serverTimestamp(),
 	};
 
@@ -199,7 +199,7 @@ export async function createUserDocIfMissing(uid, profile = {}) {
 			email: profile.email || null,
 			phone: profile.phone || null,
 			role: profile.role || "customer",
-			fcmTokens: {},
+			pushToken: null,
 			createdAt: serverTimestamp(),
 		});
 		return { created: true };

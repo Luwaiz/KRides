@@ -62,28 +62,8 @@ export function useGoogleAuth() {
             const userCredential = await signInWithCredential(FIREBASE_AUTH, googleCredential);
             console.log('✅ Firebase sign-in successful:', userCredential.user.uid);
 
-            // Register for push notifications and save token
-            try {
-                const { registerForPushNotificationsAsync } = require('../helpers/notifications');
-                const { doc, setDoc } = require('firebase/firestore');
-                const { FIREBASE_DB } = require('../firebaseConfig');
+            // Register for push notifications and save token - REMOVED
 
-                const pushToken = await registerForPushNotificationsAsync();
-
-                if (pushToken) {
-                    // Use setDoc with merge: true so it creates the doc if it doesn't exist
-                    await setDoc(doc(FIREBASE_DB, 'users', userCredential.user.uid), {
-                        pushToken: pushToken,
-                        pushTokenUpdatedAt: new Date(),
-                    }, { merge: true });
-                    console.log('✅ Push token saved:', pushToken);
-                } else {
-                    console.log('⚠️ No push token received - notifications may not work');
-                }
-            } catch (tokenError) {
-                console.error('⚠️ Failed to register push token:', tokenError.message);
-                // Don't fail the sign-in if push token registration fails
-            }
 
             // Check if phone number is needed (for drivers)
             const needsPhone = role === 'driver' && !googleUser?.phoneNumber;

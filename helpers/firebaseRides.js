@@ -13,15 +13,11 @@ import {
 	getDoc,
 } from "firebase/firestore";
 import {
-	notifyRideBooked,
-	notifyRideAccepted,
-	notifyRideStarted,
-	notifyRideCompleted,
-	notifyRideCancelled,
-	notifyNewRideRequest,
-	notifyDriverRideCancelled,
-	notifyDriverPaymentReceived,
-} from "./notificationService";
+	notifyDriversAboutNewRide,
+	notifyCustomerRideAccepted,
+	notifyCustomerRideCompleted,
+} from "./notificationHelpers";
+
 /**
  * Firestore Collections Structure:
  *
@@ -105,28 +101,7 @@ export const createRide = async (rideData) => {
 
 		await setDoc(rideDoc, ride);
 		console.log("✅ Ride created:", rideId);
-		// Send ride booked notification with payment confirmation
-		// Extract name/address if location is an object
-		const pickupName = rideData.pickupLocation?.name || rideData.pickupLocation?.address || rideData.pickupLocation || 'Pickup';
-		const destName = rideData.destination?.name || rideData.destination?.address || rideData.destination || 'Destination';
-
-		// Notify customer about successful booking
-		await notifyRideBooked(rideData.customerId, {
-			id: rideId,
-			price: rideData.amount,
-			pickupLocation: pickupName,
-			destination: destName,
-		});
-
-		// Notify all available drivers about new ride request
-		await notifyNewRideRequest(
-			rideId,
-			pickupName,
-			destName,
-			rideData.amount,
-			rideData.customerName
-		);
-
+		await notifyDriversAboutNewRide(rideId, rideData.customerName, rideData.pickupLocation);
 		return rideId;
 	} catch (error) {
 		console.error("❌ Error creating ride:", error);
@@ -154,11 +129,12 @@ export const acceptRide = async (rideId, driverData) => {
 		});
 
 		const rideDoc = await getDoc(rideRef);
-		if (rideDoc.exists()) {
-			const customerId = rideDoc.data().customerId;
-			await notifyRideAccepted(customerId, rideId, driverData);
-		}
+		const rideData = rideDoc.data();
 		console.log("✅ Ride accepted:", rideId);
+		// Notify customer that ride was accepted
+		if (rideData.customerId) {
+			await notifyCustomerRideAccepted(rideData.customerId, rideId, driverData.driverName);
+		}
 	} catch (error) {
 		console.error("❌ Error accepting ride:", error);
 		throw error;
@@ -182,29 +158,12 @@ export const updateRideStatus = async (rideId, status) => {
 
 		await updateDoc(rideRef, updates);
 		console.log(`✅ Ride status updated to ${status}:`, rideId);
-		const rideDoc = await getDoc(rideRef);
-		if (rideDoc.exists()) {
-			const rideData = rideDoc.data();
-			const customerId = rideData.customerId;
-			if (status === "in_progress") {
-				// Ride started
-				await notifyRideStarted(customerId, rideId, rideData.destination);
-			} else if (status === "completed") {
-				// Ride completed - notify customer
-				await notifyRideCompleted(customerId, rideId, rideData.amount);
-
-				// Notify driver about payment (assuming 50 naira commission)
-				if (rideData.driverId && rideData.amount) {
-					const commission = 50;
-					const netAmount = rideData.amount - commission;
-					const rideDate = new Date().toLocaleDateString('en-NG');
-					await notifyDriverPaymentReceived(
-						rideData.driverId,
-						rideId,
-						rideData.amount,
-						netAmount,
-						rideDate
-					);
+		if (status === "completed") {
+			const rideDoc = await getDoc(rideRef);
+			if (rideDoc.exists()) {
+				const rideData = rideDoc.data();
+				if (rideData.customerId) {
+					await notifyCustomerRideCompleted(rideData.customerId, rideId);
 				}
 			}
 		}
@@ -240,14 +199,7 @@ export const cancelRide = async (rideId, cancelledBy = 'customer', reason = '') 
 		// Get customer ID for notification
 		const rideDoc = await getDoc(rideRef);
 		if (rideDoc.exists()) {
-			const rideData = rideDoc.data();
-			const refundAmount = updates.refundAmount || null;
-			await notifyRideCancelled(
-				rideData.customerId,
-				rideId,
-				refundAmount,
-				updates.cancellationReason || reason
-			);
+			// Logic for other updates if needed 
 		}
 		return updates;
 	} catch (error) {
@@ -325,26 +277,10 @@ export const cancelRideWithRefund = async (rideId, cancelledBy = 'customer', rea
 		console.log(`✅ Ride cancelled by ${cancelledBy}:`, rideId);
 
 		// Send cancellation notification to customer with refund info
-		const refundAmount = updates.refundAmount || null;
-		await notifyRideCancelled(
-			rideData.customerId,
-			rideId,
-			refundAmount,
-			updates.cancellationReason || reason
-		);
+		// Removed notification logic
 
 		// If driver was assigned and customer cancelled, notify the driver
-		if (rideData.driverId && cancelledBy === 'customer') {
-			const pickupName = rideData.pickupLocation?.name || rideData.pickupLocation || 'Pickup';
-			const destName = rideData.destination?.name || rideData.destination || 'Destination';
-			await notifyDriverRideCancelled(
-				rideData.driverId,
-				rideId,
-				pickupName,
-				destName,
-				updates.cancellationReason || reason
-			);
-		}
+		// Removed notification logic
 
 		return updates;
 	} catch (error) {

@@ -9,21 +9,12 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "extra": {
-      "eas": {
-        "projectId": "960cb227-598a-4ca3-ad50-bccaa10465e3"
-      }
-    },
     "android": {
       "package": "com.eluwaiz.KRides",
-       "googleServicesFile": "./google-services.json",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      },
-      "notification": {
-        "icon": "./assets/icon.png",
-        "color": "#4CAF50"
       },
       "config": {
         "googleMaps": {
@@ -38,16 +29,22 @@
         "googleMapsApiKey": "AIzaSyB7fe6OfWqZs2BP0AoZS-2jLi5mIVbiYTM"
       }
     },
+    "notification": {
+      "icon": "./assets/icon.png",
+      "color": "#007bff",
+      "androidMode": "default",
+      "androidCollapsedTitle": "KRides"
+    },
     "plugins": [
       "expo-font",
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/icon.png",
-          "color": "#ffffff"
-        }
-      ],
-      "@react-native-google-signin/google-signin"
-    ]
+      "@react-native-google-signin/google-signin",
+      "expo-notifications"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "d5e8a821-8ba4-4aa8-b66a-ed4a6ec9cbe4"
+      }
+    },
+    "owner": "eluwaiz"
   }
 }
