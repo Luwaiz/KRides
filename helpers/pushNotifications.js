@@ -15,8 +15,8 @@ Notifications.setNotificationHandler({
 });
 
 /**
- * Register for push notifications and get Expo Push Token
- * @returns {Promise<string|null>} Expo Push Token or null if failed
+ * Register for push notifications and get FCM Token
+ * @returns {Promise<string|null>} FCM Token or null if failed
  */
 export async function registerForPushNotificationsAsync() {
     let token = null;
@@ -46,18 +46,12 @@ export async function registerForPushNotificationsAsync() {
         }
 
         try {
-            const projectId = Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
-
-            if (!projectId) {
-                console.error('❌ Project ID not found');
-                return null;
-            }
-
-            const pushTokenData = await Notifications.getExpoPushTokenAsync({ projectId });
-            token = pushTokenData.data;
-            console.log('✅ Push token obtained:', token);
+            // Get FCM token directly (instead of Expo push token)
+            const fcmTokenData = await Notifications.getDevicePushTokenAsync();
+            token = fcmTokenData.data;
+            console.log('✅ FCM token obtained:', token.substring(0, 30) + '...');
         } catch (error) {
-            console.error('❌ Error getting push token:', error);
+            console.error('❌ Error getting FCM token:', error);
         }
     } else {
         console.log('⚠️ Must use physical device for push notifications');

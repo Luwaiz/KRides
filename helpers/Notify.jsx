@@ -63,18 +63,11 @@ async function registerForPushNotificationsAsync() {
       handleRegistrationError('Permission not granted to get push token for push notification!');
       return;
     }
-    const projectId =
-      Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
-    if (!projectId) {
-      handleRegistrationError('Project ID not found');
-    }
     try {
-      const pushTokenString = (
-        await Notifications.getExpoPushTokenAsync({
-          projectId,
-        })
-      ).data;
-      console.log(pushTokenString);
+      // Get FCM token directly (instead of Expo push token)
+      const fcmTokenData = await Notifications.getDevicePushTokenAsync();
+      const pushTokenString = fcmTokenData.data;
+      console.log('✅ FCM token obtained:', pushTokenString.substring(0, 30) + '...');
       return pushTokenString;
     } catch (e) {
       handleRegistrationError(`${e}`);

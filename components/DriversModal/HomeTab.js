@@ -17,17 +17,22 @@ import {
 	useBottomTabStore,
 	useDriverDetails,
 	useAcceptedRideStore,
+	useDriverAvailability,
 } from "../../constants/Store";
+import useAuthStore from "../../constants/Store";
 import Avatar from "../../assets/svg/Frame 77avatar.svg";
 import DangerButton from "../buttons/DangerButton";
 import Destination from "../Destination";
+import RideRequestModal from "../modals/RideRequestModal";
 import axios from "axios";
 import API from "../../hooks/API";
 import { getRideCoordinates } from "../../helpers/getLocationCoordinates";
 import { listenToPendingRides, declineRide } from "../../helpers/firebaseRides";
+import { notifyCustomerRideAccepted } from "../../helpers/notificationHelpers";
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { FIREBASE_DB } from "../../firebaseConfig";
 import { sp, fs, br, ms } from "../../constants/responsive";
+import { useNavigation } from "@react-navigation/native";
 
 const HomeTab = () => {
 	const accessToken = useDriverDetails((state) => state.accessToken);
@@ -42,6 +47,8 @@ const HomeTab = () => {
 	console.log("   - phone:", phone || "MISSING");
 	console.log("   - uid:", uid || "MISSING");
 
+	const navigation = useNavigation();
+
 	const setAcceptedRide = useAcceptedRideStore(
 		(state) => state.setAcceptedRide
 	);
@@ -53,6 +60,8 @@ const HomeTab = () => {
 	const [accepting, setAccepting] = useState(null);
 	const [declining, setDeclining] = useState(null);
 	const [rides, setRides] = useState([]);
+	const [currentRideRequest, setCurrentRideRequest] = useState(null);
+	const [showRideModal, setShowRideModal] = useState(false);
 
 	// ✅ Listen to pending rides from Firestore (real-time)
 	useEffect(() => {
@@ -70,6 +79,33 @@ const HomeTab = () => {
 			unsubscribe();
 		};
 	}, [uid]);
+
+	// Show modal for first ride when rides update
+	useEffect(() => {
+		const isOnline = useDriverAvailability.getState().isOnline;
+
+		// Don't show modal if driver is offline
+		if (!isOnline) {
+			setShowRideModal(false);
+			setCurrentRideRequest(null);
+			return;
+		}
+
+		// Only show modal if:
+		// 1. There are rides available
+		// 2. No modal is currently showing
+		// 3. No current ride request is set
+		// 4. Not currently accepting a ride
+		if (rides.length > 0 && !showRideModal && !currentRideRequest && !accepting) {
+			const firstRide = rides[0];
+			// Make sure we're not showing the same ride again
+			if (!currentRideRequest || currentRideRequest.rideId !== firstRide.rideId) {
+				console.log('🔔 New ride available, showing modal:', firstRide.rideId);
+				setCurrentRideRequest(firstRide);
+				setShowRideModal(true);
+			}
+		}
+	}, [rides, showRideModal, currentRideRequest, accepting]);
 
 	const onRefresh = () => {
 		console.log("🔄 Manual refresh - Firestore listeners auto-update");
@@ -101,8 +137,42 @@ const HomeTab = () => {
 		}
 	};
 
+	// Handle modal accept
+	const handleModalAccept = async (rideId) => {
+		console.log('✅ Modal accept - closing modal and clearing current request');
+		// Immediately close modal and clear current ride to prevent re-showing
+		setShowRideModal(false);
+		setCurrentRideRequest(null);
+		await AcceptRide(rideId);
+	};
+
+	// Handle modal decline
+	const handleModalDecline = async (rideId) => {
+		console.log('❌ Modal decline - closing modal and clearing current request');
+		setShowRideModal(false);
+		setCurrentRideRequest(null);
+		await DeclineRide(rideId);
+	};
+
+	// Handle modal timeout
+	const handleModalTimeout = async (rideId) => {
+		console.log("⏰ Ride request timed out:", rideId);
+		// Auto-decline uses the same logic as manual decline
+		await handleModalDecline(rideId);
+	};
+
 	// ✅ Accept ride using Firestore
 	const AcceptRide = async (rideId) => {
+		// Check if bank details are verified
+		const driverDetails = useDriverDetails.getState();
+		if (!driverDetails.bankDetailsVerified) {
+			alert(
+				"Please complete your bank account details before accepting rides. Go to Settings > Bank Details to add your account information."
+			);
+			navigation.navigate("BankAccountDetails");
+			return;
+		}
+
 		console.log("🚗 Accepting ride:", rideId);
 		console.log("   Driver details:");
 		console.log("   - Full Name:", fullName || "MISSING");
@@ -145,6 +215,13 @@ const HomeTab = () => {
 				vehicleId: VehicleId || "",
 				acceptedAt: serverTimestamp(),
 			});
+
+			// Notify customer that ride was accepted
+			await notifyCustomerRideAccepted(
+				rideDetails.customerId,
+				rideId,
+				fullName || "Driver"
+			);
 
 			// Store the accepted ride details with coordinates
 			setAcceptedRide({
@@ -219,85 +296,96 @@ const HomeTab = () => {
 	}, []);
 
 	return (
-		<BottomSheet
-			snapPoints={rides.length > 1 ? ["76%"] : ["50%"]}
-			backgroundStyle={{ borderRadius: 30 }}
-			handleComponent={null}
-		>
-			{loading ? (
-				<ActivityIndicator />
-			) : (
-				<View style={styles.sheetCont}>
-					<View style={styles.topText}>
-						<Text style={styles.where}>Ride request</Text>
-						<TouchableOpacity onPress={onRefresh} disabled={refreshing}>
-							<Feather
-								name="refresh-cw"
-								size={ms(24)}
-								color={refreshing ? colors.lightGrey3 : colors.primaryBlue}
-							/>
-						</TouchableOpacity>
-					</View>
-					{rides?.length === 0 ? (
-						<View style={styles.noRidesContainer}>
-							<Text style={styles.noRides}>No pending rides</Text>
-							<TouchableOpacity
-								onPress={onRefresh}
-								style={styles.refreshButton}
-							>
-								<Text style={styles.refreshButtonText}>Refresh</Text>
+		<>
+			{/* Full-screen ride request modal */}
+			<RideRequestModal
+				visible={showRideModal}
+				ride={currentRideRequest}
+				onAccept={handleModalAccept}
+				onDecline={handleModalDecline}
+				onTimeout={handleModalTimeout}
+			/>
+
+			<BottomSheet
+				snapPoints={rides.length > 1 ? ["76%"] : ["50%"]}
+				backgroundStyle={{ borderRadius: 30 }}
+				handleComponent={null}
+			>
+				{loading ? (
+					<ActivityIndicator />
+				) : (
+					<View style={styles.sheetCont}>
+						<View style={styles.topText}>
+							<Text style={styles.where}>Ride request</Text>
+							<TouchableOpacity onPress={onRefresh} disabled={refreshing}>
+								<Feather
+									name="refresh-cw"
+									size={ms(24)}
+									color={refreshing ? colors.lightGrey3 : colors.primaryBlue}
+								/>
 							</TouchableOpacity>
 						</View>
-					) : (
-						<BottomSheetFlatList
-							data={rides}
-							extraData={accepting}
-							refreshControl={
-								<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-							}
-							keyExtractor={(item) =>
-								item?.rideId?.toString() ?? Math.random().toString()
-							}
-							renderItem={({ item }) => (
-								<View style={styles.container}>
-									<View style={styles.details}>
-										<Avatar width={50} height={50} />
-										<View>
-											<Text style={styles.name}>
-												{item?.customerName || item?.name || "Unknown"}
-											</Text>
-											<Text style={styles.time}>
-												Passengers:{" "}
-												{item?.numberOfPassengers ||
-													item?.number_of_passengers ||
-													1}
-											</Text>
-											<Text style={styles.time}>₦{item?.amount || 0}</Text>
+						{rides?.length === 0 ? (
+							<View style={styles.noRidesContainer}>
+								<Text style={styles.noRides}>No pending rides</Text>
+								<TouchableOpacity
+									onPress={onRefresh}
+									style={styles.refreshButton}
+								>
+									<Text style={styles.refreshButtonText}>Refresh</Text>
+								</TouchableOpacity>
+							</View>
+						) : (
+							<BottomSheetFlatList
+								data={rides}
+								extraData={accepting}
+								refreshControl={
+									<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+								}
+								keyExtractor={(item) =>
+									item?.rideId?.toString() ?? Math.random().toString()
+								}
+								renderItem={({ item }) => (
+									<View style={styles.container}>
+										<View style={styles.details}>
+											<Avatar width={50} height={50} />
+											<View>
+												<Text style={styles.name}>
+													{item?.customerName || item?.name || "Unknown"}
+												</Text>
+												<Text style={styles.time}>
+													Passengers:{" "}
+													{item?.numberOfPassengers ||
+														item?.number_of_passengers ||
+														1}
+												</Text>
+												<Text style={styles.time}>₦{item?.amount || 0}</Text>
+											</View>
+										</View>
+										<Destination
+											location={item?.pickupLocation || item?.location}
+											destination={item?.destination}
+										/>
+										<View style={styles.button}>
+											<DangerButton
+												title={"Decline"}
+												onPress={() => DeclineRide(item?.rideId || item?.id)}
+												loading={declining === (item?.rideId || item?.id)}
+											/>
+											<ActiveButton
+												title={"Accept"}
+												onPress={() => AcceptRide(item?.rideId || item?.id)}
+												loading={accepting === (item?.rideId || item?.id)}
+											/>
 										</View>
 									</View>
-									<Destination
-										location={item?.pickupLocation || item?.location}
-										destination={item?.destination}
-									/>
-									<View style={styles.button}>
-										<DangerButton
-											title={"Decline"}
-											onPress={() => DeclineRide(item?.rideId || item?.id)}
-											loading={declining === (item?.rideId || item?.id)}
-										/>
-										<ActiveButton
-											title={"Accept"}
-											onPress={() => AcceptRide(item?.rideId || item?.id)}
-											loading={accepting === (item?.rideId || item?.id)}
-										/>
-									</View>
-								</View>
-							)}
-						/>
-					)}
-				</View>
-			)}
-		</BottomSheet>
+								)}
+							/>
+						)}
+					</View>
+				)}
+			</BottomSheet>
+		</>
 	);
 };
 

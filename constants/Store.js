@@ -207,3 +207,46 @@ export const useAcceptedRideStore = create((set) => ({
 		return newState;
 	}),
 }));
+
+// Store for customer's active ride (for status bar)
+export const useActiveRideStore = create((set) => ({
+	activeRide: null,
+	rideStatus: null,
+
+	setActiveRide: (rideData) => set({
+		activeRide: rideData,
+		rideStatus: rideData.status
+	}),
+
+	updateRideStatus: (status) => set({ rideStatus: status }),
+
+	updateDriverInfo: (driverName, driverId, driverPhone, vehicleId) => set((state) => ({
+		activeRide: state.activeRide ? {
+			...state.activeRide,
+			driverName,
+			driverId,
+			driverPhone,
+			vehicleId,
+		} : null
+	})),
+
+	updateArrivalStatus: (hasArrived) => set((state) => ({
+		activeRide: state.activeRide ? {
+			...state.activeRide,
+			hasArrived,
+		} : null
+	})),
+
+	clearActiveRide: () => set({
+		activeRide: null,
+		rideStatus: null
+	}),
+}));
+
+// Store for driver availability (online/offline status)
+export const useDriverAvailability = create((set) => ({
+	isOnline: true,
+	setOnline: () => set({ isOnline: true }),
+	setOffline: () => set({ isOnline: false }),
+	toggleAvailability: () => set((state) => ({ isOnline: !state.isOnline })),
+}));

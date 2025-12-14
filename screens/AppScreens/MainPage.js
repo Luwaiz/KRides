@@ -1,26 +1,41 @@
-import { Button, PermissionsAndroid, StyleSheet, View, Text } from "react-native";
+import { Button, PermissionsAndroid, StyleSheet, View, Text, Alert } from "react-native";
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import HomeTab from "../../components/HomeTab";
 import Passenger from "../../components/Passenger";
 import ConfirmRide from "../../components/ConfirmRide";
+import RideStatusBar from "../../components/RideStatusBar";
 import HomeHeader from "../../components/homeHeader/HomeHeader";
 import PassengerHeader from "../../components/homeHeader/PassengerHeader";
 import ConfirmHeader from "../../components/homeHeader/ConfirmHeader";
-import { useBottomTabStore } from "../../constants/Store";
+import { useBottomTabStore, useActiveRideStore, useUserDetails } from "../../constants/Store";
 import { GOOGLE_MAPS_API_KEY } from "@env";
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
 import MapViewDirections from "react-native-maps-directions";
 import Geolocation from "@react-native-community/geolocation";
 import { useRideDetailsStore } from "../../constants/Store";
+import { cancelRideWithRefund, listenToRide } from "../../helpers/firebaseRides";
+import { notifyDriverRideCancelled } from "../../helpers/notificationHelpers";
+import Toast from "react-native-toast-message";
 
 const MainPage = () => {
 	const [location, setLocation] = useState(false);
+	const [cancelling, setCancelling] = useState(false);
 	const pickup = useRideDetailsStore((s) => s.pickupLocation);
 	const destination = useRideDetailsStore((s) => s.destination);
 	const mapRef = useRef(null);
 
 	const isPassengers = useBottomTabStore((state) => state.passengerPage);
 	const confirm = useBottomTabStore((state) => state.confirmPage);
+	const setConfirmPage = useBottomTabStore((state) => state.setConfirmPage);
+
+	// Active ride state
+	const activeRide = useActiveRideStore(state => state.activeRide);
+	const rideStatus = useActiveRideStore(state => state.rideStatus);
+	const clearActiveRide = useActiveRideStore(state => state.clearActiveRide);
+	const { firstName, lastName } = useUserDetails((state) => ({
+		firstName: state.firstName,
+		lastName: state.lastName,
+	}));
 
 	const BABCOCK_COORDINATES = (location && location.coords)
 		? {
@@ -78,6 +93,77 @@ const MainPage = () => {
 	useEffect(() => {
 		getLocationN();
 	}, []);
+
+	// Listen for ride updates when there's an active ride
+	useEffect(() => {
+		if (!activeRide?.rideId) return;
+
+		console.log('📡 MainPage - Setting up ride listener for:', activeRide.rideId);
+
+		const unsubscribe = listenToRide(activeRide.rideId, (rideData) => {
+			if (rideData) {
+				console.log('🔥 MainPage - Ride update received:', {
+					status: rideData.status,
+					driverName: rideData.driverName,
+				});
+
+				// Update active ride store status
+				useActiveRideStore.getState().updateRideStatus(rideData.status);
+
+				// If driver accepts ride
+				if (rideData.status === "accepted" && rideData.driverName) {
+					console.log('✅ MainPage - Driver accepted, updating driver info');
+					console.log('   Driver data from Firestore:', {
+						driverName: rideData.driverName,
+						driverId: rideData.driverId,
+						driverPhone: rideData.driverPhone,
+						vehicleId: rideData.vehicleId
+					});
+					useActiveRideStore.getState().updateDriverInfo(
+						rideData.driverName,
+						rideData.driverId,
+						rideData.driverPhone,
+						rideData.vehicleId
+					);
+
+					// Log the updated state
+					const updatedRide = useActiveRideStore.getState().activeRide;
+					console.log('   Updated activeRide:', {
+						driverName: updatedRide?.driverName,
+						driverPhone: updatedRide?.driverPhone,
+						vehicleId: updatedRide?.vehicleId
+					});
+				}
+
+				// Check if driver has arrived
+				if (rideData.hasArrived !== undefined) {
+					console.log('🚗 MainPage - Driver arrival status:', rideData.hasArrived);
+					useActiveRideStore.getState().updateArrivalStatus(rideData.hasArrived);
+				}
+
+				// If ride is completed or cancelled
+				if (rideData.status === "completed" || rideData.status === "cancelled") {
+					console.log('🏁 MainPage - Ride ended, clearing active ride');
+					clearActiveRide();
+				}
+			}
+		});
+
+		return () => {
+			console.log('🔌 MainPage - Unsubscribing from ride listener');
+			unsubscribe();
+		};
+	}, [activeRide?.rideId]);
+
+	// Debug: Log active ride state changes
+	useEffect(() => {
+		console.log('🏠 MainPage - Active Ride State:', {
+			hasActiveRide: !!activeRide,
+			rideId: activeRide?.rideId,
+			status: rideStatus,
+			driverName: activeRide?.driverName,
+		});
+	}, [activeRide, rideStatus]);
 
 	// Debug: Log pickup and destination from store
 	useEffect(() => {
@@ -143,6 +229,79 @@ const MainPage = () => {
 		}
 	}, [pickup, destination]);
 
+	// Handle cancel ride from status bar
+	const handleCancelRide = async () => {
+		if (!activeRide) return;
+
+		Alert.alert(
+			"Cancel Ride",
+			rideStatus === "accepted"
+				? "A driver has already accepted your ride. Are you sure you want to cancel?"
+				: "Are you sure you want to cancel this ride?",
+			[
+				{ text: "No, Keep Ride", style: "cancel" },
+				{
+					text: "Yes, Cancel",
+					style: "destructive",
+					onPress: async () => {
+						setCancelling(true);
+						try {
+							const result = await cancelRideWithRefund(
+								activeRide.rideId,
+								'customer',
+								'Customer cancelled the ride'
+							);
+
+							// Notify driver if ride was accepted
+							if (rideStatus === "accepted" && activeRide.driverId) {
+								await notifyDriverRideCancelled(
+									activeRide.driverId,
+									activeRide.rideId,
+									`${firstName} ${lastName}`
+								);
+							}
+
+							clearActiveRide();
+
+							if (result.refundStatus === "completed") {
+								Toast.show({
+									type: 'tomatoToast',
+									text1: 'Ride Cancelled & Refunded',
+									text2: `₦${result.refundAmount} will be refunded`,
+									position: 'top',
+									visibilityTime: 4000,
+								});
+							} else {
+								Toast.show({
+									type: 'tomatoToast',
+									text1: 'Ride Cancelled',
+									text2: 'Your ride has been cancelled',
+									position: 'top',
+									visibilityTime: 3000,
+								});
+							}
+						} catch (error) {
+							console.error('Error cancelling ride:', error);
+							Toast.show({
+								type: 'error',
+								text1: 'Error',
+								text2: 'Unable to cancel ride',
+								position: 'top',
+							});
+						} finally {
+							setCancelling(false);
+						}
+					}
+				}
+			]
+		);
+	};
+
+	// Handle view details from status bar
+	const handleViewDetails = () => {
+		setConfirmPage();
+	};
+
 	const HeaderComponents = useMemo(() => {
 		if (isPassengers) {
 			if (confirm) {
@@ -186,11 +345,6 @@ const MainPage = () => {
 					{pickup && destination && (() => {
 						const pickupCoords = pickup.coord || pickup;
 						const destCoords = destination.coord || destination;
-
-						console.log('🗺️ Rendering MapViewDirections with coords:', {
-							pickupCoords,
-							destCoords
-						});
 
 						return (
 							<MapViewDirections
@@ -250,6 +404,20 @@ const MainPage = () => {
 				>
 					<Text>Map loading or configuration error...</Text>
 				</View>
+			)}
+
+			{/* Ride Status Bar - shown when ride is active */}
+			{activeRide && (
+				<RideStatusBar
+					status={rideStatus}
+					driverName={activeRide.driverName}
+					driverPhone={activeRide.driverPhone}
+					vehicleId={activeRide.vehicleId}
+					hasArrived={activeRide.hasArrived}
+					onCancel={handleCancelRide}
+					onViewDetails={handleViewDetails}
+					cancelling={cancelling}
+				/>
 			)}
 
 			{/* Bottom Sheet */}

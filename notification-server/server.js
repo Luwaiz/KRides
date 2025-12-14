@@ -4,6 +4,7 @@ const cors = require('cors');
 require('dotenv').config();
 
 const app = express();
+
 const PORT = process.env.PORT || 3001;
 
 // Middleware
@@ -20,32 +21,81 @@ admin.initializeApp({
 
 const db = admin.firestore();
 
+// Using Firebase Cloud Messaging (FCM) for push notifications
+console.log('✅ Firebase Admin SDK initialized for FCM notifications');
+
+// Notify customer that driver has arrived
+app.post('/api/notifications/notify-driver-arrived', async (req, res) => {
+    const { customerId, driverName } = req.body;
+    console.log('\ud83d\udccd Driver arrival notification request:', { customerId, driverName });
+    if (!customerId || !driverName) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+    try {
+        const customerDoc = await db.collection('users').doc(customerId).get();
+        if (!customerDoc.exists) {
+            return res.status(404).json({ error: 'Customer not found' });
+        }
+        const pushToken = customerDoc.data()?.pushToken;
+        if (!pushToken) {
+            return res.status(400).json({ error: 'Customer has no push token' });
+        }
+        await sendFCMNotification(
+            pushToken,
+            'Driver Arrived! 🚗',
+            `${driverName} has arrived at your pickup location`,
+            { type: 'driver_arrived', driverName }
+        );
+        console.log('\u2705 Driver arrival notification sent');
+        res.json({ success: true });
+    } catch (error) {
+        console.error('\u274c Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 /**
- * Helper function to send Expo Push Notification with retry logic
- * @param {string} expoPushToken - The Expo push token
+ * Helper function to send FCM Push Notification with retry logic
+ * Uses Firebase Admin SDK instead of Expo's push service
+ * @param {string} fcmToken - The FCM push token
  * @param {string} title - Notification title
  * @param {string} body - Notification body
  * @param {object} data - Optional data payload
  */
-async function sendExpoPushNotification(expoPushToken, title, body, data = {}) {
-    if (!expoPushToken) {
+async function sendFCMNotification(fcmToken, title, body, data = {}) {
+    if (!fcmToken) {
         console.warn('No push token provided');
         return { success: false, error: 'No push token' };
     }
 
-    // Skip if not an Expo token
-    if (!expoPushToken.startsWith('ExponentPushToken[')) {
-        console.warn('Invalid Expo token format:', expoPushToken);
-        return { success: false, error: 'Invalid token format' };
-    }
-
+    // Build FCM message
     const message = {
-        to: expoPushToken,
-        sound: 'default',
-        title: title,
-        body: body,
-        data: data,
-        priority: 'high',
+        token: fcmToken,
+        notification: {
+            title: title,
+            body: body,
+        },
+        data: {
+            ...data,
+            // Convert all data values to strings (FCM requirement)
+            title: title,
+            body: body,
+        },
+        android: {
+            priority: 'high',
+            notification: {
+                sound: 'default',
+                channelId: 'default',
+            },
+        },
+        apns: {
+            payload: {
+                aps: {
+                    sound: 'default',
+                    badge: 1,
+                },
+            },
+        },
     };
 
     // Retry configuration
@@ -58,46 +108,46 @@ async function sendExpoPushNotification(expoPushToken, title, body, data = {}) {
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
-            console.log(`📤 Sending Expo notification to ${expoPushToken}: ${title} (attempt ${attempt + 1}/${maxRetries + 1})`);
+            console.log(`📤 Sending FCM notification to ${fcmToken.substring(0, 20)}...: ${title} (attempt ${attempt + 1}/${maxRetries + 1})`);
 
-            const response = await fetch('https://exp.host/--/api/v2/push/send', {
-                method: 'POST',
-                headers: {
-                    Accept: 'application/json',
-                    'Accept-encoding': 'gzip, deflate',
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(message),
-            });
+            // Send via Firebase Admin SDK
+            const response = await admin.messaging().send(message);
 
-            const result = await response.json();
-
-            // Check for Expo-specific errors
-            if (result.data && result.data.status === 'error') {
-                const errorCode = result.data.details?.error;
-
-                // Permanent errors - don't retry
-                if (errorCode === 'DeviceNotRegistered' ||
-                    errorCode === 'InvalidCredentials' ||
-                    errorCode === 'MessageTooBig') {
-                    console.warn(`🚫 Permanent error (${errorCode}), not retrying`);
-                    return { success: false, error: errorCode, permanent: true };
-                }
-
-                // Temporary errors - can retry
-                throw new Error(errorCode || 'Expo push failed');
-            }
-
-            console.log('✅ Expo notification sent:', result);
-            return { success: true, data: result };
+            console.log('✅ FCM notification sent successfully:', response);
+            return { success: true, messageId: response };
 
         } catch (error) {
             lastError = error;
 
+            // Log full error for debugging
+            console.log(`   ❌ FCM error:`, error.code, error.message);
+
+            // Check for permanent errors (don't retry)
+            const permanentErrors = [
+                'messaging/invalid-registration-token',
+                'messaging/registration-token-not-registered',
+                'messaging/invalid-argument',
+                'messaging/invalid-recipient',
+            ];
+
+            if (permanentErrors.includes(error.code)) {
+                console.warn(`🚫 Permanent error (${error.code}), not retrying`);
+                return {
+                    success: false,
+                    error: error.code,
+                    message: error.message,
+                    permanent: true
+                };
+            }
+
             // If this was the last attempt, return failure
             if (attempt === maxRetries) {
-                console.error(`❌ Error sending Expo notification (all ${maxRetries + 1} attempts failed):`, error.message);
-                return { success: false, error: error.message };
+                console.error(`❌ Error sending FCM notification (all ${maxRetries + 1} attempts failed):`, error.message);
+                return {
+                    success: false,
+                    error: error.code || 'unknown',
+                    message: error.message
+                };
             }
 
             // Calculate delay with exponential backoff
@@ -115,7 +165,11 @@ async function sendExpoPushNotification(expoPushToken, title, body, data = {}) {
     }
 
     // This shouldn't be reached, but just in case
-    return { success: false, error: lastError?.message || 'Unknown error' };
+    return {
+        success: false,
+        error: lastError?.code || 'unknown',
+        message: lastError?.message || 'Unknown error'
+    };
 }
 
 /**
@@ -163,7 +217,7 @@ app.post('/api/notifications/send', async (req, res) => {
         }
 
         // Send notification
-        const result = await sendExpoPushNotification(pushToken, title, body, data || {});
+        const result = await sendFCMNotification(pushToken, title, body, data || {});
 
         res.json(result);
     } catch (error) {
@@ -210,7 +264,7 @@ app.post('/api/notifications/send-bulk', async (req, res) => {
                 const pushToken = userData.pushToken;
 
                 if (pushToken) {
-                    const result = await sendExpoPushNotification(pushToken, title, body, data || {});
+                    const result = await sendFCMNotification(pushToken, title, body, data || {});
                     results.push({ userId, ...result });
                 } else {
                     results.push({ userId, success: false, error: 'No push token' });
@@ -267,7 +321,7 @@ app.post('/api/notifications/notify-drivers', async (req, res) => {
             const pushToken = driver.pushToken;
 
             if (pushToken) {
-                const result = await sendExpoPushNotification(
+                const result = await sendFCMNotification(
                     pushToken,
                     'New Ride Request 🚗',
                     `${customerName || 'A customer'} requested a ride from ${pickupLocation || 'nearby'}`,
@@ -339,7 +393,7 @@ app.post('/api/notifications/ride-accepted', async (req, res) => {
             });
         }
 
-        const result = await sendExpoPushNotification(
+        const result = await sendFCMNotification(
             pushToken,
             'Ride Accepted! 🚗',
             `${driverName || 'A driver'} is on the way to pick you up!`,
@@ -398,7 +452,7 @@ app.post('/api/notifications/ride-completed', async (req, res) => {
             });
         }
 
-        const result = await sendExpoPushNotification(
+        const result = await sendFCMNotification(
             pushToken,
             'Ride Completed! ✅',
             'Your ride has been completed. How was your experience?',
@@ -418,6 +472,67 @@ app.post('/api/notifications/ride-completed', async (req, res) => {
     }
 });
 
+/**
+ * POST /api/notifications/notify-driver-arrived
+ * Notify customer that driver has arrived at pickup location
+ * 
+ * Body: {
+ *   customerId: string,
+ *   driverName: string
+ * }
+ */
+app.post('/api/notifications/notify-driver-arrived', async (req, res) => {
+    try {
+        const { customerId, driverName } = req.body;
+        console.log('📍 Driver arrival notification request:', { customerId, driverName });
+
+        if (!customerId || !driverName) {
+            return res.status(400).json({
+                success: false,
+                error: 'Missing required fields: customerId, driverName'
+            });
+        }
+
+        const customerDoc = await db.collection('users').doc(customerId).get();
+
+        if (!customerDoc.exists) {
+            return res.status(404).json({
+                success: false,
+                error: 'Customer not found'
+            });
+        }
+
+        const customer = customerDoc.data();
+        const pushToken = customer.pushToken;
+
+        if (!pushToken) {
+            return res.status(400).json({
+                success: false,
+                error: 'Customer has no push token'
+            });
+        }
+
+        const result = await sendFCMNotification(
+            pushToken,
+            'Driver Arrived! 🚗',
+            `${driverName} has arrived at your pickup location`,
+            {
+                type: 'driver_arrived',
+                driverName: String(driverName),
+            }
+        );
+
+        console.log('✅ Driver arrival notification sent');
+        res.json(result);
+    } catch (error) {
+        console.error('❌ Error in /api/notifications/notify-driver-arrived:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', service: 'KRides Notification Server' });
@@ -428,3 +543,4 @@ app.listen(PORT, () => {
     console.log(`🚀 Notification server running on port ${PORT}`);
     console.log(`📡 Health check: http://localhost:${PORT}/health`);
 });
+

@@ -19,11 +19,13 @@ import {
 	useUserDetails,
 	useRideDetailsStore,
 	useBottomTabStore,
+	useActiveRideStore,
 } from "../constants/Store";
 import InActiveButton from "./buttons/InActiveButton";
 import DangerButton from "./buttons/DangerButton";
 import Payment from "../screens/AppScreens/Payment";
 import { createRide, listenToRide, cancelRide, cancelRideWithRefund } from "../helpers/firebaseRides";
+import { notifyDriverRideCancelled } from "../helpers/notificationHelpers";
 import { FIREBASE_DB, FIREBASE_AUTH } from "../firebaseConfig";
 import { doc, updateDoc } from "firebase/firestore";
 import { signOut } from "firebase/auth";
@@ -142,6 +144,26 @@ const ConfirmRide = () => {
 				}
 				setRideId(newRideId);
 				setRideStatus("pending");
+
+				// Store ride in active ride store for status bar
+				useActiveRideStore.getState().setActiveRide({
+					rideId: newRideId,
+					status: 'pending',
+					pickupLocation,
+					destination: destinationCoords,
+					pickupAddress: location,
+					destinationAddress: destination,
+					amount: Price,
+					numberOfPassengers: numberOfPassenger,
+					customerId: currentUser.uid,
+					customerName: `${firstName} ${lastName}`,
+				});
+
+				// Set pending to false BEFORE navigating to prevent flash
+				setPending(false);
+
+				// Navigate back to home
+				setHomePage();
 			} else {
 				throw new Error("Failed to create ride - no ID returned");
 			}
@@ -183,6 +205,9 @@ const ConfirmRide = () => {
 				console.log("   - Driver:", rideData.driverName);
 				setRideStatus(rideData.status);
 
+				// Update active ride store
+				useActiveRideStore.getState().updateRideStatus(rideData.status);
+
 				// If driver accepts ride
 				if (rideData.status === "accepted") {
 					console.log("✅ Driver accepted the ride!");
@@ -194,15 +219,6 @@ const ConfirmRide = () => {
 						setAcceptedDriverName(rideData.driverName);
 						setRider(rideData.driverName);
 						console.log("   - Driver name saved:", rideData.driverName);
-
-						// Show toast notification
-						Toast.show({
-							type: "tomatoToast",
-							text1: "Driver Accepted!",
-							text2: `${rideData.driverName} is on the way`,
-							position: "top",
-							visibilityTime: 4000,
-						});
 					} else {
 						console.log("   ⚠️ Warning: driverName is empty!");
 					}
@@ -224,6 +240,8 @@ const ConfirmRide = () => {
 					setPending(false);
 					setSelectRider(false);
 					setShowRatingModal(true);
+					// Clear active ride
+					useActiveRideStore.getState().clearActiveRide();
 				}
 
 				// If ride is cancelled
@@ -231,14 +249,8 @@ const ConfirmRide = () => {
 					console.log("❌ Ride was cancelled");
 					setPending(false);
 					setSelectRider(false);
-
-					Toast.show({
-						type: "tomatoToast",
-						text1: "Ride Cancelled",
-						text2: "Your ride has been cancelled",
-						position: "top",
-						visibilityTime: 3000,
-					});
+					// Clear active ride
+					useActiveRideStore.getState().clearActiveRide();
 				}
 			} else {
 				console.log("⚠️ Ride data is null");
@@ -284,6 +296,15 @@ const ConfirmRide = () => {
 
 							console.log("✅ Ride cancelled successfully");
 							console.log("   Refund status:", result.refundStatus || "N/A");
+
+							// Notify driver if ride was accepted
+							if (rideStatus === "accepted" && acceptedDriverId) {
+								await notifyDriverRideCancelled(
+									acceptedDriverId,
+									rideId,
+									`${firstName} ${lastName}`
+								);
+							}
 
 							// Reset all states
 							setPending(false);

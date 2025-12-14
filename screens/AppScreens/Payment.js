@@ -48,7 +48,6 @@ const Payment = ({ email, amount, name, phoneNumber, BookRide, subaccountId }) =
 
 	// Custom button component that receives onPress from Flutterwave
 	const CustomButton = ({ onPress, disabled, isInitializing }) => {
-		console.log("🔘 CustomButton rendered - onPress available:", !!onPress);
 
 		return (
 			<TouchableOpacity
