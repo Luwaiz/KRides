@@ -1,4 +1,4 @@
-import { StatusBar, StyleSheet, Text, View } from "react-native";
+import { StatusBar, StyleSheet, Text, View, Switch } from "react-native";
 import React, { useEffect, useState } from "react";
 import { Octicons } from "@expo/vector-icons";
 import { DrawerActions, useNavigation } from "@react-navigation/native";
@@ -7,7 +7,7 @@ import { colors } from "../../constants/styling";
 import Cash from "../../assets/svg/Cash.svg";
 import Calendar from "../../assets/svg/Calendar.svg";
 import { getDriverTodayStats } from "../../helpers/driverStats";
-import { useDriverDetails } from "../../constants/Store";
+import { useDriverDetails, useDriverAvailability } from "../../constants/Store";
 
 const HomeHeader = () => {
 	const navigation = useNavigation();
@@ -18,6 +18,10 @@ const HomeHeader = () => {
 	const uid = useDriverDetails((state) => state.uid);
 	const VehicleId = useDriverDetails((state) => state.vehicle_id);
 	const driverId = uid || VehicleId;
+
+	// Online/Offline status
+	const isOnline = useDriverAvailability((state) => state.isOnline);
+	const toggleAvailability = useDriverAvailability((state) => state.toggleAvailability);
 
 	const OpenDrawer = () => {
 		// Open the drawer instead of navigating to settings
@@ -44,27 +48,47 @@ const HomeHeader = () => {
 	}, [driverId]);
 	return (
 		<View style={styles.container}>
-			<TouchableOpacity
-				style={styles.drawerNav}
-				activeOpacity={0.7}
-				onPress={OpenDrawer}
-			>
-				<View>
-					<Octicons name="three-bars" size={24} color="black" />
-				</View>
-			</TouchableOpacity>
-			<View style={styles.box}>
-				<Calendar height={28} width={28} />
-				<View style={styles.texts}>
-					<Text style={styles.text}>Completed Trips</Text>
-					<Text style={styles.text2}>{completedTrips}</Text>
+			{/* First Row: Menu and Toggle */}
+			<View style={styles.topRow}>
+				<TouchableOpacity
+					style={styles.drawerNav}
+					activeOpacity={0.7}
+					onPress={OpenDrawer}
+				>
+					<View>
+						<Octicons name="three-bars" size={24} color="black" />
+					</View>
+				</TouchableOpacity>
+
+				{/* Online/Offline Toggle */}
+				<View style={styles.statusBox}>
+					<Text style={styles.statusText}>
+						{isOnline ? '🟢 Online' : '🔴 Offline'}
+					</Text>
+					<Switch
+						value={isOnline}
+						onValueChange={toggleAvailability}
+						trackColor={{ false: '#ccc', true: '#4caf50' }}
+						thumbColor={isOnline ? '#fff' : '#f4f3f4'}
+					/>
 				</View>
 			</View>
-			<View style={styles.box}>
-				<Cash height={28} width={28} />
-				<View style={styles.texts}>
-					<Text style={styles.text}>Earned today</Text>
-					<Text style={styles.text2}>{earnedToday}</Text>
+
+			{/* Second Row: Stats */}
+			<View style={styles.statsRow}>
+				<View style={styles.box}>
+					<Calendar height={24} width={24} />
+					<View style={styles.texts}>
+						<Text style={styles.text}>Trips</Text>
+						<Text style={styles.text2}>{completedTrips}</Text>
+					</View>
+				</View>
+				<View style={styles.box}>
+					<Cash height={24} width={24} />
+					<View style={styles.texts}>
+						<Text style={styles.text}>Earned</Text>
+						<Text style={styles.text2}>₦{earnedToday}</Text>
+					</View>
 				</View>
 			</View>
 		</View>
@@ -76,11 +100,23 @@ export default HomeHeader;
 const styles = StyleSheet.create({
 	container: {
 		width: "100%",
-		height: 100,
+		minHeight: 140,
 		backgroundColor: colors.primary,
 		paddingTop: StatusBar.currentHeight + 12,
-		flexDirection: "row",
 		paddingHorizontal: 16,
+		paddingBottom: 12,
+	},
+	topRow: {
+		flexDirection: "row",
+		alignItems: "center",
+		marginBottom: 10,
+		gap: 10,
+	},
+	statsRow: {
+		flexDirection: "row",
+		alignItems: "center",
+		gap: 10,
+		flex: 1,
 	},
 	drawerNav: {
 		width: 48,
@@ -89,28 +125,42 @@ const styles = StyleSheet.create({
 		justifyContent: "center",
 		alignItems: "center",
 		borderRadius: 24,
-		marginRight: 10,
 	},
 	box: {
-		width: 150,
-		height: 70,
+		flex: 1,
+		height: 60,
 		backgroundColor: colors.secondary,
-		marginHorizontal: 5,
 		borderRadius: 10,
 		alignItems: "center",
-		padding: 5,
+		padding: 8,
 		flexDirection: "row",
+		justifyContent: "center",
 	},
 	texts: {
-		marginLeft: 5,
+		marginLeft: 8,
+		flex: 1,
 	},
 	text: {
-		fontSize: 13,
+		fontSize: 11,
 		color: colors.lightGrey3,
 	},
 	text2: {
 		fontFamily: "Albert-SemiBold",
 		fontSize: 14,
-		marginTop: 5,
+		marginTop: 2,
+	},
+	statusBox: {
+		flex: 1,
+		height: 48,
+		backgroundColor: colors.secondary,
+		borderRadius: 10,
+		alignItems: 'center',
+		justifyContent: 'center',
+		padding: 8,
+	},
+	statusText: {
+		fontSize: 12,
+		fontWeight: '600',
+		marginBottom: 2,
 	},
 });

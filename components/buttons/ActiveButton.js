@@ -11,8 +11,8 @@ import { colors } from "../../constants/styling";
 //active button component
 const ActiveButton = ({ title, onPress, disabled, loading }) => {
 	return (
-		<TouchableOpacity disabled={disabled} onPress={onPress} activeOpacity={0.5}>
-			<View style={styles.button}>
+		<TouchableOpacity disabled={disabled || loading} onPress={onPress} activeOpacity={0.5}>
+			<View style={[styles.button, disabled && styles.buttonDisabled]}>
 				{loading ? (
 					<ActivityIndicator color={colors.secondary} />
 				) : (
@@ -33,6 +33,10 @@ const styles = StyleSheet.create({
 		borderRadius: 10,
 		alignItems: "center",
 		justifyContent: "center",
+	},
+	buttonDisabled: {
+		backgroundColor: colors.lightGrey3,
+		opacity: 0.6,
 	},
 	buttonText: {
 		color: colors.secondary,

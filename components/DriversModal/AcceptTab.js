@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, TouchableOpacity, Image } from "react-native";
+import { StyleSheet, Text, View, TouchableOpacity, Image, Linking, Alert } from "react-native";
 import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import { MaterialIcons, Octicons } from "@expo/vector-icons";
 import React, { useState, useEffect } from "react";
@@ -7,6 +7,7 @@ import ActiveButton from "../buttons/ActiveButton";
 import { colors } from "../../constants/styling";
 import { sp, fs, br } from "../../constants/responsive";
 import { useAcceptedRideStore, useDriverDetails } from "../../constants/Store";
+import useAuthStore from "../../constants/Store";
 import Avatar from "../../assets/svg/Frame 77avatar.svg";
 import Arrival from "../modals/Arrival";
 import { updateRideStatus, listenToPendingRides } from "../../helpers/firebaseRides";
@@ -15,6 +16,7 @@ import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { FIREBASE_DB } from "../../firebaseConfig";
 import { DrawerActions, useNavigation } from "@react-navigation/native";
 import { calculateDriverEarnings } from "../../constants/commission";
+import { notifyCustomerDriverArrived } from "../../helpers/notificationHelpers";
 
 const AcceptTab = () => {
 	const [endRide, setEndRide] = useState(false);
@@ -22,6 +24,7 @@ const AcceptTab = () => {
 	const [accepting, setAccepting] = useState(null);
 	const [showPendingRides, setShowPendingRides] = useState(false);
 	const [pendingRides, setPendingRides] = useState([]);
+	const [hasArrived, setHasArrived] = useState(false);
 
 	const acceptedRide = useAcceptedRideStore((state) => state.acceptedRide);
 	const nextRide = useAcceptedRideStore((state) => state.nextRide);
@@ -41,11 +44,22 @@ const AcceptTab = () => {
 
 	// Listen to pending rides
 	useEffect(() => {
+		const driverId = uid || VehicleId;
+		if (!driverId) return;
+
 		const unsubscribe = listenToPendingRides((rides) => {
-			setPendingRides(rides);
-		});
+			// Filter out rides this driver has declined and limit to 2
+			const filteredRides = rides
+				.filter(ride => {
+					const declinedBy = ride.declined_by || [];
+					return !declinedBy.includes(driverId);
+				})
+				.slice(0, 2); // Limit to maximum 2 rides
+
+			setPendingRides(filteredRides);
+		}, driverId);
 		return unsubscribe;
-	}, []);
+	}, [uid, VehicleId]);
 
 	const RideEnded = async () => {
 		if (!acceptedRide?.rideId) {
@@ -75,14 +89,16 @@ const AcceptTab = () => {
 			setTimeout(() => {
 				console.log("⏰ Timeout triggered - checking for next ride...");
 				if (nextRide) {
-					console.log("🔄 Activating next queued ride:", nextRide.rideId);
-					console.log("🔄 Before activation - acceptedRide:", acceptedRide?.rideId);
+					console.log('🔄 Activating next queued ride:', nextRide.rideId);
+					console.log('🔄 Before activation - acceptedRide:', acceptedRide?.rideId);
 					activateNextRide();
-					console.log("🔄 After activation called");
+					console.log('🔄 After activation called');
 					setEndRide(false); // Close modal
+					setHasArrived(false); // Reset arrival state for next ride
 				} else {
-					console.log("🏁 No next ride queued, clearing accepted ride");
+					console.log('🏁 No next ride queued, clearing accepted ride');
 					clearAcceptedRide();
+					setHasArrived(false); // Reset arrival state
 				}
 			}, 1500);
 		} catch (error) {
@@ -93,7 +109,80 @@ const AcceptTab = () => {
 		}
 	};
 
+	// Open navigation to pickup location
+	const openNavigation = () => {
+		if (!acceptedRide?.pickupCoords) {
+			Alert.alert('Error', 'Pickup location not available');
+			return;
+		}
+
+		const { latitude, longitude } = acceptedRide.pickupCoords;
+		const url = `google.navigation:q=${latitude},${longitude}`;
+
+		Linking.canOpenURL(url).then(supported => {
+			if (supported) {
+				Linking.openURL(url);
+			} else {
+				// Fallback to Google Maps web
+				const webUrl = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
+				Linking.openURL(webUrl);
+			}
+		}).catch(err => {
+			console.error('Error opening navigation:', err);
+			Alert.alert('Error', 'Could not open navigation');
+		});
+	};
+
+	// Notify customer that driver has arrived
+	const notifyArrival = async () => {
+		if (!acceptedRide?.customerId) {
+			Alert.alert('Error', 'Customer information not available');
+			return;
+		}
+
+		if (hasArrived) {
+			Alert.alert('Already Notified', 'You have already notified the customer of your arrival');
+			return;
+		}
+
+		try {
+			// Use acceptedRide.driverName which was set when accepting the ride
+			// Fallback to fullName from store, then to 'Your driver'
+			const driverName = acceptedRide.driverName || fullName || 'Your driver';
+			console.log('📤 Notifying customer with driver name:', driverName);
+
+			// Update ride status in Firestore to mark driver as arrived
+			const rideRef = doc(FIREBASE_DB, 'rides', acceptedRide.rideId);
+			await updateDoc(rideRef, {
+				hasArrived: true,
+				arrivedAt: serverTimestamp(),
+			});
+			console.log('✅ Ride updated with arrival status');
+
+			await notifyCustomerDriverArrived(
+				acceptedRide.customerId,
+				driverName
+			);
+
+			setHasArrived(true);
+			Alert.alert('Success', 'Customer notified of your arrival. You can now complete the ride.');
+		} catch (error) {
+			console.error('Error notifying arrival:', error);
+			Alert.alert('Error', 'Could not notify customer. Please try again.');
+		}
+	};
+
 	const AcceptNextRide = async (rideId) => {
+		// Check if bank details are verified
+		const driverDetails = useDriverDetails.getState();
+		if (!driverDetails.bankDetailsVerified) {
+			alert(
+				"Please complete your bank account details before accepting rides. Go to Settings > Bank Details to add your account information."
+			);
+			navigation.navigate("BankAccountDetails");
+			return;
+		}
+
 		if (nextRide) {
 			alert("You already have a ride queued. Complete the current rides first.");
 			return;
@@ -260,11 +349,28 @@ const AcceptTab = () => {
 							</View>
 						)}
 
+						{/* I've Arrived Button */}
+						<TouchableOpacity
+							style={[
+								styles.arrivalButton,
+								hasArrived && styles.arrivalButtonDisabled
+							]}
+							onPress={notifyArrival}
+							activeOpacity={0.7}
+							disabled={hasArrived}
+						>
+							<MaterialIcons name="location-on" size={20} color="#fff" />
+							<Text style={styles.arrivalButtonText}>
+								{hasArrived ? "Arrived ✓" : "I've Arrived"}
+							</Text>
+						</TouchableOpacity>
+
 						<View style={styles.button}>
 							<ActiveButton
 								title={"Complete Ride"}
 								onPress={RideEnded}
 								loading={loading}
+								disabled={!hasArrived}
 							/>
 						</View>
 					</View>
@@ -431,5 +537,23 @@ const styles = StyleSheet.create({
 		color: "white",
 		fontSize: fs(14),
 		fontWeight: "600",
+	},
+	arrivalButton: {
+		backgroundColor: '#4caf50',
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		padding: sp(14),
+		borderRadius: br(10),
+		marginTop: sp(16),
+		gap: sp(8),
+	},
+	arrivalButtonDisabled: {
+		backgroundColor: colors.lightGrey3,
+	},
+	arrivalButtonText: {
+		color: '#fff',
+		fontSize: fs(16),
+		fontWeight: '600',
 	},
 });

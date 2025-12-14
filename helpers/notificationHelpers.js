@@ -1,6 +1,12 @@
 import axios from 'axios';
 
-const NOTIFICATION_SERVER_URL = 'https://krides.onrender.com/api/notifications';
+// For local testing: Use your computer's IP address (not localhost)
+// To find your IP: Run 'ipconfig' on Windows or 'ifconfig' on Mac/Linux
+const NOTIFICATION_SERVER_URL = 'http://172.20.10.3:3001/api/notifications';
+
+// Production server (Render.com) - uncomment when deployed
+// const NOTIFICATION_SERVER_URL = 'https://krides.onrender.com/api/notifications';
+
 
 /**
  * Retry a function with exponential backoff
@@ -175,6 +181,45 @@ export async function notifyCustomerRideCompleted(customerId, rideId) {
 }
 
 /**
+ * Send notification when customer cancels a ride
+ * @param {string} driverId - Driver ID
+ * @param {string} rideId - Ride ID
+ * @param {string} customerName - Customer name
+ */
+export async function notifyDriverRideCancelled(driverId, rideId, customerName) {
+    try {
+        return await retryWithBackoff(
+            async () => {
+                const response = await axios.post(`${NOTIFICATION_SERVER_URL}/send`, {
+                    userId: driverId,
+                    role: 'driver',
+                    title: 'Ride Cancelled ❌',
+                    body: `${customerName || 'Customer'} cancelled the ride`,
+                    data: {
+                        type: 'ride_cancelled',
+                        rideId: String(rideId),
+                    },
+                });
+                console.log('✅ Driver notified about ride cancellation:', response.data);
+                return response.data;
+            },
+            {
+                maxRetries: 3,
+                initialDelay: 1000,
+                shouldRetry: shouldRetryError,
+                onRetry: (attempt, delay, error) => {
+                    console.log(`⚠️ Retry attempt ${attempt}/3 for notifyDriverRideCancelled after ${delay}ms`);
+                    console.log(`   Error: ${error.message}`);
+                }
+            }
+        );
+    } catch (error) {
+        console.error('❌ Error notifying driver (all retries failed):', error.message);
+        return null;
+    }
+}
+
+/**
  * Send custom notification to a user
  * @param {string} userId - User ID
  * @param {string} role - User role ('customer' or 'driver')
@@ -211,3 +256,38 @@ export async function sendNotificationToUser(userId, role, title, body, data = {
         return null;
     }
 }
+
+/**
+ * Notify customer that driver has arrived at pickup location
+ * @param {string} customerId - Customer's user ID
+ * @param {string} driverName - Driver's name
+ * @returns {Promise} Response from notification server
+ */
+export const notifyCustomerDriverArrived = async (customerId, driverName) => {
+    console.log('📍 Notifying customer of driver arrival:', { customerId, driverName });
+
+    try {
+        return await retryWithBackoff(
+            async () => {
+                const response = await axios.post(`${NOTIFICATION_SERVER_URL}/notify-driver-arrived`, {
+                    customerId,
+                    driverName,
+                });
+                console.log('✅ Customer notified of driver arrival:', response.data);
+                return response.data;
+            },
+            {
+                maxRetries: 3,
+                initialDelay: 1000,
+                shouldRetry: shouldRetryError,
+                onRetry: (attempt, delay, error) => {
+                    console.log(`⚠️ Retry attempt ${attempt}/3 for notifyCustomerDriverArrived after ${delay}ms`);
+                    console.log(`   Error: ${error.message}`);
+                }
+            }
+        );
+    } catch (error) {
+        console.error('❌ Error notifying customer of arrival (all retries failed):', error.message);
+        throw error;
+    }
+};

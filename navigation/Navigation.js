@@ -69,31 +69,57 @@ const Navigation = () => {
 						if (userSnap.exists()) {
 							const profile = userSnap.data();
 							const role = profile.role || "customer";
-							console.log("✅ Found customer profile:", profile);
-							setAuthData(currentUser, profile, role);
+							console.log(`✅ Found profile in users collection (role: ${role}):`, profile);
 
-							// Populate useUserDetails store for customers
-							console.log(
-								"✅ Populating customer details in useUserDetails store:",
-								profile
-							);
-							setUserId(currentUser.uid);
-							setEmail(profile.email || currentUser.email || "");
-							setPhone(profile.phone || "");
-							setProfileImageUrl(profile.profileImageUrl || profile.photoURL || null);
+							// Check if this is actually a driver stored in users collection
+							if (role === "driver") {
+								console.log("   This is a driver, populating driver store");
+								console.log("   Driver profile fields:", {
+									fullname: profile.fullname,
+									name: profile.name,
+									fullName: profile.fullName,
+									phone: profile.phone,
+									vehicle_id: profile.vehicle_id,
+									email: profile.email
+								});
+								setAuthData(currentUser, profile, role);
 
-							// Handle name - could be 'name' or split into firstName/lastName
-							if (profile.name) {
-								const nameParts = profile.name.split(" ");
-								setFirstName(nameParts[0] || "");
-								setLastName(nameParts.slice(1).join(" ") || "");
+								// Populate useDriverDetails store for drivers
+								setDriverProfile({
+									...profile,
+									uid: currentUser.uid,
+								});
+
+								// Initialize notifications for driver
+								await notificationManager.initialize(currentUser.uid, role);
 							} else {
-								setFirstName(profile.firstName || "");
-								setLastName(profile.lastName || "");
-							}
+								// Regular customer
+								console.log("   This is a customer, populating customer store");
+								setAuthData(currentUser, profile, role);
 
-							// Initialize notifications for customer
-							await notificationManager.initialize(currentUser.uid, role);
+								// Populate useUserDetails store for customers
+								console.log(
+									"✅ Populating customer details in useUserDetails store:",
+									profile
+								);
+								setUserId(currentUser.uid);
+								setEmail(profile.email || currentUser.email || "");
+								setPhone(profile.phone || "");
+								setProfileImageUrl(profile.profileImageUrl || profile.photoURL || null);
+
+								// Handle name - could be 'name' or split into firstName/lastName
+								if (profile.name) {
+									const nameParts = profile.name.split(" ");
+									setFirstName(nameParts[0] || "");
+									setLastName(nameParts.slice(1).join(" ") || "");
+								} else {
+									setFirstName(profile.firstName || "");
+									setLastName(profile.lastName || "");
+								}
+
+								// Initialize notifications for customer
+								await notificationManager.initialize(currentUser.uid, role);
+							}
 						} else {
 							console.log("🔍 Not found in users, checking drivers...");
 							// Otherwise check in "drivers"
@@ -106,6 +132,14 @@ const Navigation = () => {
 								const profile = driverSnap.data();
 								const role = profile.role || "driver";
 								console.log("✅ Found driver profile:", profile);
+								console.log("   Driver profile fields:", {
+									fullname: profile.fullname,
+									name: profile.name,
+									fullName: profile.fullName,
+									phone: profile.phone,
+									vehicle_id: profile.vehicle_id,
+									email: profile.email
+								});
 								setAuthData(currentUser, profile, role);
 
 								// Populate useDriverDetails store for drivers
@@ -226,22 +260,13 @@ const Navigation = () => {
 						<Stack.Screen name="AuthStack" component={AuthStack} />
 					</>
 				) : storeRole === "driver" ? (
-					// Driver logged in
-					// Check if bank details are verified
-					useDriverDetails.getState().bankDetailsVerified ? (
-						<Stack.Screen
-							key="driver-drawer"
-							name="DriverDrawer"
-							component={DriverDrawer}
-						/>
-					) : (
-						// If not verified, show onboarding stack
-						<Stack.Screen
-							key="driver-onboarding"
-							name="DriverOnboardingStack"
-							component={DriverOnboardingStack}
-						/>
-					)
+					// Driver logged in - always show driver home
+					// Bank details check happens when accepting rides, not on login
+					<Stack.Screen
+						key="driver-drawer"
+						name="DriverDrawer"
+						component={DriverDrawer}
+					/>
 				) : (
 					// Customer logged in - use key to force remount when role changes
 					<Stack.Screen

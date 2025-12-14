@@ -58,8 +58,8 @@ class NotificationManager {
     }
 
     /**
-     * Register for push notifications and get Expo Push Token
-     * @returns {Promise<string|null>} Expo Push Token or null if failed
+     * Register for push notifications and get FCM Token
+     * @returns {Promise<string|null>} FCM Token or null if failed
      */
     async registerForPushNotifications() {
         let token = null;
@@ -91,18 +91,12 @@ class NotificationManager {
             }
 
             try {
-                const projectId = Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
-
-                if (!projectId) {
-                    console.error('❌ Project ID not found');
-                    return null;
-                }
-
-                const pushTokenData = await Notifications.getExpoPushTokenAsync({ projectId });
-                token = pushTokenData.data;
-                console.log('✅ Push token obtained:', token);
+                // Get FCM token directly (instead of Expo push token)
+                const fcmTokenData = await Notifications.getDevicePushTokenAsync();
+                token = fcmTokenData.data;
+                console.log('✅ FCM token obtained:', token.substring(0, 30) + '...');
             } catch (error) {
-                console.error('❌ Error getting push token:', error);
+                console.error('❌ Error getting FCM token:', error);
             }
         } else {
             console.log('⚠️ Must use physical device for push notifications');
@@ -114,7 +108,7 @@ class NotificationManager {
     /**
      * Save push token to Firestore
      * @param {string} uid - User ID
-     * @param {string} token - Expo Push Token
+     * @param {string} token - FCM Token
      * @param {string} role - User role ('customer' or 'driver')
      */
     async saveTokenToFirestore(uid, token, role) {
@@ -212,7 +206,13 @@ class NotificationManager {
                 });
                 console.log('✅ Push token removed from Firestore');
             } catch (error) {
-                console.error('❌ Error removing push token:', error);
+                // Silently handle permission errors during logout
+                // The token will be overwritten on next login anyway
+                if (error.code === 'permission-denied') {
+                    console.log('ℹ️ Could not remove push token (permission denied) - will be overwritten on next login');
+                } else {
+                    console.error('❌ Error removing push token:', error.message);
+                }
             }
         }
 
