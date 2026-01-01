@@ -9,14 +9,12 @@ import useAuthStore, {
 	useUserDetails,
 	useDriverDetails,
 } from "../constants/Store"; // Import stores
-import notificationManager from "../helpers/notificationManager";
 
 // Screens and Navigators
 import OnBoarding from "../screens/OnBoarding";
 import AuthStack from "./AuthStack";
 import DrawerNavigator from "./DrawerNavigator"; // for customers (with drawer)
 import DriverDrawer from "./DriverDrawer"; // for drivers (with drawer)
-import DriverOnboardingStack from "./DriverOnboardingStack";
 
 const Stack = createNativeStackNavigator();
 
@@ -30,14 +28,13 @@ const Navigation = () => {
 	const setAuthData = useAuthStore((state) => state.setAuthData);
 
 	// Get setters from useUserDetails store
-	const { setFirstName, setLastName, setEmail, setPhone, setUserId, setProfileImageUrl } =
+	const { setFirstName, setLastName, setEmail, setPhone, setUserId } =
 		useUserDetails((state) => ({
 			setFirstName: state.setFirstName,
 			setLastName: state.setLastName,
 			setEmail: state.setEmail,
 			setPhone: state.setPhone,
 			setUserId: state.setUserId,
-			setProfileImageUrl: state.setProfileImageUrl,
 		}));
 
 	// Get setter from useDriverDetails store
@@ -47,19 +44,19 @@ const Navigation = () => {
 
 	useEffect(() => {
 		let mounted = true;
-
+		
 		const unsubscribe = onAuthStateChanged(
 			FIREBASE_AUTH,
 			async (currentUser) => {
 				if (!mounted) return;
-
+				
 				setUser(currentUser);
 
 				if (currentUser && !storeRole) {
 					setRoleLoading(true);
 					try {
 						console.log("🔍 Fetching user profile for:", currentUser.uid);
-
+						
 						// First check if user exists in "users" collection
 						const userRef = doc(FIREBASE_DB, "users", currentUser.uid);
 						const userSnap = await getDoc(userRef);
@@ -69,56 +66,26 @@ const Navigation = () => {
 						if (userSnap.exists()) {
 							const profile = userSnap.data();
 							const role = profile.role || "customer";
-							console.log(`✅ Found profile in users collection (role: ${role}):`, profile);
+							console.log("✅ Found customer profile:", profile);
+							setAuthData(currentUser, profile, role);
 
-							// Check if this is actually a driver stored in users collection
-							if (role === "driver") {
-								console.log("   This is a driver, populating driver store");
-								console.log("   Driver profile fields:", {
-									fullname: profile.fullname,
-									name: profile.name,
-									fullName: profile.fullName,
-									phone: profile.phone,
-									vehicle_id: profile.vehicle_id,
-									email: profile.email
-								});
-								setAuthData(currentUser, profile, role);
+							// Populate useUserDetails store for customers
+							console.log(
+								"✅ Populating customer details in useUserDetails store:",
+								profile
+							);
+							setUserId(currentUser.uid);
+							setEmail(profile.email || currentUser.email || "");
+							setPhone(profile.phone || "");
 
-								// Populate useDriverDetails store for drivers
-								setDriverProfile({
-									...profile,
-									uid: currentUser.uid,
-								});
-
-								// Initialize notifications for driver
-								await notificationManager.initialize(currentUser.uid, role);
+							// Handle name - could be 'name' or split into firstName/lastName
+							if (profile.name) {
+								const nameParts = profile.name.split(" ");
+								setFirstName(nameParts[0] || "");
+								setLastName(nameParts.slice(1).join(" ") || "");
 							} else {
-								// Regular customer
-								console.log("   This is a customer, populating customer store");
-								setAuthData(currentUser, profile, role);
-
-								// Populate useUserDetails store for customers
-								console.log(
-									"✅ Populating customer details in useUserDetails store:",
-									profile
-								);
-								setUserId(currentUser.uid);
-								setEmail(profile.email || currentUser.email || "");
-								setPhone(profile.phone || "");
-								setProfileImageUrl(profile.profileImageUrl || profile.photoURL || null);
-
-								// Handle name - could be 'name' or split into firstName/lastName
-								if (profile.name) {
-									const nameParts = profile.name.split(" ");
-									setFirstName(nameParts[0] || "");
-									setLastName(nameParts.slice(1).join(" ") || "");
-								} else {
-									setFirstName(profile.firstName || "");
-									setLastName(profile.lastName || "");
-								}
-
-								// Initialize notifications for customer
-								await notificationManager.initialize(currentUser.uid, role);
+								setFirstName(profile.firstName || "");
+								setLastName(profile.lastName || "");
 							}
 						} else {
 							console.log("🔍 Not found in users, checking drivers...");
@@ -132,14 +99,6 @@ const Navigation = () => {
 								const profile = driverSnap.data();
 								const role = profile.role || "driver";
 								console.log("✅ Found driver profile:", profile);
-								console.log("   Driver profile fields:", {
-									fullname: profile.fullname,
-									name: profile.name,
-									fullName: profile.fullName,
-									phone: profile.phone,
-									vehicle_id: profile.vehicle_id,
-									email: profile.email
-								});
 								setAuthData(currentUser, profile, role);
 
 								// Populate useDriverDetails store for drivers
@@ -151,12 +110,9 @@ const Navigation = () => {
 									...profile,
 									uid: currentUser.uid,
 								});
-
-								// Initialize notifications for driver
-								await notificationManager.initialize(currentUser.uid, role);
 							} else {
 								console.log("⚠️ User not found in any collection, using defaults");
-								setAuthData(currentUser, {
+								setAuthData(currentUser, { 
 									email: currentUser.email,
 									name: currentUser.displayName || "User"
 								}, "customer"); // fallback
@@ -166,13 +122,13 @@ const Navigation = () => {
 						console.error("❌ Error fetching user role:", error);
 						console.error("Error code:", error.code);
 						console.error("Error message:", error.message);
-
+						
 						// Check if it's a Firestore permission error
 						if (error.code === "permission-denied") {
 							console.error("🚨 CRITICAL: Firestore permission denied!");
 							console.error("This means Firestore security rules are blocking user profile access.");
 							console.error("Please update Firestore rules in Firebase Console.");
-
+							
 							// Show detailed alert about Firestore rules
 							Alert.alert(
 								"Setup Required",
@@ -189,43 +145,37 @@ const Navigation = () => {
 								);
 							}
 						}
-
+						
 						// Set comprehensive fallback data to prevent crashes
 						if (!mounted) return;
-
+						
 						const fallbackProfile = {
 							email: currentUser.email || "",
 							name: currentUser.displayName || "User",
 							phone: currentUser.phoneNumber || "",
 							uid: currentUser.uid,
 						};
-
+						
 						console.log("⚠️ Using fallback profile data:", fallbackProfile);
-
+						
 						// Set auth data
 						setAuthData(currentUser, fallbackProfile, "customer");
-
+						
 						// Populate user details store with fallback data
 						setUserId(currentUser.uid);
 						setEmail(currentUser.email || "");
 						setPhone(currentUser.phoneNumber || "");
-
+						
 						const nameParts = (currentUser.displayName || "User").split(" ");
 						setFirstName(nameParts[0] || "User");
 						setLastName(nameParts.slice(1).join(" ") || "");
-
+						
 						console.log("✅ Fallback profile data populated in stores");
 					} finally {
 						setRoleLoading(false);
 					}
 				} else if (!currentUser) {
 					if (mounted) {
-						// Cleanup notifications on logout
-						const prevRole = useAuthStore.getState().role;
-						const prevUser = useAuthStore.getState().user;
-						if (prevUser?.uid && prevRole) {
-							await notificationManager.cleanup(prevUser.uid, prevRole);
-						}
 						setAuthData(null, null, null);
 					}
 				}
@@ -260,8 +210,7 @@ const Navigation = () => {
 						<Stack.Screen name="AuthStack" component={AuthStack} />
 					</>
 				) : storeRole === "driver" ? (
-					// Driver logged in - always show driver home
-					// Bank details check happens when accepting rides, not on login
+					// Driver logged in - use key to force remount when role changes
 					<Stack.Screen
 						key="driver-drawer"
 						name="DriverDrawer"

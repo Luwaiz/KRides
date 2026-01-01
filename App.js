@@ -10,7 +10,6 @@ import { PaperProvider } from "react-native-paper";
 import Toast from "react-native-toast-message";
 import ToastConfig from "./components/ToastConfig";
 import ErrorBoundary from "./components/ErrorBoundary";
-import { GoogleSignin } from '@react-native-google-signin/google-signin';
 
 import {
 	configureReanimatedLogger,
@@ -27,18 +26,17 @@ if (!__DEV__) {
 		// Log to console
 		originalConsoleError(...args);
 
-		// Only show user-friendly alert for FATAL/CRITICAL errors
-		// Let components handle their own Firebase/Network errors
+		// Show user-friendly alert for critical errors
 		const errorMessage = args.join(' ');
-		if (errorMessage.includes('FATAL') || errorMessage.includes('CRITICAL')) {
+		if (errorMessage.includes('Firebase') ||
+			errorMessage.includes('Network') ||
+			errorMessage.includes('FATAL')) {
 			Alert.alert(
-				'Critical Error',
-				'A critical error occurred. Please restart the app or contact support.',
+				'Error',
+				'An error occurred. Please try again or contact support.',
 				[{ text: 'OK' }]
 			);
 		}
-		// Other errors (Firebase, Network) are logged but not alerted
-		// This allows components to show specific error messages
 	};
 }
 
@@ -47,15 +45,6 @@ configureReanimatedLogger({
 	level: ReanimatedLogLevel.warn,
 	strict: false, // Reanimated runs in strict mode by default
 });
-
-// Configure Google Sign-In
-// Web Client ID from google-services.json (client_type: 3)
-GoogleSignin.configure({
-	webClientId: '1054058095059-6j788gaiqicduqgt1jo322hsvb7ums7b.apps.googleusercontent.com',
-	offlineAccess: true,
-	forceCodeForRefreshToken: true,
-});
-
 export default function App() {
 	const fontLoaded = FontResources();
 

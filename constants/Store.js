@@ -144,6 +144,12 @@ export const useRideStore = create((set) => ({
 	setLocation: (location) => set({ location }),
 	setPrice: (price) => set({ price }),
 	setRider: (rider) => set({ rider }),
+	clearRide: () => set({
+		destination: "",
+		location: "",
+		numberOfPassenger: "",
+		price: "",
+	}),
 }));
 
 export const useRideDetailsStore = create((set) => ({

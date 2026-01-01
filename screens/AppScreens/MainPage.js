@@ -4,10 +4,11 @@ import HomeTab from "../../components/HomeTab";
 import Passenger from "../../components/Passenger";
 import ConfirmRide from "../../components/ConfirmRide";
 import RideStatusBar from "../../components/RideStatusBar";
+import RatingModal from "../../components/modals/RatingModal";
 import HomeHeader from "../../components/homeHeader/HomeHeader";
 import PassengerHeader from "../../components/homeHeader/PassengerHeader";
 import ConfirmHeader from "../../components/homeHeader/ConfirmHeader";
-import { useBottomTabStore, useActiveRideStore, useUserDetails } from "../../constants/Store";
+import { useBottomTabStore, useActiveRideStore, useUserDetails, useRideStore } from "../../constants/Store";
 import { GOOGLE_MAPS_API_KEY } from "@env";
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
 import MapViewDirections from "react-native-maps-directions";
@@ -20,6 +21,8 @@ import Toast from "react-native-toast-message";
 const MainPage = () => {
 	const [location, setLocation] = useState(false);
 	const [cancelling, setCancelling] = useState(false);
+	const [showRatingModal, setShowRatingModal] = useState(false);
+	const [completedRideData, setCompletedRideData] = useState(null);
 	const pickup = useRideDetailsStore((s) => s.pickupLocation);
 	const destination = useRideDetailsStore((s) => s.destination);
 	const mapRef = useRef(null);
@@ -27,6 +30,7 @@ const MainPage = () => {
 	const isPassengers = useBottomTabStore((state) => state.passengerPage);
 	const confirm = useBottomTabStore((state) => state.confirmPage);
 	const setConfirmPage = useBottomTabStore((state) => state.setConfirmPage);
+	const setHomePage = useBottomTabStore((state) => state.setHomePage);
 
 	// Active ride state
 	const activeRide = useActiveRideStore(state => state.activeRide);
@@ -141,10 +145,38 @@ const MainPage = () => {
 					useActiveRideStore.getState().updateArrivalStatus(rideData.hasArrived);
 				}
 
-				// If ride is completed or cancelled
-				if (rideData.status === "completed" || rideData.status === "cancelled") {
-					console.log('🏁 MainPage - Ride ended, clearing active ride');
+				// If ride is completed - show rating modal
+				if (rideData.status === "completed" && !rideData.customerRating) {
+					console.log('✅ MainPage - Ride completed, showing rating modal');
+
+					// Reset bottom tab navigation state FIRST
+					setHomePage();
+
+					setCompletedRideData({
+						rideId: activeRide.rideId,
+						driverId: rideData.driverId || activeRide.driverId,
+						driverName: rideData.driverName || activeRide.driverName || 'Driver',
+					});
+					setShowRatingModal(true);
 					clearActiveRide();
+
+					// Reset location selections for fresh start
+					useRideStore.getState().clearRide();
+					useRideDetailsStore.getState().resetRideDetails();
+				}
+
+				// If ride is cancelled
+				if (rideData.status === "cancelled") {
+					console.log('❌ MainPage - Ride cancelled, clearing active ride and resetting selections');
+
+					// Reset bottom tab navigation state
+					setHomePage();
+
+					clearActiveRide();
+
+					// Reset location selections for fresh start
+					useRideStore.getState().clearRide();
+					useRideDetailsStore.getState().resetRideDetails();
 				}
 			}
 		});
@@ -422,6 +454,21 @@ const MainPage = () => {
 
 			{/* Bottom Sheet */}
 			{BottomSheetComponents}
+
+			{/* Rating Modal - shown after ride completion */}
+			{showRatingModal && completedRideData && (
+				<RatingModal
+					visible={showRatingModal}
+					onClose={() => {
+						setShowRatingModal(false);
+						setCompletedRideData(null);
+						setHomePage(); // Navigate back to home after rating
+					}}
+					rideId={completedRideData.rideId}
+					driverId={completedRideData.driverId}
+					driverName={completedRideData.driverName}
+				/>
+			)}
 		</View>
 	);
 };

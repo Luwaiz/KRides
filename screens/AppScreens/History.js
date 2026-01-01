@@ -6,13 +6,17 @@ import BackButton from "../../components/buttons/BackButton";
 import HistoryCard from "../../components/HistoryCard";
 import { useUserDetails, useDriverDetails } from "../../constants/Store";
 import { ActivityIndicator } from "react-native-paper";
-import { getCustomerHistory, getDriverHistory } from "../../helpers/firebaseRides";
+import { getCustomerHistoryPaginated, getDriverHistoryPaginated } from "../../helpers/firebaseRides";
 
 const { width } = Dimensions.get("window");
+const PAGE_SIZE = 20;
 
 const History = () => {
 	const [loading, setLoading] = useState(false);
+	const [loadingMore, setLoadingMore] = useState(false);
 	const [history, setHistory] = useState([]);
+	const [lastVisible, setLastVisible] = useState(null);
+	const [hasMore, setHasMore] = useState(true);
 	const UserId = useUserDetails((state) => state?.UserId);
 	const driverUid = useDriverDetails((state) => state?.uid);
 
@@ -37,24 +41,68 @@ const History = () => {
 
 		setLoading(true);
 		try {
-			console.log(`📜 Fetching ${isDriver ? "driver" : "customer"} history for:`, userId);
-			const rides = isDriver
-				? await getDriverHistory(userId)
-				: await getCustomerHistory(userId);
-			console.log("✅ History fetched:", rides.length, "rides");
-			console.log("📊 Ride details:", JSON.stringify(rides, null, 2));
-			setHistory(rides);
+			console.log(`📜 Fetching ${isDriver ? "driver" : "customer"} history (paginated) for:`, userId);
+			const result = isDriver
+				? await getDriverHistoryPaginated(userId, PAGE_SIZE)
+				: await getCustomerHistoryPaginated(userId, PAGE_SIZE);
+
+			console.log("✅ History fetched:", result.rides.length, "rides");
+			setHistory(result.rides);
+			setLastVisible(result.lastVisible);
+			setHasMore(result.hasMore);
 		} catch (error) {
 			console.error("❌ Error fetching history:", error);
 			setHistory([]);
+			setHasMore(false);
 		} finally {
 			setLoading(false);
+		}
+	};
+
+	const loadMoreHistory = async () => {
+		if (loadingMore || !hasMore) return;
+
+		const isDriver = !!driverUid && !UserId;
+		const userId = isDriver ? driverUid : UserId;
+
+		if (!userId || !lastVisible) return;
+
+		setLoadingMore(true);
+		try {
+			console.log("📜 Loading more history...");
+			const result = isDriver
+				? await getDriverHistoryPaginated(userId, PAGE_SIZE, lastVisible)
+				: await getCustomerHistoryPaginated(userId, PAGE_SIZE, lastVisible);
+
+			console.log("✅ More history loaded:", result.rides.length, "rides");
+			setHistory((prev) => [...prev, ...result.rides]);
+			setLastVisible(result.lastVisible);
+			setHasMore(result.hasMore);
+		} catch (error) {
+			console.error("❌ Error loading more history:", error);
+		} finally {
+			setLoadingMore(false);
 		}
 	};
 
 	useEffect(() => {
 		getHistory();
 	}, [UserId, driverUid]);
+
+	const renderFooter = () => {
+		if (!loadingMore) return null;
+		return (
+			<View style={styles.footerLoader}>
+				<ActivityIndicator size={24} color={colors.primaryBlue} />
+				<Text style={styles.loadingText}>Loading more rides...</Text>
+			</View>
+		);
+	};
+
+	const renderEmpty = () => {
+		if (loading) return null;
+		return <Text style={styles.emptyText}>No ride history yet</Text>;
+	};
 
 	return (
 		<SafeAreaView style={styles.container}>
@@ -73,9 +121,10 @@ const History = () => {
 					ListHeaderComponent={
 						<Text style={styles.monthDate}>{currentMonthName}</Text>
 					}
-					ListEmptyComponent={
-						<Text style={styles.emptyText}>No ride history yet</Text>
-					}
+					ListEmptyComponent={renderEmpty}
+					ListFooterComponent={renderFooter}
+					onEndReached={loadMoreHistory}
+					onEndReachedThreshold={0.5}
 					contentContainerStyle={styles.contentContainer}
 					style={{ width }}
 				/>
@@ -109,6 +158,16 @@ const styles = StyleSheet.create({
 		textAlign: "center",
 		marginTop: 40,
 		fontSize: 16,
+		fontFamily: "Albert-Regular",
+		color: colors.lightGrey3,
+	},
+	footerLoader: {
+		paddingVertical: 20,
+		alignItems: "center",
+	},
+	loadingText: {
+		marginTop: 8,
+		fontSize: 14,
 		fontFamily: "Albert-Regular",
 		color: colors.lightGrey3,
 	},

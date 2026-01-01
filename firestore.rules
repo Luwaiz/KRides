@@ -13,12 +13,13 @@ service cloud.firestore {
     
     // Drivers collection
     match /drivers/{driverId} {
-      // Allow any authenticated user to read driver profiles (needed for customers to see driver info)
-      allow read: if request.auth != null;
+      // Allow unauthenticated reads for login (to look up email by phone number)
+      // Allow authenticated users to read driver profiles (needed for customers to see driver info)
+      allow read: if true;
       allow create: if request.auth != null && request.auth.uid == driverId;
       // Allow driver to update their own profile, OR allow customers to add ratings
       allow update: if request.auth != null && (
-        request.auth.uid == driverId ||
+        request.auth.uid == driverId || 
         // Allow adding ratings (only specific fields can be updated by customers)
         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ratings', 'totalRatings', 'ratingSum']))
       );

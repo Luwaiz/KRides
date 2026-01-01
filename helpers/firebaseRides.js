@@ -8,6 +8,8 @@ import {
 	query,
 	where,
 	orderBy,
+	limit,
+	startAfter,
 	serverTimestamp,
 	getDocs,
 	getDoc,
@@ -101,7 +103,12 @@ export const createRide = async (rideData) => {
 
 		await setDoc(rideDoc, ride);
 		console.log("✅ Ride created:", rideId);
-		await notifyDriversAboutNewRide(rideId, rideData.customerName, rideData.pickupLocation);
+		await notifyDriversAboutNewRide(
+			rideId,
+			rideData.customerName,
+			rideData.pickupAddress,
+			rideData.destinationAddress
+		);
 		return rideId;
 	} catch (error) {
 		console.error("❌ Error creating ride:", error);
@@ -753,5 +760,161 @@ export const getDriverHistory = async (driverId) => {
 	} catch (error) {
 		console.error("❌ Error getting driver history:", error);
 		return [];
+	}
+};
+
+/**
+ * Get customer ride history with pagination
+ * @param {string} customerId - Customer ID
+ * @param {number} pageSize - Number of rides per page (default: 20)
+ * @param {Object} lastDoc - Last document from previous page (for pagination)
+ * @returns {Promise<{rides: Array, lastVisible: Object, hasMore: boolean}>}
+ */
+export const getCustomerHistoryPaginated = async (customerId, pageSize = 20, lastDoc = null) => {
+	try {
+		const ridesRef = collection(FIREBASE_DB, "rides");
+
+		// Build queries for completed rides (without orderBy to avoid index requirement)
+		const completedQueryParts = [
+			ridesRef,
+			where("customerId", "==", customerId),
+			where("status", "==", "completed"),
+			limit(pageSize * 2) // Fetch more to ensure we have enough after sorting
+		];
+		const completedQuery = query(...completedQueryParts);
+
+		// Build queries for cancelled rides (without orderBy to avoid index requirement)
+		const cancelledQueryParts = [
+			ridesRef,
+			where("customerId", "==", customerId),
+			where("status", "==", "cancelled"),
+			limit(pageSize * 2) // Fetch more to ensure we have enough after sorting
+		];
+		const cancelledQuery = query(...cancelledQueryParts);
+
+		const [completedSnapshot, cancelledSnapshot] = await Promise.all([
+			getDocs(completedQuery),
+			getDocs(cancelledQuery),
+		]);
+
+		const rides = [];
+		let lastCompletedDoc = null;
+		let lastCancelledDoc = null;
+
+		completedSnapshot.forEach((doc) => {
+			rides.push({ ...doc.data(), rideId: doc.id });
+			lastCompletedDoc = doc;
+		});
+
+		cancelledSnapshot.forEach((doc) => {
+			rides.push({ ...doc.data(), rideId: doc.id });
+			lastCancelledDoc = doc;
+		});
+
+		// Sort by completion/cancellation date (newest first)
+		rides.sort((a, b) => {
+			const aTime = (a.completedAt || a.cancelledAt)?.toMillis
+				? (a.completedAt || a.cancelledAt).toMillis()
+				: 0;
+			const bTime = (b.completedAt || b.cancelledAt)?.toMillis
+				? (b.completedAt || b.cancelledAt).toMillis()
+				: 0;
+			return bTime - aTime;
+		});
+
+		// Limit to pageSize after merging
+		const paginatedRides = rides.slice(0, pageSize);
+
+		// Check if there are more rides
+		const hasMore = completedSnapshot.size === pageSize || cancelledSnapshot.size === pageSize;
+
+		const lastVisible = {
+			completed: lastCompletedDoc,
+			cancelled: lastCancelledDoc
+		};
+
+		console.log("📜 Customer history (paginated) fetched:", paginatedRides.length, "rides, hasMore:", hasMore);
+		return { rides: paginatedRides, lastVisible, hasMore };
+	} catch (error) {
+		console.error("❌ Error getting customer history (paginated):", error);
+		return { rides: [], lastVisible: null, hasMore: false };
+	}
+};
+
+/**
+ * Get driver ride history with pagination
+ * @param {string} driverId - Driver ID
+ * @param {number} pageSize - Number of rides per page (default: 20)
+ * @param {Object} lastDoc - Last document from previous page (for pagination)
+ * @returns {Promise<{rides: Array, lastVisible: Object, hasMore: boolean}>}
+ */
+export const getDriverHistoryPaginated = async (driverId, pageSize = 20, lastDoc = null) => {
+	try {
+		const ridesRef = collection(FIREBASE_DB, "rides");
+
+		// Build queries for completed rides (without orderBy to avoid index requirement)
+		const completedQueryParts = [
+			ridesRef,
+			where("driverId", "==", driverId),
+			where("status", "==", "completed"),
+			limit(pageSize * 2) // Fetch more to ensure we have enough after sorting
+		];
+		const completedQuery = query(...completedQueryParts);
+
+		// Build queries for cancelled rides (without orderBy to avoid index requirement)
+		const cancelledQueryParts = [
+			ridesRef,
+			where("driverId", "==", driverId),
+			where("status", "==", "cancelled"),
+			limit(pageSize * 2) // Fetch more to ensure we have enough after sorting
+		];
+		const cancelledQuery = query(...cancelledQueryParts);
+
+		const [completedSnapshot, cancelledSnapshot] = await Promise.all([
+			getDocs(completedQuery),
+			getDocs(cancelledQuery),
+		]);
+
+		const rides = [];
+		let lastCompletedDoc = null;
+		let lastCancelledDoc = null;
+
+		completedSnapshot.forEach((doc) => {
+			rides.push({ ...doc.data(), rideId: doc.id });
+			lastCompletedDoc = doc;
+		});
+
+		cancelledSnapshot.forEach((doc) => {
+			rides.push({ ...doc.data(), rideId: doc.id });
+			lastCancelledDoc = doc;
+		});
+
+		// Sort by completion/cancellation date (newest first)
+		rides.sort((a, b) => {
+			const aTime = (a.completedAt || a.cancelledAt)?.toMillis
+				? (a.completedAt || a.cancelledAt).toMillis()
+				: 0;
+			const bTime = (b.completedAt || b.cancelledAt)?.toMillis
+				? (b.completedAt || b.cancelledAt).toMillis()
+				: 0;
+			return bTime - aTime;
+		});
+
+		// Limit to pageSize after merging
+		const paginatedRides = rides.slice(0, pageSize);
+
+		// Check if there are more rides
+		const hasMore = completedSnapshot.size === pageSize || cancelledSnapshot.size === pageSize;
+
+		const lastVisible = {
+			completed: lastCompletedDoc,
+			cancelled: lastCancelledDoc
+		};
+
+		console.log("📜 Driver history (paginated) fetched:", paginatedRides.length, "rides, hasMore:", hasMore);
+		return { rides: paginatedRides, lastVisible, hasMore };
+	} catch (error) {
+		console.error("❌ Error getting driver history (paginated):", error);
+		return { rides: [], lastVisible: null, hasMore: false };
 	}
 };

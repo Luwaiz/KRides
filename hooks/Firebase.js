@@ -15,11 +15,14 @@ import {
 	getFirestore,
 	doc,
 	getDoc,
+	getDocs,
 	setDoc,
 	updateDoc,
 	deleteField,
 	serverTimestamp,
 	collection,
+	query,
+	where,
 } from "firebase/firestore";
 import { FIREBASE_APP, FIREBASE_DB, FIREBASE_AUTH } from "../firebaseConfig";
 
@@ -33,73 +36,6 @@ export async function signInWithEmail(email, password) {
 		password
 	);
 	return credential.user;
-}
-
-// Sign in with Google (already authenticated with Firebase)
-export async function handleGoogleSignIn(firebaseUser, googleUser, role = 'customer') {
-	const { uid, email, displayName, photoURL } = firebaseUser;
-
-	console.log('🔐 handleGoogleSignIn called:', { uid, email, role });
-
-	// Determine collection based on role
-	const collectionName = role === 'driver' ? 'drivers' : 'users';
-	const userRef = doc(FIREBASE_DB, collectionName, uid);
-
-	// Check if user already exists
-	const userSnap = await getDoc(userRef);
-
-	if (userSnap.exists()) {
-		console.log('✅ User already exists in', collectionName);
-		return { user: firebaseUser, isNew: false, data: userSnap.data() };
-	}
-
-	// Create new user document
-	const nameField = role === 'driver' ? 'fullname' : 'name';
-	const userData = {
-		uid,
-		[nameField]: displayName || googleUser?.name || 'User',
-		email,
-		photoURL: photoURL || googleUser?.photo || null,
-		role,
-		authProvider: 'google',
-		// Phone will be added later for drivers
-		phone: null,
-		createdAt: serverTimestamp(),
-	};
-
-	console.log(`📝 Creating new user in ${collectionName}:`, userData);
-
-	try {
-		await setDoc(userRef, userData);
-		console.log(`✅ User created successfully in ${collectionName}`);
-		return { user: firebaseUser, isNew: true, data: userData };
-	} catch (error) {
-		console.error('❌ Error creating user document:', error);
-		throw error;
-	}
-}
-
-// Update driver phone number after Google Sign-In
-export async function updateDriverPhone(uid, phone) {
-	if (!uid || !phone) {
-		throw new Error('UID and phone are required');
-	}
-
-	console.log('📞 Updating driver phone:', { uid, phone });
-
-	const driverRef = doc(FIREBASE_DB, 'drivers', uid);
-
-	try {
-		await updateDoc(driverRef, {
-			phone,
-			updatedAt: serverTimestamp(),
-		});
-		console.log('✅ Driver phone updated successfully');
-		return { success: true };
-	} catch (error) {
-		console.error('❌ Error updating driver phone:', error);
-		throw error;
-	}
 }
 
 // Sign up (for both users and drivers)
@@ -139,7 +75,7 @@ export async function signUpWithEmail({
 		phone: phone || null,
 		role,
 		...(vehicle_id && { vehicle_id }),
-		pushToken: null,
+		fcmTokens: {},
 		createdAt: serverTimestamp(),
 	};
 
@@ -171,11 +107,10 @@ export async function signUpWithEmail({
 }
 
 // Sign up driver specifically
-export async function signUpDriver({ phone, email, password, fullname, vehicle_id }) {
-	// Use provided email or fallback to generated one (though UI enforces email now)
-	const driverEmail = email || `${phone}@rideapp.com`;
+export async function signUpDriver({ phone, password, fullname, vehicle_id }) {
+	const email = `${phone}@rideapp.com`;
 	return signUpWithEmail({
-		email: driverEmail,
+		email,
 		password,
 		name: fullname,
 		phone,
@@ -199,7 +134,7 @@ export async function createUserDocIfMissing(uid, profile = {}) {
 			email: profile.email || null,
 			phone: profile.phone || null,
 			role: profile.role || "customer",
-			pushToken: null,
+			fcmTokens: {},
 			createdAt: serverTimestamp(),
 		});
 		return { created: true };
@@ -264,6 +199,43 @@ export async function resetPassword(email) {
 	}
 }
 
+/** ---------- DRIVER EMAIL LOOKUP ---------- **/
+
+/**
+ * Get driver's email address by phone number
+ * Used for driver login flow where drivers use phone numbers
+ * @param {string} phone - Driver's phone number
+ * @returns {Promise<string>} Driver's email address
+ */
+export async function getDriverEmailByPhone(phone) {
+	if (!phone) {
+		throw new Error("Phone number is required");
+	}
+
+	try {
+		const driversRef = collection(FIREBASE_DB, "drivers");
+		const q = query(driversRef, where("phone", "==", phone));
+		const querySnapshot = await getDocs(q);
+
+		if (querySnapshot.empty) {
+			throw new Error("No driver found with this phone number");
+		}
+
+		const driverDoc = querySnapshot.docs[0];
+		const driverData = driverDoc.data();
+
+		if (!driverData.email) {
+			throw new Error("Driver email not found");
+		}
+
+		console.log(`✅ Found driver email for phone ${phone}`);
+		return driverData.email;
+	} catch (error) {
+		console.error("Error looking up driver email:", error);
+		throw error;
+	}
+}
+
 /** ---------- USER DOC FETCH ---------- **/
 
 export async function getUserDoc(uid) {
@@ -293,8 +265,6 @@ export default {
 	signInWithEmail,
 	signUpWithEmail,
 	signUpDriver,
-	handleGoogleSignIn,
-	updateDriverPhone,
 	createUserDocIfMissing,
 	registerFcmToken,
 	unregisterFcmToken,
@@ -302,5 +272,6 @@ export default {
 	signOut,
 	onAuthStateChanged,
 	resetPassword,
+	getDriverEmailByPhone,
 	getUserDoc,
 };

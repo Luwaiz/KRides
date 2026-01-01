@@ -298,12 +298,13 @@ app.post('/api/notifications/send-bulk', async (req, res) => {
  * Body: {
  *   rideId: string,
  *   customerName: string,
- *   pickupLocation: string
+ *   pickupLocation: string,
+ *   destination: string
  * }
  */
 app.post('/api/notifications/notify-drivers', async (req, res) => {
     try {
-        const { rideId, customerName, pickupLocation } = req.body;
+        const { rideId, customerName, pickupLocation, destination } = req.body;
 
         if (!rideId) {
             return res.status(400).json({
@@ -324,7 +325,7 @@ app.post('/api/notifications/notify-drivers', async (req, res) => {
                 const result = await sendFCMNotification(
                     pushToken,
                     'New Ride Request 🚗',
-                    `${customerName || 'A customer'} requested a ride from ${pickupLocation || 'nearby'}`,
+                    `${customerName || 'A customer'} requested a ride from ${pickupLocation || 'nearby'} to ${destination || 'destination'}`,
                     {
                         type: 'ride_booked',
                         rideId: String(rideId),

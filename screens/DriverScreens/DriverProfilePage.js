@@ -1,4 +1,5 @@
 import { StatusBar, StyleSheet, Text, ToastAndroid, View, Image, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
+import { AntDesign } from "@expo/vector-icons";
 import React, { useState, useEffect } from "react";
 import { colors } from "../../constants/styling";
 import BackButton from "../../components/buttons/BackButton";
@@ -305,6 +306,18 @@ const DriverProfilePage = () => {
 					</View>
 				</View>
 
+				{/* View Reviews Button */}
+				<View style={styles.reviewsButtonCont}>
+					<TouchableOpacity
+						style={styles.reviewsButton}
+						onPress={() => navigation.navigate("DriverReviews")}
+					>
+						<AntDesign name="star" size={20} color={colors.primaryBlue} />
+						<Text style={styles.reviewsButtonText}>View All Reviews</Text>
+						<AntDesign name="right" size={16} color={colors.primaryBlue} />
+					</TouchableOpacity>
+				</View>
+
 				<View style={styles.infoCont}>
 					<EditableInput
 						text={"Full Name"}
@@ -460,5 +473,31 @@ const styles = StyleSheet.create({
 		fontSize: 14,
 		fontFamily: "Albert-SemiBold",
 		color: "#333",
+	},
+	reviewsButtonCont: {
+		paddingHorizontal: 16,
+		marginBottom: 16,
+	},
+	reviewsButton: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "center",
+		backgroundColor: "white",
+		paddingVertical: 14,
+		paddingHorizontal: 20,
+		borderRadius: 12,
+		borderWidth: 1.5,
+		borderColor: colors.primaryBlue,
+		gap: 8,
+		elevation: 2,
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.1,
+		shadowRadius: 4,
+	},
+	reviewsButtonText: {
+		fontSize: 16,
+		fontFamily: "Albert-SemiBold",
+		color: colors.primaryBlue,
 	},
 });
