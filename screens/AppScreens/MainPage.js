@@ -17,6 +17,9 @@ import { useRideDetailsStore } from "../../constants/Store";
 import { cancelRideWithRefund, listenToRide } from "../../helpers/firebaseRides";
 import { notifyDriverRideCancelled } from "../../helpers/notificationHelpers";
 import Toast from "react-native-toast-message";
+import { registerForPushNotificationsAsync } from "../../helpers/pushNotifications";
+import { doc, updateDoc } from "firebase/firestore";
+import { FIREBASE_DB } from "../../firebaseConfig";
 
 const MainPage = () => {
 	const [location, setLocation] = useState(false);
@@ -40,6 +43,7 @@ const MainPage = () => {
 		firstName: state.firstName,
 		lastName: state.lastName,
 	}));
+	const UserId = useUserDetails((state) => state.UserId);
 
 	const BABCOCK_COORDINATES = (location && location.coords)
 		? {
@@ -97,6 +101,36 @@ const MainPage = () => {
 	useEffect(() => {
 		getLocationN();
 	}, []);
+
+	// Register for push notifications
+	useEffect(() => {
+		const setupNotifications = async () => {
+			if (!UserId) return;
+
+			try {
+				console.log("📱 Registering customer for push notifications...");
+				const token = await registerForPushNotificationsAsync();
+
+				if (token) {
+					console.log("✅ Customer FCM token obtained:", token.substring(0, 30) + "...");
+
+					// Store token in Firestore
+					const userRef = doc(FIREBASE_DB, "users", UserId);
+					await updateDoc(userRef, {
+						fcmToken: token,
+						lastTokenUpdate: new Date(),
+					});
+					console.log("✅ Customer FCM token saved to Firestore");
+				} else {
+					console.log("⚠️ Failed to get FCM token");
+				}
+			} catch (error) {
+				console.error("❌ Error setting up notifications:", error);
+			}
+		};
+
+		setupNotifications();
+	}, [UserId]);
 
 	// Listen for ride updates when there's an active ride
 	useEffect(() => {

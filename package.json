@@ -25,6 +25,7 @@
     "dotenv": "^16.4.7",
     "expo": "~52.0.47",
     "expo-dev-client": "~5.0.8",
+    "expo-device": "^8.0.10",
     "expo-font": "~13.0.2",
     "expo-haptics": "^15.0.8",
     "expo-image-picker": "^17.0.10",

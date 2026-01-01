@@ -319,7 +319,7 @@ app.post('/api/notifications/notify-drivers', async (req, res) => {
 
         for (const doc of driversSnapshot.docs) {
             const driver = doc.data();
-            const pushToken = driver.pushToken;
+            const pushToken = driver.fcmToken || driver.pushToken; // Support both field names
 
             if (pushToken) {
                 const result = await sendFCMNotification(
