@@ -1,0 +1,18 @@
+\t\t\tsetRideId(newRideId);
+\t\t\tsetLoading(false);
+
+\t\t\t// Set active ride in store so status bar appears
+\t\t\tconsole.log("📦 Setting active ride in store...");
+\t\t\tuseActiveRideStore.getState().setActiveRide({
+\t\t\t\trideId: newRideId,
+\t\t\t\tstatus: 'pending',
+\t\t\t\tdriverName: null,
+\t\t\t\tdriverId: null,
+\t\t\t\tdriverPhone: null,
+\t\t\t\tvehicleId: null,
+\t\t\t\thasArrived: false,
+\t\t\t});
+
+\t\t\t// Navigate to home immediately after booking
+\t\t\tconsole.log("🏠 Navigating to home page...");
+\t\t\tsetHomePage();

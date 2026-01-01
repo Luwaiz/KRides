@@ -19,11 +19,13 @@ import {
 	useUserDetails,
 	useRideDetailsStore,
 	useBottomTabStore,
+	useActiveRideStore,
 } from "../constants/Store";
 import InActiveButton from "./buttons/InActiveButton";
 import DangerButton from "./buttons/DangerButton";
 import Payment from "../screens/AppScreens/Payment";
 import { createRide, listenToRide, cancelRide } from "../helpers/firebaseRides";
+import { calculateDistance, calculateFare } from "../helpers/rideCalculations";
 import { FIREBASE_DB, FIREBASE_AUTH } from "../firebaseConfig";
 import { doc, updateDoc } from "firebase/firestore";
 import { signOut } from "firebase/auth";
@@ -82,7 +84,14 @@ const ConfirmRide = () => {
 	console.log("   - Phone:", phone || "MISSING");
 	console.log("   - User ID:", UserId || "MISSING");
 
-	const Price = numberOfPassenger * 200;
+	// Calculate distance and price using the same logic as Passenger.js
+	const distance = pickupLocation && destinationCoords
+		? calculateDistance(
+			{ latitude: pickupLocation.latitude, longitude: pickupLocation.longitude },
+			{ latitude: destinationCoords.latitude, longitude: destinationCoords.longitude }
+		)
+		: 0;
+	const Price = calculateFare(distance, parseInt(numberOfPassenger));
 
 	const ToPromo = () => {
 		navigation.navigate("Promo");
@@ -242,8 +251,23 @@ const ConfirmRide = () => {
 			console.log("✅ Ride created successfully! Ride ID:", newRideId);
 
 			setRideId(newRideId);
-			setPending(true);
-			setLoading(false);
+
+
+			// Set active ride in store so status bar appears
+			console.log("Setting active ride in store...");
+			useActiveRideStore.getState().setActiveRide({
+				rideId: newRideId,
+				status: 'pending',
+				driverName: null,
+				driverId: null,
+				driverPhone: null,
+				vehicleId: null,
+				hasArrived: false,
+			});
+
+			// Navigate to home immediately after booking
+			console.log("🏠 Navigating to home page...");
+			setHomePage();
 		} catch (error) {
 			console.error("❌ Error creating ride:", error);
 			let errorMessage = "Failed to create ride. Please try again.";
@@ -259,7 +283,19 @@ const ConfirmRide = () => {
 			} else {
 				alert(errorMessage);
 			}
-			setLoading(false);
+
+
+			// Set active ride in store so status bar appears
+			console.log(" Setting active ride in store...")
+useActiveRideStore.getState().setActiveRide({
+				rideId: newRideId,
+				status: 'pending',
+				driverName: null,
+				driverId: null,
+				driverPhone: null,
+				vehicleId: null,
+				hasArrived: false,
+			});
 		}
 	};
 
@@ -303,8 +339,9 @@ const ConfirmRide = () => {
 						setAcceptedDriverId(rideData.driverId);
 					}
 
-					setPending(false);
-					setSelectRider(true);
+					// Navigate to home page to show RideStatusBar instead of modal
+					console.log("🏠 Navigating to home to show status bar...");
+					setHomePage();
 				} // If ride is completed - show rating modal
 				if (rideData.status === "completed" && !rideData.customerRating) {
 					console.log("✅ Ride completed - showing rating modal");
@@ -490,13 +527,7 @@ const ConfirmRide = () => {
 				</View>
 			</BottomSheet>
 
-			{selectRider && (
-				<RideConfirm
-					modal={selectRider}
-					setModal={setSelectRider}
-					driverName={acceptedDriverName || rider || "Driver"}
-				/>
-			)}
+			{/* RideConfirm modal removed - navigation to home happens automatically */}
 
 			{showRatingModal && (
 				<RatingModal
@@ -616,3 +647,4 @@ const styles = StyleSheet.create({
 		color: colors.primaryBlue,
 	},
 });
+

@@ -106,8 +106,8 @@ export const createRide = async (rideData) => {
 		await notifyDriversAboutNewRide(
 			rideId,
 			rideData.customerName,
-			rideData.pickupAddress,
-			rideData.destinationAddress
+			rideData.pickupLocation,
+			rideData.destination
 		);
 		return rideId;
 	} catch (error) {

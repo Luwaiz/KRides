@@ -19,6 +19,10 @@ import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import MapViewDirections from "react-native-maps-directions";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Geolocation from "@react-native-community/geolocation";
+import { registerForPushNotificationsAsync } from "../../helpers/pushNotifications";
+import { doc, updateDoc } from "firebase/firestore";
+import { FIREBASE_DB } from "../../firebaseConfig";
+import { useDriverDetails } from "../../constants/Store";
 
 const HomePage = () => {
 	const Accept = useBottomTabStore((state) => state.AcceptRidePage);
@@ -27,6 +31,7 @@ const HomePage = () => {
 	const isRideActive = useAcceptedRideStore((state) => state.isRideActive);
 	const navigation = useNavigation();
 	const mapRef = useRef(null);
+	const { uid } = useDriverDetails((state) => ({ uid: state.uid }));
 
 	// Request location permissions
 	const requestLocationPermissions = async () => {
@@ -74,6 +79,36 @@ const HomePage = () => {
 		};
 		checkNewDriver();
 	}, []);
+
+	// Register for push notifications
+	useEffect(() => {
+		const setupNotifications = async () => {
+			if (!uid) return;
+
+			try {
+				console.log("📱 Registering driver for push notifications...");
+				const token = await registerForPushNotificationsAsync();
+
+				if (token) {
+					console.log("✅ Driver FCM token obtained:", token.substring(0, 30) + "...");
+
+					// Store token in Firestore
+					const driverRef = doc(FIREBASE_DB, "drivers", uid);
+					await updateDoc(driverRef, {
+						fcmToken: token,
+						lastTokenUpdate: new Date(),
+					});
+					console.log("✅ Driver FCM token saved to Firestore");
+				} else {
+					console.log("⚠️ Failed to get FCM token");
+				}
+			} catch (error) {
+				console.error("❌ Error setting up notifications:", error);
+			}
+		};
+
+		setupNotifications();
+	}, [uid]);
 
 	const BABCOCK_COORDINATES = {
 		latitude: 6.8935,
