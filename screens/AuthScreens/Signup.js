@@ -9,8 +9,6 @@ import Terms from "../../components/Terms";
 import BackButton from "../../components/buttons/BackButton";
 import Firebase from "../../hooks/Firebase";
 import Toast from "react-native-toast-message";
-import { useGoogleAuth } from "../../hooks/useGoogleAuth";
-import useAuthStore from "../../constants/Store";
 
 const Signup = ({ navigation }) => {
 	const [email, setEmail] = useState("");
@@ -20,8 +18,6 @@ const Signup = ({ navigation }) => {
 	const [lastName, setLastName] = useState("");
 	const [confirmPassword, setConfirmPassword] = useState("");
 	const [loading, setLoading] = useState(false);
-	const { signInWithGoogle, loading: googleLoading } = useGoogleAuth();
-	const setAuthData = useAuthStore((state) => state.setAuthData);
 
 	const isPasswordValid = (password) => {
 		return password.length >= 8;
@@ -29,23 +25,6 @@ const Signup = ({ navigation }) => {
 
 	const isPasswordMatched = (password, confirmPassword) => {
 		return password === confirmPassword;
-	};
-
-	const isPhoneValid = (phone) => {
-		// Check if phone is exactly 11 digits
-		const phoneRegex = /^\d{11}$/;
-		return phoneRegex.test(phone);
-	};
-
-	const isEmailValid = (email) => {
-		// Basic email validation
-		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-		return emailRegex.test(email);
-	};
-
-	const isNameValid = (name) => {
-		// Name should be at least 2 characters
-		return name && name.trim().length >= 2;
 	};
 
 	const handleSignUp = async () => {
@@ -57,69 +36,24 @@ const Signup = ({ navigation }) => {
 			!password ||
 			!confirmPassword
 		) {
-			Alert.alert(
-				"Oops! Missing Information",
-				"Please fill in all the fields so we can create your account. We need your name, email, phone number, and password to get you started! 😊"
-			);
-			return;
-		}
-
-		// Validate first name
-		if (!isNameValid(firstName)) {
-			Alert.alert(
-				"Oops! Invalid First Name",
-				"Please enter a valid first name (at least 2 characters) 😊"
-			);
-			return;
-		}
-
-		// Validate last name
-		if (!isNameValid(lastName)) {
-			Alert.alert(
-				"Oops! Invalid Last Name",
-				"Please enter a valid last name (at least 2 characters) 😊"
-			);
-			return;
-		}
-
-		// Validate email
-		if (!isEmailValid(email)) {
-			Alert.alert(
-				"Oops! Invalid Email",
-				"Please enter a valid email address (e.g., johndoe@gmail.com) 📧"
-			);
-			return;
-		}
-
-		// Validate phone number
-		if (!isPhoneValid(phone)) {
-			Alert.alert(
-				"Oops! Invalid Phone Number",
-				"Phone number must be exactly 11 digits (e.g., 08123456789) 📞"
-			);
+			Alert.alert("Missing Fields", "Please fill in all fields");
 			return;
 		}
 
 		if (!isPasswordValid(password)) {
-			Alert.alert(
-				"Weak Password",
-				"Please choose a stronger password (at least 8 characters) 🔒"
-			);
+			Alert.alert("Weak Password", "Password must be at least 8 characters.");
 			return;
 		}
 
 		if (!isPasswordMatched(password, confirmPassword)) {
-			Alert.alert(
-				"Password Mismatch",
-				"Passwords don't match. Please try again! 🔑"
-			);
+			Alert.alert("Password Mismatch", "Passwords do not match.");
 			return;
 		}
 
 		setLoading(true);
 		try {
 			console.log("🚀 Starting customer signup process...");
-
+			
 			// Use Firebase Auth to create user and Firestore user doc
 			const user = await Firebase.signUpWithEmail({
 				email,
@@ -147,7 +81,7 @@ const Signup = ({ navigation }) => {
 				position: "top",
 				visibilityTime: 2000,
 			});
-
+			
 			// Don't setLoading(false) here - let Navigation handle the transition
 			// Navigation.js will automatically route to customer home
 			// No need to manually navigate
@@ -166,36 +100,6 @@ const Signup = ({ navigation }) => {
 			}
 
 			Alert.alert("Sign Up Failed", errorMessage);
-		}
-	};
-
-	const handleGoogleSignIn = async () => {
-		try {
-			console.log('🔐 Starting Google Sign-In for customer signup...');
-			const result = await signInWithGoogle('customer');
-
-			if (result && result.user) {
-				console.log('✅ Google Sign-In successful:', result.user.email);
-
-				// Handle user creation in Firestore
-				const { data: profile } = await Firebase.handleGoogleSignIn(result.user, result.googleUser, 'customer');
-
-				// Manually update store to ensure Navigation sees us as a customer immediately
-				// This prevents race conditions if the user also has a driver account
-				setAuthData(result.user, profile, 'customer');
-
-				// Navigation handled automatically by Navigation.js
-				Toast.show({
-					type: "tomatoToast",
-					text1: "Welcome!",
-					text2: `Account created with Google`,
-					position: "top",
-					visibilityTime: 2000,
-				});
-			}
-		} catch (error) {
-			console.error('❌ Google Sign-In Error:', error);
-			Alert.alert('Sign Up Failed', error.message || 'Google Sign-In failed. Please try again.');
 		}
 	};
 
@@ -252,7 +156,15 @@ const Signup = ({ navigation }) => {
 							<ActiveButton
 								title={"Sign up"}
 								onPress={handleSignUp}
-								disabled={loading}
+								disabled={
+									!email ||
+									!password ||
+									!confirmPassword ||
+									!firstName ||
+									!lastName ||
+									!phone ||
+									loading
+								}
 								loading={loading}
 							/>
 							<View style={styles.OrContainer}>
@@ -260,10 +172,7 @@ const Signup = ({ navigation }) => {
 								<Text style={styles.OrText}>OR</Text>
 								<View style={styles.dash} />
 							</View>
-							<GoogleButton
-								title={googleLoading ? "Signing in..." : "Continue with Google"}
-								onPress={handleGoogleSignIn}
-							/>
+							<GoogleButton title={"Continue with Google"} />
 						</View>
 					</View>
 					<Terms />

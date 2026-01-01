@@ -7,7 +7,7 @@ import Direction from "../assets/svg/Frame 34direction.svg";
 import { useRideStore, useRideDetailsStore } from "../constants/Store";
 import LocationPicker from "./LocationPicker";
 
-const WhereTo = () => {
+const WhereTo = ({ disabled = false }) => {
 	const [showPickupPicker, setShowPickupPicker] = useState(false);
 	const [showDestinationPicker, setShowDestinationPicker] = useState(false);
 
@@ -49,27 +49,29 @@ const WhereTo = () => {
 
 	return (
 		<>
-			<View style={styles.locations}>
+			<View style={[styles.locations, disabled && styles.locationsDisabled]}>
 				<View style={styles.pointer}>
 					<Direction height={110} />
 				</View>
 				<View style={styles.destinations}>
 					<TouchableOpacity
-						activeOpacity={0.7}
-						onPress={() => setShowPickupPicker(true)}
+						activeOpacity={disabled ? 1 : 0.7}
+						onPress={() => !disabled && setShowPickupPicker(true)}
+						disabled={disabled}
 					>
-						<View style={styles.destination}>
-							<Text style={styles.destinationText}>
+						<View style={[styles.destination, disabled && styles.destinationDisabled]}>
+							<Text style={[styles.destinationText, disabled && styles.destinationTextDisabled]}>
 								{location !== "" ? location : "Choose Pickup Location"}
 							</Text>
 						</View>
 					</TouchableOpacity>
 					<TouchableOpacity
-						activeOpacity={0.7}
-						onPress={() => setShowDestinationPicker(true)}
+						activeOpacity={disabled ? 1 : 0.7}
+						onPress={() => !disabled && setShowDestinationPicker(true)}
+						disabled={disabled}
 					>
-						<View style={styles.destination}>
-							<Text style={styles.destinationText}>
+						<View style={[styles.destination, disabled && styles.destinationDisabled]}>
+							<Text style={[styles.destinationText, disabled && styles.destinationTextDisabled]}>
 								{destination !== "" ? destination : "Choose Destination"}
 							</Text>
 						</View>
@@ -109,6 +111,9 @@ const styles = StyleSheet.create({
 		borderRadius: br(16),
 		flexDirection: "row",
 	},
+	locationsDisabled: {
+		opacity: 0.6,
+	},
 	destinations: {
 		minWidth: wp(270),
 		flex: 1,
@@ -124,10 +129,16 @@ const styles = StyleSheet.create({
 		padding: sp(8),
 		justifyContent: "center",
 	},
+	destinationDisabled: {
+		backgroundColor: colors.lightGrey3,
+	},
 	destinationText: {
 		fontSize: fs(16),
 		fontWeight: "regular",
 		color: "black",
+	},
+	destinationTextDisabled: {
+		color: colors.lightGrey3,
 	},
 	pointer: {
 		marginTop: sp(5),

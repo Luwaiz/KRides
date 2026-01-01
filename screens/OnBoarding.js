@@ -1,4 +1,4 @@
-import { FlatList, Image, StyleSheet, Text, View } from "react-native";
+import { FlatList, Image, StyleSheet, Text, View, Dimensions } from "react-native";
 import React, { useRef, useState } from "react";
 import { OnBoard } from "../constants/OnBoardData";
 import BottomSheet from "@gorhom/bottom-sheet";
@@ -13,8 +13,7 @@ configureReanimatedLogger({
 	strict: true, // Reanimated runs in strict mode by default
 });
 
-const width = 375; // Fixed width for onboarding
-const height = 812; // Fixed height for onboarding
+const { width, height } = Dimensions.get('window');
 
 const OnBoarding = ({ navigation }) => {
 	const [currentIndex, setCurrentIndex] = useState(0);
@@ -57,10 +56,17 @@ const OnBoarding = ({ navigation }) => {
 				scrollEnabled
 				onMomentumScrollEnd={scrollFunction}
 				pagingEnabled
-				style={{ flex: 0.65 }}
+				snapToInterval={width}
+				decelerationRate="fast"
 				showsHorizontalScrollIndicator={false}
+				getItemLayout={(data, index) => ({
+					length: width,
+					offset: width * index,
+					index,
+				})}
+				style={{ flex: 0.65 }}
 				renderItem={({ item }) => (
-					<>
+					<View style={{ width }}>
 						{/* <Image
 							source={item?.image}
 							style={styles.image}
@@ -78,7 +84,7 @@ const OnBoarding = ({ navigation }) => {
 								<Text style={styles.subTitle}>{item.subTitle}</Text>
 							</View>
 						</BottomSheet>
-					</>
+					</View>
 				)}
 			/>
 			<Footer

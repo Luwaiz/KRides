@@ -20,37 +20,25 @@ const ForgetPass = ({ navigation }) => {
 
 	const requestCode = async () => {
 		if (!email) {
-			Alert.alert("Error", "Please enter your email address or phone number");
+			Alert.alert("Error", "Please enter your email address");
+			return;
+		}
+
+		// Basic email validation
+		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+		if (!emailRegex.test(email)) {
+			Alert.alert("Error", "Please enter a valid email address");
 			return;
 		}
 
 		setLoading(true);
 		try {
-			let emailToUse = email.trim();
-
-			// Check if input is a phone number (11 digits)
-			const phoneRegex = /^\d{11}$/;
-			if (phoneRegex.test(emailToUse)) {
-				// Convert phone to driver email format
-				emailToUse = `${emailToUse}@rideapp.com`;
-				console.log("🔐 Converted phone number to driver email:", emailToUse);
-			} else {
-				// Validate email format
-				const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-				if (!emailRegex.test(emailToUse)) {
-					Alert.alert(
-						"Invalid Input",
-						"Please enter a valid email address or 11-digit phone number"
-					);
-					setLoading(false);
-					return;
-				}
-			}
-
-			console.log("🔐 Sending password reset email to:", emailToUse);
-
-			// Send password reset email
-			await sendPasswordResetEmail(FIREBASE_AUTH, emailToUse);
+			console.log("🔐 Sending password reset email to:", email);
+			
+			// Send password reset email (without action code settings to avoid domain errors)
+			// To use custom redirect URLs, you need to allowlist them in Firebase Console:
+			// Authentication → Settings → Authorized domains
+			await sendPasswordResetEmail(FIREBASE_AUTH, email);
 
 			console.log("✅ Password reset email sent successfully");
 
@@ -75,7 +63,7 @@ const ForgetPass = ({ navigation }) => {
 			let errorMessage = "Failed to send reset email. Please try again.";
 
 			if (error.code === "auth/user-not-found") {
-				errorMessage = "No account found with this email or phone number";
+				errorMessage = "No account found with this email address";
 			} else if (error.code === "auth/invalid-email") {
 				errorMessage = "Invalid email address";
 			} else if (error.code === "auth/too-many-requests") {
@@ -94,20 +82,20 @@ const ForgetPass = ({ navigation }) => {
 			</View>
 			<View style={styles.infoCont}>
 				<Text style={styles.infoText1}>
-					Enter your registered email address or phone number to receive a password reset link
+					Enter your registered email to receive a password reset link
 				</Text>
 				<Text style={styles.infoText2}>
-					Note: Drivers can use their 11-digit phone number. Check your spam/junk folder if you don't see the email.
+					Note: Check your spam/junk folder if you don't see the email in your inbox.
 				</Text>
 			</View>
 			<View style={styles.bottomCont}>
 				<TextInput1
 					onChangeText={(text) => setEmail(text)}
 					value={email}
-					placeholder="email@example.com or 08123456789"
-					keyboardType="default"
+					placeholder="johndoe22@gmail.com"
+					keyboardType="email-address"
 					autoCapitalize="none"
-					text="Email or Phone Number"
+					text="Email Address"
 				/>
 				<View style={styles.button}>
 					<ActiveButton

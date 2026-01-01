@@ -11,6 +11,7 @@ import {
 	useUserDetails,
 	useRideStore,
 	useRideDetailsStore,
+	useActiveRideStore,
 } from "../constants/Store";
 import { formatDate, parseISO } from "date-fns";
 import { FIREBASE_AUTH, FIREBASE_DB } from "../firebaseConfig";
@@ -30,6 +31,11 @@ const HomeTab = () => {
 			pickupLocation: state.pickupLocation,
 			destination: state.destination,
 		}));
+
+	// Check if there's an active ride
+	const activeRide = useActiveRideStore(state => state.activeRide);
+	const hasActiveRide = !!activeRide;
+
 	const date = new Date();
 	const dateFormat = formatDate(date, "dd/MM/yyyy");
 	const [name, setName] = useState("");
@@ -98,23 +104,36 @@ const HomeTab = () => {
 						</Text>
 						<Text style={styles.where}>Where are you going?</Text>
 					</View>
-					<WhereTo />
+					<WhereTo disabled={hasActiveRide} />
 					<View style={styles.dateCont}>
 						<Feather name="calendar" size={ms(24)} color={colors.primaryBlue} />
 						<Text style={styles.date}>{dateFormat}</Text>
 					</View>
-					{!canContinue && (
-						<Text style={styles.helperText}>
-							Please select both pickup and destination to continue
-						</Text>
+
+					{/* Show different messages based on state */}
+					{hasActiveRide ? (
+						<View style={styles.lockedContainer}>
+							<Feather name="lock" size={ms(20)} color={colors.primaryBlue} />
+							<Text style={styles.lockedText}>
+								Complete your current ride to book another
+							</Text>
+						</View>
+					) : (
+						<>
+							{!canContinue && (
+								<Text style={styles.helperText}>
+									Please select both pickup and destination to continue
+								</Text>
+							)}
+							<View style={styles.button}>
+								<ActiveButton
+									title={"Continue"}
+									onPress={Passengers}
+									disabled={!canContinue}
+								/>
+							</View>
+						</>
 					)}
-					<View style={styles.button}>
-						<ActiveButton
-							title={"Continue"}
-							onPress={Passengers}
-							disabled={!canContinue}
-						/>
-					</View>
 				</View>
 			</BottomSheetScrollView>
 		</BottomSheet>
@@ -161,6 +180,23 @@ const styles = StyleSheet.create({
 		textAlign: "center",
 		marginTop: sp(8),
 		fontStyle: "italic",
+	},
+	lockedContainer: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "center",
+		backgroundColor: colors.secondary,
+		padding: sp(16),
+		borderRadius: br(12),
+		marginTop: sp(16),
+		borderWidth: 1,
+		borderColor: colors.primaryBlue,
+	},
+	lockedText: {
+		fontSize: fs(14),
+		color: colors.primaryBlue,
+		marginLeft: sp(8),
+		fontWeight: "600",
 	},
 	button: {
 		marginTop: sp(20),

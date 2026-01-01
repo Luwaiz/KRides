@@ -2,7 +2,7 @@ import { StyleSheet, Text, View, TouchableOpacity } from "react-native";
 import { PayWithFlutterwave } from "flutterwave-react-native";
 import React from "react";
 
-const Payment = ({ email, amount, name, phoneNumber, BookRide, subaccountId }) => {
+const Payment = ({ email, amount, name, phoneNumber, BookRide }) => {
 	console.log("💳 Payment component rendered with:");
 	console.log("   - Email:", email || "MISSING");
 	console.log("   - Amount:", amount);
@@ -22,13 +22,11 @@ const Payment = ({ email, amount, name, phoneNumber, BookRide, subaccountId }) =
 	const handleOnRedirect = (data) => {
 		console.log("💳 Payment redirect data:", data);
 		console.log("💳 Payment status:", data?.status);
-		console.log("💳 Transaction ID:", data?.transaction_id);
 
 		if (data.status === "completed" || data.status === "successful") {
 			// Handle successful payment
 			console.log("✅ Payment successful! Creating ride...");
-			// Pass transaction data to BookRide for saving
-			BookRide(data.transaction_id, data);
+			BookRide();
 		} else {
 			console.log("❌ Payment was not completed. Status:", data.status);
 		}
@@ -48,6 +46,7 @@ const Payment = ({ email, amount, name, phoneNumber, BookRide, subaccountId }) =
 
 	// Custom button component that receives onPress from Flutterwave
 	const CustomButton = ({ onPress, disabled, isInitializing }) => {
+		console.log("🔘 CustomButton rendered - onPress available:", !!onPress);
 
 		return (
 			<TouchableOpacity
@@ -67,8 +66,8 @@ const Payment = ({ email, amount, name, phoneNumber, BookRide, subaccountId }) =
 					{isInitializing
 						? "Initializing..."
 						: disabled
-							? "Processing..."
-							: `Pay ₦${amount}`}
+						? "Processing..."
+						: `Pay ₦${amount}`}
 				</Text>
 			</TouchableOpacity>
 		);
@@ -92,15 +91,6 @@ const Payment = ({ email, amount, name, phoneNumber, BookRide, subaccountId }) =
 					amount: amount,
 					currency: "NGN",
 					payment_options: "card,banktransfer,ussd",
-					...(subaccountId && {
-						subaccounts: [
-							{
-								id: subaccountId,
-								transaction_split_ratio: amount - 50, // Driver gets amount minus 50 naira fee
-								transaction_charge_type: "flat_subaccount",
-							},
-						],
-					}),
 				}}
 				customButton={CustomButton}
 			/>

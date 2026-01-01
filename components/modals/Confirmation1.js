@@ -33,7 +33,7 @@ const Confirmation1 = ({ modal, setModal, title }) => {
 	const [loading, setLoading] = useState(false);
 
 	const ToAuthScreen = () => {
-		// Don't close modal immediately, wait for async op
+		setModal(false);
 		if (title === "Logout") {
 			logOut();
 		} else {
@@ -148,7 +148,6 @@ const Confirmation1 = ({ modal, setModal, title }) => {
 			useAuthStore.getState().clearAuth();
 
 			// Reset navigation to AuthStack
-			setModal(false);
 			navigation.dispatch(
 				CommonActions.reset({
 					index: 0,
@@ -194,6 +193,26 @@ const Confirmation1 = ({ modal, setModal, title }) => {
 					</View>
 				</View>
 			</Modal>
+
+			{/* Loading Overlay */}
+			{loading && (
+				<Modal
+					visible={loading}
+					transparent
+					statusBarTranslucent
+					animationType="fade"
+				>
+					<View style={styles.loadingOverlay}>
+						<View style={styles.loadingContainer}>
+							<ActivityIndicator size="large" color={colors.primaryBlue} />
+							<Text style={styles.loadingText}>
+								{title === "Logout" ? "Logging out..." : "Deleting account..."}
+							</Text>
+							<Text style={styles.loadingSubText}>Please wait</Text>
+						</View>
+					</View>
+				</Modal>
+			)}
 		</>
 	);
 };

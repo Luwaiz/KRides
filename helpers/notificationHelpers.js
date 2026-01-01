@@ -1,11 +1,11 @@
 import axios from 'axios';
 
+// Production server (Render.com)
+const NOTIFICATION_SERVER_URL = 'https://krides.onrender.com/api/notifications';
+
 // For local testing: Use your computer's IP address (not localhost)
 // To find your IP: Run 'ipconfig' on Windows or 'ifconfig' on Mac/Linux
-const NOTIFICATION_SERVER_URL = 'http://172.20.10.3:3001/api/notifications';
-
-// Production server (Render.com) - uncomment when deployed
-// const NOTIFICATION_SERVER_URL = 'https://krides.onrender.com/api/notifications';
+// const NOTIFICATION_SERVER_URL = 'http://172.20.10.3:3001/api/notifications';
 
 
 /**
@@ -84,9 +84,10 @@ function shouldRetryError(error) {
  * Send notification when a new ride is created
  * @param {string} rideId - Ride ID
  * @param {string} customerName - Customer name
- * @param {string} pickupLocation - Pickup location
+ * @param {string} pickupLocation - Pickup location address
+ * @param {string} destination - Destination address
  */
-export async function notifyDriversAboutNewRide(rideId, customerName, pickupLocation) {
+export async function notifyDriversAboutNewRide(rideId, customerName, pickupLocation, destination) {
     try {
         return await retryWithBackoff(
             async () => {
@@ -94,6 +95,7 @@ export async function notifyDriversAboutNewRide(rideId, customerName, pickupLoca
                     rideId,
                     customerName,
                     pickupLocation,
+                    destination,
                 });
                 console.log('✅ Drivers notified about new ride:', response.data);
                 return response.data;

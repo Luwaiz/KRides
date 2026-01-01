@@ -32,8 +32,10 @@ const DriverLogin = ({ navigation }) => {
 
 		setLoading(true);
 		try {
-			// Construct email from phone number
-			const email = `${phone}@rideapp.com`;
+			// Look up the driver's real email from Firestore using phone number
+			const email = await Firebase.getDriverEmailByPhone(phone);
+
+			// Sign in with the real email
 			await Firebase.signInWithEmail(email, password);
 
 			// Navigation.js will automatically handle routing based on Firebase Auth
@@ -52,6 +54,8 @@ const DriverLogin = ({ navigation }) => {
 				errorMessage = "Invalid phone number or password";
 			} else if (error.code === "auth/too-many-requests") {
 				errorMessage = "Too many failed attempts. Please try again later.";
+			} else if (error.message === "No driver found with this phone number") {
+				errorMessage = "Invalid phone number or password";
 			}
 
 			alert(errorMessage);

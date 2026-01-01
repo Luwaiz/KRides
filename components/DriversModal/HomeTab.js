@@ -238,13 +238,10 @@ const HomeTab = () => {
 				fullName || "Driver"
 			);
 
-			// Add a small delay to ensure smooth transition and prevent flashing of the previous screen
-			setTimeout(() => {
-				// Switch to AcceptTab to show the "Complete Ride" button
-				setAcceptRidePage();
-				console.log("🔄 Switched to AcceptTab");
-				setAccepting(null);
-			}, 500);
+			// Switch to AcceptTab immediately to show the "Complete Ride" button
+			setAcceptRidePage();
+			console.log("🔄 Switched to AcceptTab");
+			setAccepting(null);
 
 			// Remove from pending list (will be handled by listener automatically)
 		} catch (error) {
