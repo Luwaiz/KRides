@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
 import { FIREBASE_AUTH } from '../firebaseConfig';
@@ -10,6 +10,15 @@ import { FIREBASE_AUTH } from '../firebaseConfig';
 export function useGoogleAuth() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+
+    // Configure Google Sign-In on mount
+    useEffect(() => {
+        GoogleSignin.configure({
+            webClientId: '1054058095059-6j788gaiqicduqgt1jo322hsvb7ums7b.apps.googleusercontent.com',
+            offlineAccess: true,
+        });
+        console.log('✅ Google Sign-In configured');
+    }, []);
 
     /**
      * Sign in with Google

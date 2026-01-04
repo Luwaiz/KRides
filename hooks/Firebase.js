@@ -261,6 +261,64 @@ export async function getUserDoc(uid) {
 	}
 }
 
+/** ---------- GOOGLE SIGN-IN ---------- **/
+
+/**
+ * Handle Google Sign-In user creation/update
+ * Creates or updates user document in Firestore after successful Google Sign-In
+ * @param {object} firebaseUser - Firebase user object from signInWithCredential
+ * @param {object} googleUser - Google user data from GoogleSignin
+ * @param {string} role - User role ('customer' or 'driver')
+ * @returns {Promise<{data: object}>} User profile data
+ */
+export async function handleGoogleSignIn(firebaseUser, googleUser, role = 'customer') {
+	if (!firebaseUser || !firebaseUser.uid) {
+		throw new Error("Firebase user is required");
+	}
+
+	const uid = firebaseUser.uid;
+	const collectionName = role === "driver" ? "drivers" : "users";
+	const userRef = doc(FIREBASE_DB, collectionName, uid);
+
+	// Extract user data from Google profile
+	const userData = {
+		uid,
+		email: firebaseUser.email || googleUser?.email || null,
+		name: firebaseUser.displayName || googleUser?.name || null,
+		phone: firebaseUser.phoneNumber || googleUser?.phoneNumber || null,
+		photoURL: firebaseUser.photoURL || googleUser?.photo || null,
+		role,
+		fcmTokens: {},
+		updatedAt: serverTimestamp(),
+	};
+
+	try {
+		// Check if user document exists
+		const userSnap = await getDoc(userRef);
+
+		if (userSnap.exists()) {
+			// Update existing user
+			await updateDoc(userRef, {
+				...userData,
+				updatedAt: serverTimestamp(),
+			});
+			console.log(`✅ Updated existing ${role} profile for ${uid}`);
+			return { data: { ...userSnap.data(), ...userData } };
+		} else {
+			// Create new user document
+			await setDoc(userRef, {
+				...userData,
+				createdAt: serverTimestamp(),
+			});
+			console.log(`✅ Created new ${role} profile for ${uid}`);
+			return { data: userData };
+		}
+	} catch (error) {
+		console.error(`❌ Error handling Google Sign-In for ${uid}:`, error);
+		throw error;
+	}
+}
+
 export default {
 	signInWithEmail,
 	signUpWithEmail,
@@ -274,4 +332,5 @@ export default {
 	resetPassword,
 	getDriverEmailByPhone,
 	getUserDoc,
+	handleGoogleSignIn,
 };
