@@ -180,19 +180,15 @@ const BankAccountDetails = ({ navigation, route }) => {
                             const driverId = uid || FIREBASE_AUTH.currentUser?.uid;
                             if (!driverId) return;
 
-                            // Update Firestore
                             const driverRef = doc(FIREBASE_DB, "drivers", driverId);
-                            await updateDoc(driverRef, {
-                                bankDetailsVerified: true, // Mark as "handled" so they can enter the app
-                            });
+                            await updateDoc(driverRef, { bankDetailsVerified: true });
 
-                            // Update local store to trigger navigation switch
                             useDriverDetails.getState().setDriverProfile({
                                 ...useDriverDetails.getState(),
                                 bankDetailsVerified: true,
                             });
 
-                            // Navigation will be handled by Navigation.js switching stacks
+                            navigation.navigate("DriverHome");
                         } catch (error) {
                             console.error("Error skipping:", error);
                             Alert.alert("Error", "Could not skip. Please try again.");

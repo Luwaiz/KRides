@@ -27,6 +27,18 @@ const Signup = ({ navigation }) => {
 		return password === confirmPassword;
 	};
 
+	const isPhoneValid = (phone) => {
+		// Check if phone is exactly 11 digits
+		const phoneRegex = /^\d{11}$/;
+		return phoneRegex.test(phone);
+	};
+
+	const isEmailValid = (email) => {
+		// Basic email validation
+		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+		return emailRegex.test(email);
+	};
+
 	const handleSignUp = async () => {
 		if (
 			!firstName ||
@@ -50,10 +62,26 @@ const Signup = ({ navigation }) => {
 			return;
 		}
 
+		if (!isPhoneValid(phone)) {
+			Alert.alert(
+				"Invalid Phone Number",
+				"Phone number must be exactly 11 digits (e.g., 08123456789)"
+			);
+			return;
+		}
+
+		if (!isEmailValid(email)) {
+			Alert.alert(
+				"Invalid Email",
+				"Please enter a valid email address (e.g., johndoe@gmail.com)"
+			);
+			return;
+		}
+
 		setLoading(true);
 		try {
 			console.log("🚀 Starting customer signup process...");
-			
+
 			// Use Firebase Auth to create user and Firestore user doc
 			const user = await Firebase.signUpWithEmail({
 				email,
@@ -81,7 +109,7 @@ const Signup = ({ navigation }) => {
 				position: "top",
 				visibilityTime: 2000,
 			});
-			
+
 			// Don't setLoading(false) here - let Navigation handle the transition
 			// Navigation.js will automatically route to customer home
 			// No need to manually navigate

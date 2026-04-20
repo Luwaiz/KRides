@@ -5,6 +5,7 @@ import { ActivityIndicator, View, Alert } from "react-native";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { FIREBASE_AUTH, FIREBASE_DB } from "../firebaseConfig";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import useAuthStore, {
 	useUserDetails,
 	useDriverDetails,
@@ -22,6 +23,13 @@ const Navigation = () => {
 	const [initializing, setInitializing] = useState(true);
 	const [user, setUser] = useState(null);
 	const [roleLoading, setRoleLoading] = useState(false);
+	const [hasSeenOnboarding, setHasSeenOnboarding] = useState(null);
+
+	useEffect(() => {
+		AsyncStorage.getItem('has_seen_onboarding').then(value => {
+			setHasSeenOnboarding(value === 'true');
+		});
+	}, []);
 
 	// Get role from Zustand store instead of local state
 	const storeRole = useAuthStore((state) => state.role);
@@ -44,19 +52,19 @@ const Navigation = () => {
 
 	useEffect(() => {
 		let mounted = true;
-		
+
 		const unsubscribe = onAuthStateChanged(
 			FIREBASE_AUTH,
 			async (currentUser) => {
 				if (!mounted) return;
-				
+
 				setUser(currentUser);
 
 				if (currentUser && !storeRole) {
 					setRoleLoading(true);
 					try {
 						console.log("🔍 Fetching user profile for:", currentUser.uid);
-						
+
 						// First check if user exists in "users" collection
 						const userRef = doc(FIREBASE_DB, "users", currentUser.uid);
 						const userSnap = await getDoc(userRef);
@@ -66,19 +74,13 @@ const Navigation = () => {
 						if (userSnap.exists()) {
 							const profile = userSnap.data();
 							const role = profile.role || "customer";
-							console.log("✅ Found customer profile:", profile);
 							setAuthData(currentUser, profile, role);
+							await AsyncStorage.setItem(`role_${currentUser.uid}`, role);
 
-							// Populate useUserDetails store for customers
-							console.log(
-								"✅ Populating customer details in useUserDetails store:",
-								profile
-							);
 							setUserId(currentUser.uid);
 							setEmail(profile.email || currentUser.email || "");
 							setPhone(profile.phone || "");
 
-							// Handle name - could be 'name' or split into firstName/lastName
 							if (profile.name) {
 								const nameParts = profile.name.split(" ");
 								setFirstName(nameParts[0] || "");
@@ -88,89 +90,75 @@ const Navigation = () => {
 								setLastName(profile.lastName || "");
 							}
 						} else {
-							console.log("🔍 Not found in users, checking drivers...");
-							// Otherwise check in "drivers"
-							const driverRef = doc(FIREBASE_DB, "drivers", currentUser.uid);
-							const driverSnap = await getDoc(driverRef);
+							// Check pending_role set by Google sign-in before auth state fired
+							const pendingRole = await AsyncStorage.getItem('pending_role');
+							await AsyncStorage.removeItem('pending_role');
 
-							if (!mounted) return;
-
-							if (driverSnap.exists()) {
-								const profile = driverSnap.data();
-								const role = profile.role || "driver";
-								console.log("✅ Found driver profile:", profile);
-								setAuthData(currentUser, profile, role);
-
-								// Populate useDriverDetails store for drivers
-								console.log(
-									"✅ Populating driver details in useDriverDetails store:",
-									profile
-								);
-								setDriverProfile({
-									...profile,
-									uid: currentUser.uid,
-								});
-							} else {
-								console.log("⚠️ User not found in any collection, using defaults");
-								setAuthData(currentUser, { 
+							if (pendingRole === 'customer') {
+								// Google sign-in explicitly requested customer — honour it
+								// even if a driver profile exists for this UID
+								setAuthData(currentUser, {
 									email: currentUser.email,
-									name: currentUser.displayName || "User"
-								}, "customer"); // fallback
+									name: currentUser.displayName || "User",
+								}, "customer");
+								setUserId(currentUser.uid);
+								setEmail(currentUser.email || "");
+								const nameParts = (currentUser.displayName || "User").split(" ");
+								setFirstName(nameParts[0] || "");
+								setLastName(nameParts.slice(1).join(" ") || "");
+							} else {
+								// Check in "drivers"
+								const driverRef = doc(FIREBASE_DB, "drivers", currentUser.uid);
+								const driverSnap = await getDoc(driverRef);
+
+								if (!mounted) return;
+
+								if (driverSnap.exists()) {
+									const profile = driverSnap.data();
+									const role = profile.role || "driver";
+									setAuthData(currentUser, profile, role);
+									await AsyncStorage.setItem(`role_${currentUser.uid}`, role);
+									setDriverProfile({ ...profile, uid: currentUser.uid });
+								} else {
+									setAuthData(currentUser, {
+										email: currentUser.email,
+										name: currentUser.displayName || "User"
+									}, "customer");
+								}
 							}
 						}
 					} catch (error) {
-						console.error("❌ Error fetching user role:", error);
-						console.error("Error code:", error.code);
-						console.error("Error message:", error.message);
-						
-						// Check if it's a Firestore permission error
+						console.error("❌ Error fetching user role:", error.message);
+
 						if (error.code === "permission-denied") {
-							console.error("🚨 CRITICAL: Firestore permission denied!");
-							console.error("This means Firestore security rules are blocking user profile access.");
-							console.error("Please update Firestore rules in Firebase Console.");
-							
-							// Show detailed alert about Firestore rules
 							Alert.alert(
 								"Setup Required",
-								"Your account was created successfully, but the app cannot load your profile due to database security settings.\n\nThis is a one-time setup issue that needs to be fixed in Firebase Console.\n\nPlease contact support or check the documentation (FIRESTORE_RULES_FIX.md) for instructions.",
+								"Your account was created successfully, but the app cannot load your profile due to database security settings.\n\nPlease contact support.",
 								[{ text: "OK" }]
 							);
-						} else {
-							// Alert user for other errors
-							if (!__DEV__) {
-								Alert.alert(
-									"Connection Error",
-									"Unable to load user data. Please check your internet connection and try again.",
-									[{ text: "OK" }]
-								);
-							}
 						}
-						
-						// Set comprehensive fallback data to prevent crashes
+
 						if (!mounted) return;
-						
+
+						// Use cached role so drivers don't get misrouted on transient network errors
+						const cachedRole = await AsyncStorage.getItem(`role_${currentUser.uid}`);
+						const fallbackRole = cachedRole || "customer";
+
 						const fallbackProfile = {
 							email: currentUser.email || "",
 							name: currentUser.displayName || "User",
 							phone: currentUser.phoneNumber || "",
 							uid: currentUser.uid,
 						};
-						
-						console.log("⚠️ Using fallback profile data:", fallbackProfile);
-						
-						// Set auth data
-						setAuthData(currentUser, fallbackProfile, "customer");
-						
-						// Populate user details store with fallback data
+
+						setAuthData(currentUser, fallbackProfile, fallbackRole);
 						setUserId(currentUser.uid);
 						setEmail(currentUser.email || "");
 						setPhone(currentUser.phoneNumber || "");
-						
+
 						const nameParts = (currentUser.displayName || "User").split(" ");
 						setFirstName(nameParts[0] || "User");
 						setLastName(nameParts.slice(1).join(" ") || "");
-						
-						console.log("✅ Fallback profile data populated in stores");
 					} finally {
 						setRoleLoading(false);
 					}
@@ -178,6 +166,7 @@ const Navigation = () => {
 					if (mounted) {
 						setAuthData(null, null, null);
 					}
+					// No need to clear cached role — it remains valid for next login
 				}
 
 				if (mounted) {
@@ -192,7 +181,7 @@ const Navigation = () => {
 		};
 	}, [storeRole]);
 
-	if (initializing || (user && !storeRole && roleLoading)) {
+	if (initializing || (user && !storeRole && roleLoading) || hasSeenOnboarding === null) {
 		return (
 			<View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
 				<ActivityIndicator size="large" color="#007bff" />
@@ -206,7 +195,7 @@ const Navigation = () => {
 				{/* If user not logged in */}
 				{!user ? (
 					<>
-						<Stack.Screen name="OnBoarding" component={OnBoarding} />
+						{!hasSeenOnboarding && <Stack.Screen name="OnBoarding" component={OnBoarding} />}
 						<Stack.Screen name="AuthStack" component={AuthStack} />
 					</>
 				) : storeRole === "driver" ? (

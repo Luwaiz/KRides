@@ -1,6 +1,6 @@
-import { StyleSheet, Text, TouchableOpacity, View, Alert } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View, Alert, Linking } from "react-native";
 import BottomSheet from "@gorhom/bottom-sheet";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import ActiveButton from "./buttons/ActiveButton";
 import { colors } from "../constants/styling";
 import { useNavigation } from "@react-navigation/native";
@@ -36,12 +36,11 @@ const ConfirmRide = () => {
 	const [selectRider, setSelectRider] = useState(false);
 	const [loading, setLoading] = useState(false);
 	const [cancelling, setCancelling] = useState(false);
-	const [pending, setPending] = useState(false);
 	const [rideId, setRideId] = useState(null);
-	const [rideStatus, setRideStatus] = useState("pending");
 	const [acceptedDriverName, setAcceptedDriverName] = useState("");
-	const [acceptedDriverId, setAcceptedDriverId] = useState("");
 	const [showRatingModal, setShowRatingModal] = useState(false);
+	const activeRide = useActiveRideStore((state) => state.activeRide);
+	const rideStatus = useActiveRideStore((state) => state.rideStatus);
 	const setHomePage = useBottomTabStore((state) => state.setHomePage);
 	const clearAuth = useAuthStore((state) => state.clearAuth);
 	const clearUser = useUserDetails((state) => state.clearUser);
@@ -77,45 +76,25 @@ const ConfirmRide = () => {
 		})
 	);
 
-	console.log("👤 Customer details from store:");
-	console.log("   - First Name:", firstName || "MISSING");
-	console.log("   - Last Name:", lastName || "MISSING");
-	console.log("   - Email:", email || "MISSING");
-	console.log("   - Phone:", phone || "MISSING");
-	console.log("   - User ID:", UserId || "MISSING");
-
-	// Calculate distance and price using the same logic as Passenger.js
-	const distance = pickupLocation && destinationCoords
-		? calculateDistance(
+	const Price = useMemo(() => {
+		if (!pickupLocation || !destinationCoords) return 0;
+		const dist = calculateDistance(
 			{ latitude: pickupLocation.latitude, longitude: pickupLocation.longitude },
 			{ latitude: destinationCoords.latitude, longitude: destinationCoords.longitude }
-		)
-		: 0;
-	const Price = calculateFare(distance, parseInt(numberOfPassenger));
+		);
+		return calculateFare(dist, parseInt(numberOfPassenger));
+	}, [pickupLocation, destinationCoords, numberOfPassenger]);
 
 	const ToPromo = () => {
 		navigation.navigate("Promo");
 	};
 
 	// ✅ Create a new ride using Firebase helper
-	const BookRide = async () => {
-		console.log("🚀 BookRide function called!");
-		console.log("📍 Pickup:", location, pickupLocation);
-		console.log("📍 Destination:", destination, destinationCoords);
-		console.log("👥 Passengers:", numberOfPassenger);
-		console.log("💰 Price:", Price);
-
-		// Check Firebase Auth state
+	const BookRide = async (transactionId = null) => {
 		const currentUser = FIREBASE_AUTH.currentUser;
-		console.log("🔐 Firebase Auth State:");
-		console.log("   - User exists:", !!currentUser);
-		console.log("   - User UID:", currentUser?.uid);
-		console.log("   - Store UserId:", UserId);
-		console.log("   - Match:", currentUser?.uid === UserId);
 
 		// Validation: Check if user is logged in
 		if (!UserId) {
-			console.log("❌ Validation failed: User not logged in");
 			Alert.alert(
 				"Session Expired",
 				"Please log in to book a ride.",
@@ -216,17 +195,17 @@ const ConfirmRide = () => {
 					},
 					{
 						text: "Continue",
-						onPress: () => continueBooking(),
+						onPress: () => continueBooking(transactionId),
 					},
 				]
 			);
 			return;
 		}
 
-		await continueBooking();
+		await continueBooking(transactionId);
 	};
 
-	const continueBooking = async () => {
+	const continueBooking = async (transactionId = null) => {
 		setLoading(true);
 		try {
 			const rideData = {
@@ -241,12 +220,8 @@ const ConfirmRide = () => {
 				numberOfPassengers: numberOfPassenger,
 				amount: Price,
 				paymentMethod: "flutterwave",
+				transactionId: transactionId,
 			};
-
-			console.log(
-				"📦 Creating ride in Firestore with data:",
-				JSON.stringify(rideData, null, 2)
-			);
 			const newRideId = await createRide(rideData);
 			console.log("✅ Ride created successfully! Ride ID:", newRideId);
 
@@ -270,114 +245,25 @@ const ConfirmRide = () => {
 			setHomePage();
 		} catch (error) {
 			console.error("❌ Error creating ride:", error);
-			let errorMessage = "Failed to create ride. Please try again.";
-
 			if (error.code === "permission-denied") {
-				errorMessage =
-					"Permission denied. This is a Firebase security rule issue. Please check FIRESTORE_RULES_FIX.md for instructions.";
 				Alert.alert(
 					"Firebase Permission Error",
-					"The Firestore security rules are blocking ride creation. This is a Firebase Console configuration issue, not an app issue.\n\nPlease:\n1. Open Firebase Console\n2. Go to Firestore → Rules\n3. Update and publish the security rules\n\nSee FIRESTORE_RULES_FIX.md for detailed instructions.",
+					"The Firestore security rules are blocking ride creation. This is a Firebase Console configuration issue, not an app issue.\n\nPlease:\n1. Open Firebase Console\n2. Go to Firestore → Rules\n3. Update and publish the security rules.",
 					[{ text: "OK" }]
 				);
 			} else {
-				alert(errorMessage);
+				alert("Failed to create ride. Please try again.");
 			}
-
-
-			// Set active ride in store so status bar appears
-			console.log(" Setting active ride in store...")
-useActiveRideStore.getState().setActiveRide({
-				rideId: newRideId,
-				status: 'pending',
-				driverName: null,
-				driverId: null,
-				driverPhone: null,
-				vehicleId: null,
-				hasArrived: false,
-			});
+		} finally {
+			setLoading(false);
 		}
 	};
 
-	// 👂 Listen for changes on the ride document (real-time updates)
-	useEffect(() => {
-		if (!rideId) return;
-		console.log("📡 Listening for ride updates for ID:", rideId);
-
-		const unsubscribe = listenToRide(rideId, (rideData) => {
-			if (rideData) {
-				console.log("🔥 Ride update received:");
-				console.log("   - Status:", rideData.status);
-				console.log("   - Driver:", rideData.driverName);
-				setRideStatus(rideData.status);
-
-				// If driver accepts ride
-				if (rideData.status === "accepted") {
-					console.log("✅ Driver accepted the ride!");
-					console.log("   - Updating driver name to:", rideData.driverName);
-					console.log("   - Driver ID:", rideData.driverId);
-
-					// Update rider name and ID in local state
-					if (rideData.driverName) {
-						setAcceptedDriverName(rideData.driverName);
-						setRider(rideData.driverName);
-						console.log("   - Driver name saved:", rideData.driverName);
-
-						// Show toast notification
-						Toast.show({
-							type: "tomatoToast",
-							text1: "Driver Accepted!",
-							text2: `${rideData.driverName} is on the way`,
-							position: "top",
-							visibilityTime: 4000,
-						});
-					} else {
-						console.log("   ⚠️ Warning: driverName is empty!");
-					}
-
-					if (rideData.driverId) {
-						setAcceptedDriverId(rideData.driverId);
-					}
-
-					// Navigate to home page to show RideStatusBar instead of modal
-					console.log("🏠 Navigating to home to show status bar...");
-					setHomePage();
-				} // If ride is completed - show rating modal
-				if (rideData.status === "completed" && !rideData.customerRating) {
-					console.log("✅ Ride completed - showing rating modal");
-					setPending(false);
-					setSelectRider(false);
-					setShowRatingModal(true);
-				}
-
-				// If ride is cancelled
-				if (rideData.status === "cancelled") {
-					console.log("❌ Ride was cancelled");
-					setPending(false);
-					setSelectRider(false);
-
-					Toast.show({
-						type: "tomatoToast",
-						text1: "Ride Cancelled",
-						text2: "Your ride has been cancelled",
-						position: "top",
-						visibilityTime: 3000,
-					});
-				}
-			} else {
-				console.log("⚠️ Ride data is null");
-			}
-		});
-
-		return () => {
-			console.log("🔌 Unsubscribing from ride updates");
-			unsubscribe();
-		};
-	}, [rideId]);
 
 	// ❌ Cancel ride with confirmation dialog
 	const handleCancelRide = () => {
-		if (!rideId) {
+		const cancelRideId = activeRide?.rideId || rideId;
+		if (!cancelRideId) {
 			alert("No active ride to cancel");
 			return;
 		}
@@ -399,14 +285,12 @@ useActiveRideStore.getState().setActiveRide({
 					onPress: async () => {
 						setCancelling(true);
 						try {
-							await cancelRide(rideId);
+							await cancelRide(cancelRideId);
 							console.log("✅ Ride cancelled successfully");
 
-							// Reset all states
-							setPending(false);
+							// Reset local states
 							setSelectRider(false);
 							setRideId(null);
-							setRideStatus("pending");
 							setAcceptedDriverName("");
 
 							// Navigate back to home
@@ -453,9 +337,16 @@ useActiveRideStore.getState().setActiveRide({
 								{rider ? rider : "No driver assigned yet"}
 							</Text>
 						</View>
-						<View style={styles.phoneCont}>
+						<TouchableOpacity
+							style={styles.phoneCont}
+							onPress={() => {
+								const phone = activeRide?.driverPhone;
+								if (phone) Linking.openURL(`tel:${phone}`);
+							}}
+							disabled={!activeRide?.driverPhone}
+						>
 							<Phone width={25} height={25} />
-						</View>
+						</TouchableOpacity>
 					</View>
 
 					{/* Pickup/Destination */}
@@ -498,7 +389,7 @@ useActiveRideStore.getState().setActiveRide({
 
 					{/* Buttons */}
 					<View style={styles.button}>
-						{pending ? (
+						{activeRide ? (
 							<View
 								style={{
 									alignItems: "center",
@@ -537,7 +428,7 @@ useActiveRideStore.getState().setActiveRide({
 						setHomePage(); // Navigate back to home after rating
 					}}
 					rideId={rideId}
-					driverId={acceptedDriverId}
+					driverId={activeRide?.driverId || null}
 					driverName={acceptedDriverName || rider || "Driver"}
 				/>
 			)}

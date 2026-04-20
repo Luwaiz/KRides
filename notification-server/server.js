@@ -36,9 +36,9 @@ app.post('/api/notifications/notify-driver-arrived', async (req, res) => {
         if (!customerDoc.exists) {
             return res.status(404).json({ error: 'Customer not found' });
         }
-        const pushToken = customerDoc.data()?.pushToken;
+        const pushToken = customerDoc.data()?.fcmToken || customerDoc.data()?.pushToken;
         if (!pushToken) {
-            return res.status(400).json({ error: 'Customer has no push token' });
+            return res.json({ success: false, skipped: true, reason: 'no_push_token' });
         }
         await sendFCMNotification(
             pushToken,
@@ -207,13 +207,10 @@ app.post('/api/notifications/send', async (req, res) => {
         }
 
         const userData = userDoc.data();
-        const pushToken = userData.pushToken;
+        const pushToken = userData.fcmToken || userData.pushToken;
 
         if (!pushToken) {
-            return res.status(400).json({
-                success: false,
-                error: 'User has no push token'
-            });
+            return res.json({ success: false, skipped: true, reason: 'no_push_token' });
         }
 
         // Send notification
@@ -261,7 +258,7 @@ app.post('/api/notifications/send-bulk', async (req, res) => {
 
             if (userDoc.exists) {
                 const userData = userDoc.data();
-                const pushToken = userData.pushToken;
+                const pushToken = userData.fcmToken || userData.pushToken;
 
                 if (pushToken) {
                     const result = await sendFCMNotification(pushToken, title, body, data || {});
@@ -385,13 +382,10 @@ app.post('/api/notifications/ride-accepted', async (req, res) => {
         }
 
         const customer = customerDoc.data();
-        const pushToken = customer.pushToken;
+        const pushToken = customer.fcmToken || customer.pushToken;
 
         if (!pushToken) {
-            return res.status(400).json({
-                success: false,
-                error: 'Customer has no push token'
-            });
+            return res.json({ success: false, skipped: true, reason: 'no_push_token' });
         }
 
         const result = await sendFCMNotification(
@@ -444,13 +438,10 @@ app.post('/api/notifications/ride-completed', async (req, res) => {
         }
 
         const customer = customerDoc.data();
-        const pushToken = customer.pushToken;
+        const pushToken = customer.fcmToken || customer.pushToken;
 
         if (!pushToken) {
-            return res.status(400).json({
-                success: false,
-                error: 'Customer has no push token'
-            });
+            return res.json({ success: false, skipped: true, reason: 'no_push_token' });
         }
 
         const result = await sendFCMNotification(
@@ -504,13 +495,10 @@ app.post('/api/notifications/notify-driver-arrived', async (req, res) => {
         }
 
         const customer = customerDoc.data();
-        const pushToken = customer.pushToken;
+        const pushToken = customer.fcmToken || customer.pushToken;
 
         if (!pushToken) {
-            return res.status(400).json({
-                success: false,
-                error: 'Customer has no push token'
-            });
+            return res.json({ success: false, skipped: true, reason: 'no_push_token' });
         }
 
         const result = await sendFCMNotification(

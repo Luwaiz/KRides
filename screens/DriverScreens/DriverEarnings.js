@@ -9,12 +9,14 @@ import {
     StatusBar,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { MaterialIcons, FontAwesome5 } from "@expo/vector-icons";
+import { MaterialIcons, FontAwesome5, Ionicons } from "@expo/vector-icons";
 import BackButton from "../../components/buttons/BackButton";
 import { colors } from "../../constants/styling";
 import { sp, fs, br, ms } from "../../constants/responsive";
 import { getDriverEarnings, formatCurrency } from "../../helpers/driverEarnings";
 import { useDriverDetails } from "../../constants/Store";
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 const DriverEarnings = () => {
     const { uid } = useDriverDetails((state) => ({
@@ -22,7 +24,8 @@ const DriverEarnings = () => {
     }));
 
     const [loading, setLoading] = useState(true);
-    const [selectedPeriod, setSelectedPeriod] = useState("month");
+    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+    const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
     const [earningsData, setEarningsData] = useState({
         rides: [],
         totalRides: 0,
@@ -34,13 +37,13 @@ const DriverEarnings = () => {
 
     useEffect(() => {
         fetchEarnings();
-    }, [uid, selectedPeriod]);
+    }, [uid, selectedYear, selectedMonth]);
 
     const fetchEarnings = async () => {
         if (!uid) return;
         setLoading(true);
         try {
-            const data = await getDriverEarnings(uid, selectedPeriod);
+            const data = await getDriverEarnings(uid, "month", selectedYear, selectedMonth);
             setEarningsData(data);
         } catch (error) {
             console.error("Error fetching earnings:", error);
@@ -60,27 +63,7 @@ const DriverEarnings = () => {
         });
     };
 
-    const getPeriodLabel = () => {
-        switch (selectedPeriod) {
-            case "today":
-                return "Today";
-            case "week":
-                return "This Week";
-            case "month":
-                return "This Month";
-            case "year":
-                return "This Year";
-            default:
-                return "This Month";
-        }
-    };
-
-    const periods = [
-        { key: "today", label: "Today" },
-        { key: "week", label: "Week" },
-        { key: "month", label: "Month" },
-        { key: "year", label: "Year" },
-    ];
+    const getPeriodLabel = () => `${MONTHS[selectedMonth]} ${selectedYear}`;
 
     if (loading) {
         return (
@@ -101,35 +84,49 @@ const DriverEarnings = () => {
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}
             >
-                {/* Period Filter Tabs */}
-                <View style={styles.filterSection}>
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.filterTabs}
+                {/* Year selector */}
+                <View style={styles.yearRow}>
+                    <TouchableOpacity onPress={() => setSelectedYear((y) => y - 1)} style={styles.arrowBtn}>
+                        <Ionicons name="chevron-back" size={22} color={colors.primaryBlue} />
+                    </TouchableOpacity>
+                    <Text style={styles.yearText}>{selectedYear}</Text>
+                    <TouchableOpacity
+                        onPress={() => setSelectedYear((y) => y + 1)}
+                        disabled={selectedYear >= new Date().getFullYear()}
+                        style={styles.arrowBtn}
                     >
-                        {periods.map((period) => (
+                        <Ionicons
+                            name="chevron-forward"
+                            size={22}
+                            color={selectedYear >= new Date().getFullYear() ? colors.lightGrey3 : colors.primaryBlue}
+                        />
+                    </TouchableOpacity>
+                </View>
+
+                {/* Month pills */}
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.filterTabs}
+                    style={styles.monthScroll}
+                >
+                    {MONTHS.map((m, i) => {
+                        const isActive = i === selectedMonth;
+                        const isFuture = selectedYear === new Date().getFullYear() && i > new Date().getMonth();
+                        return (
                             <TouchableOpacity
-                                key={period.key}
-                                style={[
-                                    styles.filterTab,
-                                    selectedPeriod === period.key && styles.filterTabActive,
-                                ]}
-                                onPress={() => setSelectedPeriod(period.key)}
+                                key={m}
+                                disabled={isFuture}
+                                onPress={() => setSelectedMonth(i)}
+                                style={[styles.filterTab, isActive && styles.filterTabActive, isFuture && { opacity: 0.35 }]}
                             >
-                                <Text
-                                    style={[
-                                        styles.filterTabText,
-                                        selectedPeriod === period.key &&
-                                        styles.filterTabTextActive,
-                                    ]}
-                                >
-                                    {period.label}
+                                <Text style={[styles.filterTabText, isActive && styles.filterTabTextActive]}>
+                                    {m}
                                 </Text>
                             </TouchableOpacity>
-                        ))}
-                    </ScrollView>
-                </View>
+                        );
+                    })}
+                </ScrollView>
 
                 {/* Earnings Summary Card */}
                 <View style={styles.summaryCard}>
@@ -262,17 +259,36 @@ const styles = StyleSheet.create({
     scrollContent: {
         paddingBottom: sp(24),
     },
-    filterSection: {
+    yearRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
         marginTop: sp(16),
-        marginBottom: sp(8),
+        gap: sp(16),
+    },
+    arrowBtn: {
+        padding: sp(6),
+    },
+    yearText: {
+        fontSize: fs(20),
+        fontFamily: "Albert-SemiBold",
+        color: "black",
+        minWidth: 60,
+        textAlign: "center",
+    },
+    monthScroll: {
+        height: sp(44),
+        flexGrow: 0,
+        flexShrink: 0,
     },
     filterTabs: {
         paddingHorizontal: sp(16),
+        alignItems: 'center',
         gap: sp(8),
     },
     filterTab: {
-        paddingHorizontal: sp(20),
-        paddingVertical: sp(10),
+        paddingHorizontal: sp(14),
+        paddingVertical: sp(7),
         borderRadius: br(20),
         backgroundColor: colors.lightGrey2,
         marginRight: sp(8),
@@ -281,9 +297,9 @@ const styles = StyleSheet.create({
         backgroundColor: colors.primaryBlue,
     },
     filterTabText: {
-        fontSize: fs(14),
-        fontFamily: "Albert-Medium",
-        color: colors.textGrey,
+        fontSize: fs(13),
+        fontFamily: "Albert-Regular",
+        color: colors.lightGrey4,
     },
     filterTabTextActive: {
         color: "white",

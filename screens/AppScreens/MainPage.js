@@ -1,4 +1,4 @@
-import { Button, PermissionsAndroid, StyleSheet, View, Text, Alert } from "react-native";
+import { PermissionsAndroid, StyleSheet, View, Alert } from "react-native";
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import HomeTab from "../../components/HomeTab";
 import Passenger from "../../components/Passenger";
@@ -8,12 +8,12 @@ import RatingModal from "../../components/modals/RatingModal";
 import HomeHeader from "../../components/homeHeader/HomeHeader";
 import PassengerHeader from "../../components/homeHeader/PassengerHeader";
 import ConfirmHeader from "../../components/homeHeader/ConfirmHeader";
-import { useBottomTabStore, useActiveRideStore, useUserDetails, useRideStore } from "../../constants/Store";
+import { useBottomTabStore, useActiveRideStore, useUserDetails, useRideStore, useRideDetailsStore } from "../../constants/Store";
 import { GOOGLE_MAPS_API_KEY } from "@env";
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
+import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import MapViewDirections from "react-native-maps-directions";
 import Geolocation from "@react-native-community/geolocation";
-import { useRideDetailsStore } from "../../constants/Store";
+import { useShallow } from "zustand/react/shallow";
 import { cancelRideWithRefund, listenToRide } from "../../helpers/firebaseRides";
 import { notifyDriverRideCancelled } from "../../helpers/notificationHelpers";
 import Toast from "react-native-toast-message";
@@ -23,27 +23,58 @@ import { FIREBASE_DB } from "../../firebaseConfig";
 
 const MainPage = () => {
 	const [location, setLocation] = useState(false);
+	const [mapReady, setMapReady] = useState(false);
 	const [cancelling, setCancelling] = useState(false);
 	const [showRatingModal, setShowRatingModal] = useState(false);
 	const [completedRideData, setCompletedRideData] = useState(null);
-	const pickup = useRideDetailsStore((s) => s.pickupLocation);
-	const destination = useRideDetailsStore((s) => s.destination);
 	const mapRef = useRef(null);
 
-	const isPassengers = useBottomTabStore((state) => state.passengerPage);
-	const confirm = useBottomTabStore((state) => state.confirmPage);
-	const setConfirmPage = useBottomTabStore((state) => state.setConfirmPage);
-	const setHomePage = useBottomTabStore((state) => state.setHomePage);
+	// Consolidated store subscriptions — one subscription per store
+	const { isPassengers, confirm, setConfirmPage, setHomePage } = useBottomTabStore(
+		useShallow((state) => ({
+			isPassengers: state.passengerPage,
+			confirm: state.confirmPage,
+			setConfirmPage: state.setConfirmPage,
+			setHomePage: state.setHomePage,
+		}))
+	);
 
-	// Active ride state
-	const activeRide = useActiveRideStore(state => state.activeRide);
-	const rideStatus = useActiveRideStore(state => state.rideStatus);
-	const clearActiveRide = useActiveRideStore(state => state.clearActiveRide);
-	const { firstName, lastName } = useUserDetails((state) => ({
-		firstName: state.firstName,
-		lastName: state.lastName,
-	}));
-	const UserId = useUserDetails((state) => state.UserId);
+	const { activeRide, rideStatus, clearActiveRide } = useActiveRideStore(
+		useShallow((state) => ({
+			activeRide: state.activeRide,
+			rideStatus: state.rideStatus,
+			clearActiveRide: state.clearActiveRide,
+		}))
+	);
+
+	const { firstName, lastName, UserId } = useUserDetails(
+		useShallow((state) => ({
+			firstName: state.firstName,
+			lastName: state.lastName,
+			UserId: state.UserId,
+		}))
+	);
+
+	const { pickup, destination } = useRideDetailsStore(
+		useShallow((state) => ({ pickup: state.pickupLocation, destination: state.destination }))
+	);
+
+	// Stable coordinate objects — prevent MapViewDirections from re-fetching on unrelated renders
+	const pickupCoords = useMemo(() => {
+		if (!pickup) return null;
+		const p = pickup.coord || pickup;
+		const lat = parseFloat(p.latitude);
+		const lng = parseFloat(p.longitude);
+		return isNaN(lat) || isNaN(lng) ? null : { latitude: lat, longitude: lng };
+	}, [pickup]);
+
+	const destCoords = useMemo(() => {
+		if (!destination) return null;
+		const d = destination.coord || destination;
+		const lat = parseFloat(d.latitude);
+		const lng = parseFloat(d.longitude);
+		return isNaN(lat) || isNaN(lng) ? null : { latitude: lat, longitude: lng };
+	}, [destination]);
 
 	const BABCOCK_COORDINATES = (location && location.coords)
 		? {
@@ -125,7 +156,7 @@ const MainPage = () => {
 					console.log("⚠️ Failed to get FCM token");
 				}
 			} catch (error) {
-				console.error("❌ Error setting up notifications:", error);
+				console.warn("⚠️ Error setting up notifications (non-critical):", error);
 			}
 		};
 
@@ -136,56 +167,29 @@ const MainPage = () => {
 	useEffect(() => {
 		if (!activeRide?.rideId) return;
 
-		console.log('📡 MainPage - Setting up ride listener for:', activeRide.rideId);
-
 		const unsubscribe = listenToRide(activeRide.rideId, (rideData) => {
 			if (rideData) {
-				console.log('🔥 MainPage - Ride update received:', {
-					status: rideData.status,
-					driverName: rideData.driverName,
-				});
-
 				// Update active ride store status
 				useActiveRideStore.getState().updateRideStatus(rideData.status);
 
 				// If driver accepts ride
 				if (rideData.status === "accepted" && rideData.driverName) {
-					console.log('✅ MainPage - Driver accepted, updating driver info');
-					console.log('   Driver data from Firestore:', {
-						driverName: rideData.driverName,
-						driverId: rideData.driverId,
-						driverPhone: rideData.driverPhone,
-						vehicleId: rideData.vehicleId
-					});
 					useActiveRideStore.getState().updateDriverInfo(
 						rideData.driverName,
 						rideData.driverId,
 						rideData.driverPhone,
 						rideData.vehicleId
 					);
-
-					// Log the updated state
-					const updatedRide = useActiveRideStore.getState().activeRide;
-					console.log('   Updated activeRide:', {
-						driverName: updatedRide?.driverName,
-						driverPhone: updatedRide?.driverPhone,
-						vehicleId: updatedRide?.vehicleId
-					});
 				}
 
 				// Check if driver has arrived
 				if (rideData.hasArrived !== undefined) {
-					console.log('🚗 MainPage - Driver arrival status:', rideData.hasArrived);
 					useActiveRideStore.getState().updateArrivalStatus(rideData.hasArrived);
 				}
 
 				// If ride is completed - show rating modal
 				if (rideData.status === "completed" && !rideData.customerRating) {
-					console.log('✅ MainPage - Ride completed, showing rating modal');
-
-					// Reset bottom tab navigation state FIRST
 					setHomePage();
-
 					setCompletedRideData({
 						rideId: activeRide.rideId,
 						driverId: rideData.driverId || activeRide.driverId,
@@ -193,107 +197,42 @@ const MainPage = () => {
 					});
 					setShowRatingModal(true);
 					clearActiveRide();
-
-					// Reset location selections for fresh start
 					useRideStore.getState().clearRide();
 					useRideDetailsStore.getState().resetRideDetails();
 				}
 
 				// If ride is cancelled
 				if (rideData.status === "cancelled") {
-					console.log('❌ MainPage - Ride cancelled, clearing active ride and resetting selections');
-
-					// Reset bottom tab navigation state
 					setHomePage();
-
 					clearActiveRide();
-
-					// Reset location selections for fresh start
 					useRideStore.getState().clearRide();
 					useRideDetailsStore.getState().resetRideDetails();
+					const cancelledByDriver = rideData.cancelledBy === 'driver';
+					Toast.show({
+						type: 'tomatoToast',
+						text1: 'Ride Cancelled',
+						text2: cancelledByDriver
+							? 'Your driver cancelled the ride. Please book a new one.'
+							: 'Your ride has been cancelled.',
+						position: 'top',
+						visibilityTime: 4000,
+					});
 				}
 			}
 		});
 
-		return () => {
-			console.log('🔌 MainPage - Unsubscribing from ride listener');
-			unsubscribe();
-		};
+		return () => unsubscribe();
 	}, [activeRide?.rideId]);
 
-	// Debug: Log active ride state changes
+	// Fit map once the map is ready and coordinates are available
 	useEffect(() => {
-		console.log('🏠 MainPage - Active Ride State:', {
-			hasActiveRide: !!activeRide,
-			rideId: activeRide?.rideId,
-			status: rideStatus,
-			driverName: activeRide?.driverName,
-		});
-	}, [activeRide, rideStatus]);
-
-	// Debug: Log pickup and destination from store
-	useEffect(() => {
-		console.log('🗺️ MainPage store values:', {
-			pickup: pickup,
-			destination: destination,
-			hasPickup: !!pickup,
-			hasDestination: !!destination
-		});
-	}, [pickup, destination]);
-
-	// Fit map to show route when pickup and destination are set
-	useEffect(() => {
-		if (pickup && destination && mapRef.current) {
-			try {
-				const pickupCoords = pickup.coord || pickup;
-				const destCoords = destination.coord || destination;
-
-				// Validate coordinates exist
-				if (!pickupCoords.latitude || !destCoords.latitude) {
-					console.error("❌ Missing coordinates:", { pickup: pickupCoords, destination: destCoords });
-					return;
-				}
-
-				// Parse and validate coordinates
-				const pickupLat = parseFloat(pickupCoords.latitude);
-				const pickupLng = parseFloat(pickupCoords.longitude);
-				const destLat = parseFloat(destCoords.latitude);
-				const destLng = parseFloat(destCoords.longitude);
-
-				// Check if coordinates are valid numbers
-				if (isNaN(pickupLat) || isNaN(pickupLng) || isNaN(destLat) || isNaN(destLng)) {
-					console.error("❌ Invalid coordinates:", {
-						pickup: pickupCoords,
-						destination: destCoords
-					});
-					return;
-				}
-
-				console.log("📍 Fitting map to coordinates:", {
-					pickup: { lat: pickupLat, lng: pickupLng },
-					destination: { lat: destLat, lng: destLng }
-				});
-
-				// Add a small delay to ensure map is fully rendered
-				setTimeout(() => {
-					if (mapRef.current) {
-						mapRef.current.fitToCoordinates(
-							[
-								{ latitude: pickupLat, longitude: pickupLng },
-								{ latitude: destLat, longitude: destLng }
-							],
-							{
-								edgePadding: { top: 50, right: 20, bottom: 50, left: 20 },
-								animated: true,
-							}
-						);
-					}
-				}, 500);
-			} catch (error) {
-				console.error("❌ Error fitting map to coordinates:", error);
-			}
+		if (mapReady && pickupCoords && destCoords && mapRef.current) {
+			mapRef.current.fitToCoordinates(
+				[pickupCoords, destCoords],
+				{ edgePadding: { top: 50, right: 20, bottom: 50, left: 20 }, animated: true }
+			);
 		}
-	}, [pickup, destination]);
+	}, [mapReady, pickupCoords, destCoords]);
 
 	// Handle cancel ride from status bar
 	const handleCancelRide = async () => {
@@ -348,12 +287,6 @@ const MainPage = () => {
 							}
 						} catch (error) {
 							console.error('Error cancelling ride:', error);
-							Toast.show({
-								type: 'error',
-								text1: 'Error',
-								text2: 'Unable to cancel ride',
-								position: 'top',
-							});
 						} finally {
 							setCancelling(false);
 						}
@@ -370,107 +303,63 @@ const MainPage = () => {
 
 	const HeaderComponents = useMemo(() => {
 		if (isPassengers) {
-			if (confirm) {
-				return <ConfirmHeader />;
-			} else {
-				return <PassengerHeader />;
-			}
-		} else {
-			return <HomeHeader />;
+			return confirm ? <ConfirmHeader /> : <PassengerHeader />;
 		}
+		return <HomeHeader />;
 	}, [isPassengers, confirm]);
 
 	const BottomSheetComponents = useMemo(() => {
 		if (isPassengers) {
-			if (confirm) {
-				return <ConfirmRide />;
-			} else {
-				return <Passenger />;
-			}
-		} else {
-			return <HomeTab />;
+			return confirm ? <ConfirmRide /> : <Passenger />;
 		}
+		return <HomeTab />;
 	}, [isPassengers, confirm]);
 
 	return (
 		<View style={styles.container}>
 			<View style={styles.head}>{HeaderComponents}</View>
-			{/* Map is always visible */}
-			{GOOGLE_MAPS_API_KEY || true ? (
-				<MapView
-					ref={mapRef}
-					provider={PROVIDER_GOOGLE}
-					style={styles.map}
-					initialRegion={BABCOCK_COORDINATES}
-					showsUserLocation={true}
-					showsMyLocationButton={true}
-					showsCompass={true}
-					loadingEnabled={true}
-				>
-					{/* Route line - only visible when ride is active */}
-					{pickup && destination && (() => {
-						const pickupCoords = pickup.coord || pickup;
-						const destCoords = destination.coord || destination;
 
-						return (
-							<MapViewDirections
-								origin={{
-									latitude: parseFloat(pickupCoords.latitude),
-									longitude: parseFloat(pickupCoords.longitude)
-								}}
-								destination={{
-									latitude: parseFloat(destCoords.latitude),
-									longitude: parseFloat(destCoords.longitude)
-								}}
-								apikey={GOOGLE_MAPS_API_KEY || "AIzaSyCPMwyZl3iso7lmMGhQt0QwGJXWdqxcqiw"}
-								strokeWidth={5}
-								strokeColor="#007AFF"
-								optimizeWaypoints={true}
-								onReady={(result) => {
-									console.log('✅ Route loaded successfully!');
-									console.log(`   Distance: ${result.distance} km`);
-									console.log(`   Duration: ${result.duration} min.`);
-								}}
-								onError={(errorMessage) => {
-									console.error('❌ MapViewDirections error:', errorMessage);
-								}}
-							/>
-						);
-					})()}
+			<MapView
+				ref={mapRef}
+				provider={PROVIDER_GOOGLE}
+				style={styles.map}
+				initialRegion={BABCOCK_COORDINATES}
+				showsUserLocation={true}
+				showsMyLocationButton={true}
+				showsCompass={true}
+				loadingEnabled={true}
+				onMapReady={() => setMapReady(true)}
+			>
+				{pickupCoords && destCoords && (
+					<MapViewDirections
+						origin={pickupCoords}
+						destination={destCoords}
+						apikey={GOOGLE_MAPS_API_KEY}
+						strokeWidth={5}
+						strokeColor="#007AFF"
+						optimizeWaypoints={true}
+						onError={() => {}}
+					/>
+				)}
 
-					{/* Pickup marker - only visible when ride is active */}
-					{pickup && (
-						<Marker
-							coordinate={{
-								latitude: parseFloat((pickup.coord || pickup).latitude),
-								longitude: parseFloat((pickup.coord || pickup).longitude)
-							}}
-							title="Pickup Location"
-							description={pickup.name || "Pickup"}
-							pinColor="#4caf50"
-						/>
-					)}
+				{pickupCoords && (
+					<Marker
+						coordinate={pickupCoords}
+						title="Pickup Location"
+						description={pickup.name || "Pickup"}
+						pinColor="#4caf50"
+					/>
+				)}
 
-					{/* Destination marker - only visible when ride is active */}
-					{destination && (
-						<Marker
-							coordinate={{
-								latitude: parseFloat((destination.coord || destination).latitude),
-								longitude: parseFloat((destination.coord || destination).longitude)
-							}}
-							title="Destination"
-							description={destination.name || "Destination"}
-							pinColor="#1976D2"
-						/>
-					)}
-				</MapView>
-			) : (
-				<View
-					style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
-				>
-					<Text>Map loading or configuration error...</Text>
-				</View>
-			)}
+				{destCoords && (
+					<Marker
+						coordinate={destCoords}
+						title="Destination"
+						description={destination.name || "Destination"}
+						pinColor="#1976D2"
+					/>
+				)}
+			</MapView>
 
 			{/* Ride Status Bar - shown when ride is active */}
 			{activeRide && (
@@ -479,7 +368,6 @@ const MainPage = () => {
 					driverName={activeRide.driverName}
 					driverPhone={activeRide.driverPhone}
 					vehicleId={activeRide.vehicleId}
-					hasArrived={activeRide.hasArrived}
 					onCancel={handleCancelRide}
 					onViewDetails={handleViewDetails}
 					cancelling={cancelling}
@@ -506,6 +394,7 @@ const MainPage = () => {
 		</View>
 	);
 };
+
 
 export default MainPage;
 

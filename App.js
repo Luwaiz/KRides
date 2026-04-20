@@ -26,19 +26,23 @@ if (!__DEV__) {
 		// Log to console
 		originalConsoleError(...args);
 
-		// Show user-friendly alert for critical errors
+		// Show user-friendly alert for critical errors only
 		const errorMessage = args.join(' ');
-		if (errorMessage.includes('Firebase') ||
-			errorMessage.includes('Network') ||
-			errorMessage.includes('FATAL')) {
+
+		// Only show alert for truly fatal crashes or errors we explicitly mark as FATAL
+		// Avoid showing for common background Firebase/Network warnings that are often non-fatal
+		if (errorMessage.includes('FATAL') &&
+			!errorMessage.includes('Firebase: Error (auth/user-not-found)') &&
+			!errorMessage.includes('Firestore: Error (permission-denied)')) {
 			Alert.alert(
-				'Error',
-				'An error occurred. Please try again or contact support.',
+				'System Error',
+				'A critical error occurred. Please restart the app or contact support.',
 				[{ text: 'OK' }]
 			);
 		}
 	};
 }
+
 
 // This is the default configuration
 configureReanimatedLogger({

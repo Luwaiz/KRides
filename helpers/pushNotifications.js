@@ -51,7 +51,7 @@ export async function registerForPushNotificationsAsync() {
             token = fcmTokenData.data;
             console.log('✅ FCM token obtained:', token.substring(0, 30) + '...');
         } catch (error) {
-            console.error('❌ Error getting FCM token:', error);
+            console.warn('⚠️ Error getting FCM token (non-critical):', error);
         }
     } else {
         console.log('⚠️ Must use physical device for push notifications');
@@ -97,7 +97,7 @@ export async function sendPushNotification(expoPushToken, title, body, data = {}
         console.log('✅ Notification sent:', result);
         return result;
     } catch (error) {
-        console.error('❌ Error sending notification:', error);
+        console.warn('⚠️ Error sending notification:', error);
         return null;
     }
 }
@@ -133,7 +133,7 @@ export async function sendBulkNotifications(tokens, title, body, data = {}) {
         console.log(`✅ Bulk notifications sent to ${tokens.length} recipients`);
         return result;
     } catch (error) {
-        console.error('❌ Error sending bulk notifications:', error);
+        console.warn('⚠️ Error sending bulk notifications:', error);
         return null;
     }
 }

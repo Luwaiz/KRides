@@ -17,9 +17,8 @@ const Name = ({ navigation }) => {
 		});
 	};
 
-	const { email, password, phone } = useUserDetails((state) => ({
+	const { email, phone } = useUserDetails((state) => ({
 		email: state.email,
-		password: state.password,
 		phone: state.phone,
 	}));
 	const ToUpload = () => {

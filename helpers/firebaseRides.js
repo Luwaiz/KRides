@@ -103,12 +103,12 @@ export const createRide = async (rideData) => {
 
 		await setDoc(rideDoc, ride);
 		console.log("✅ Ride created:", rideId);
-		await notifyDriversAboutNewRide(
+		notifyDriversAboutNewRide(
 			rideId,
 			rideData.customerName,
 			rideData.pickupLocation,
 			rideData.destination
-		);
+		).catch(err => console.warn("⚠️ Driver notification failed:", err.message));
 		return rideId;
 	} catch (error) {
 		console.error("❌ Error creating ride:", error);
