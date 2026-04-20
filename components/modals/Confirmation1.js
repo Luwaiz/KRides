@@ -1,36 +1,39 @@
 import {
-	Image,
 	Modal,
 	StyleSheet,
 	Text,
 	View,
 	Alert,
 	ActivityIndicator,
+	TextInput,
 } from "react-native";
 import React, { useState } from "react";
 import ActiveButton from "../buttons/ActiveButton";
-import { CommonActions, useNavigation } from "@react-navigation/native";
+import { useNavigation } from "@react-navigation/native";
 import LoginButton from "../buttons/LoginButton";
 import useAuthStore, {
 	useDriverDetails,
 	useUserDetails,
 } from "../../constants/Store";
-import axios from "axios";
-import API from "../../hooks/API";
 import { FIREBASE_AUTH, FIREBASE_DB } from "../../firebaseConfig";
-import { signOut, deleteUser as firebaseDeleteUser } from "firebase/auth";
+import {
+	signOut,
+	deleteUser as firebaseDeleteUser,
+	reauthenticateWithCredential,
+	GoogleAuthProvider,
+	EmailAuthProvider,
+} from "firebase/auth";
+import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import { doc, deleteDoc } from "firebase/firestore";
 import Toast from "react-native-toast-message";
 import { colors } from "../../constants/styling";
 
 const Confirmation1 = ({ modal, setModal, title }) => {
 	const navigation = useNavigation();
-	const { accessToken, email, setAccessToken } = useUserDetails((state) => ({
-		accessToken: state.accessToken,
-		email: state.email,
-		setAccessToken: state.setAccessToken,
-	}));
+	const { email } = useUserDetails((state) => ({ email: state.email }));
 	const [loading, setLoading] = useState(false);
+	const [passwordPrompt, setPasswordPrompt] = useState(false);
+	const [passwordInput, setPasswordInput] = useState("");
 
 	const ToAuthScreen = () => {
 		setModal(false);
@@ -44,96 +47,86 @@ const Confirmation1 = ({ modal, setModal, title }) => {
 		setModal(false);
 	};
 
-	const deleteUser = async () => {
-		try {
-			setLoading(true);
-			const currentUser = FIREBASE_AUTH.currentUser;
+	const reauthenticate = async (currentUser, password = null) => {
+		const providers = currentUser.providerData.map((p) => p.providerId);
+		if (providers.includes("google.com")) {
+			await GoogleSignin.hasPlayServices();
+			const response = await GoogleSignin.signIn();
+			const idToken = response.idToken || response.data?.idToken;
+			const credential = GoogleAuthProvider.credential(idToken);
+			await reauthenticateWithCredential(currentUser, credential);
+		} else {
+			if (!password) throw new Error("PASSWORD_NEEDED");
+			const credential = EmailAuthProvider.credential(currentUser.email, password);
+			await reauthenticateWithCredential(currentUser, credential);
+		}
+	};
 
+	const performDeletion = async (password = null) => {
+		setLoading(true);
+		setPasswordPrompt(false);
+		try {
+			const currentUser = FIREBASE_AUTH.currentUser;
 			if (!currentUser) {
 				Alert.alert("Error", "No user is currently logged in.");
-				setLoading(false);
 				return;
 			}
 
-			console.log("🗑️ Starting account deletion process...");
-			console.log("   - User ID:", currentUser.uid);
-			console.log("   - Email:", currentUser.email);
-
-			// Determine if user is a driver or customer based on store state
 			const { role } = useAuthStore.getState();
-			const collection = role === "driver" ? "drivers" : "users";
+			const collectionName = role === "driver" ? "drivers" : "users";
 
-			console.log("   - Account type:", collection);
-
-			// Step 1: Delete user document from Firestore
-			try {
-				const userDocRef = doc(FIREBASE_DB, collection, currentUser.uid);
-				await deleteDoc(userDocRef);
-				console.log("✅ User document deleted from Firestore");
-			} catch (firestoreError) {
-				console.error("❌ Error deleting Firestore document:", firestoreError);
-				// Continue with auth deletion even if Firestore fails
-			}
-
-			// Step 2: Delete user from Firebase Authentication
+			// Step 1: Delete Firebase Auth user (may need reauthentication)
 			try {
 				await firebaseDeleteUser(currentUser);
-				console.log("✅ User deleted from Firebase Auth");
 			} catch (authError) {
-				console.error("❌ Error deleting Firebase Auth user:", authError);
-
 				if (authError.code === "auth/requires-recent-login") {
-					Alert.alert(
-						"Re-authentication Required",
-						"For security reasons, you need to log in again before deleting your account. Please log out and log back in, then try deleting your account again.",
-						[{ text: "OK" }]
-					);
-					setLoading(false);
-					setModal(false);
-					return;
+					try {
+						await reauthenticate(currentUser, password);
+						await firebaseDeleteUser(currentUser);
+					} catch (reauthError) {
+						if (reauthError.message === "PASSWORD_NEEDED") {
+							setLoading(false);
+							setPasswordInput("");
+							setPasswordPrompt(true);
+							return;
+						}
+						throw reauthError;
+					}
+				} else {
+					throw authError;
 				}
-
-				throw authError;
 			}
 
-			// Step 3: Clear all local stores
+			// Step 2: Delete Firestore document (only after Auth deletion succeeds)
+			try {
+				await deleteDoc(doc(FIREBASE_DB, collectionName, currentUser.uid));
+			} catch (e) {
+				// Non-fatal — auth account is already gone
+			}
+
+			// Step 3: Clear stores and navigate
 			useUserDetails.getState().clearUser();
 			useDriverDetails.getState().clearDriver();
 			useAuthStore.getState().clearAuth();
 
-			console.log("✅ Account deletion completed successfully");
-
-			// Step 4: Show success message and navigate to auth screen
 			Toast.show({
 				type: "tomatoToast",
 				text1: "Account Deleted",
 				text2: "Your account has been permanently deleted",
-				text2Style: { flexWrap: "wrap", maxWidth: 250 },
 				position: "top",
 				visibilityTime: 5000,
 			});
 
-			// Navigate to AuthStack
 			setModal(false);
-			navigation.dispatch(
-				CommonActions.reset({
-					index: 0,
-					routes: [{ name: "AuthStack" }],
-				})
-			);
-
-			setLoading(false);
 		} catch (error) {
+			console.error("❌ Error deleting account:", error);
+			Alert.alert("Deletion Failed", error.message || "Please try again or contact support.");
+		} finally {
 			setLoading(false);
-			console.error("❌ Error deleting user:", error);
-
-			Alert.alert(
-				"Deletion Failed",
-				`Failed to delete account: ${error.message}. Please try again or contact support.`,
-				[{ text: "OK" }]
-			);
 		}
 	};
+
+	const deleteUser = () => performDeletion(null);
 
 	const logOut = async () => {
 		try {
@@ -147,14 +140,7 @@ const Confirmation1 = ({ modal, setModal, title }) => {
 			useDriverDetails.getState().clearDriver();
 			useAuthStore.getState().clearAuth();
 
-			// Reset navigation to AuthStack
-			navigation.dispatch(
-				CommonActions.reset({
-					index: 0,
-					routes: [{ name: "AuthStack" }],
-				})
-			);
-
+			// onAuthStateChanged in Navigation.js handles routing automatically
 			setLoading(false);
 		} catch (error) {
 			setLoading(false);
@@ -193,6 +179,29 @@ const Confirmation1 = ({ modal, setModal, title }) => {
 					</View>
 				</View>
 			</Modal>
+
+			{/* Password re-entry for email users */}
+			{passwordPrompt && (
+				<Modal visible transparent statusBarTranslucent animationType="fade">
+					<View style={styles.modal}>
+						<View style={styles.container}>
+							<Text style={styles.text}>Enter your password to confirm deletion</Text>
+							<TextInput
+								style={styles.passwordInput}
+								placeholder="Password"
+								secureTextEntry
+								value={passwordInput}
+								onChangeText={setPasswordInput}
+								autoFocus
+							/>
+							<View style={styles.button}>
+								<ActiveButton title={"Confirm"} onPress={() => performDeletion(passwordInput)} disabled={!passwordInput} />
+								<LoginButton title={"Cancel"} onPress={() => { setPasswordPrompt(false); setPasswordInput(""); }} />
+							</View>
+						</View>
+					</View>
+				</Modal>
+			)}
 
 			{/* Loading Overlay */}
 			{loading && (
@@ -244,6 +253,16 @@ const styles = StyleSheet.create({
 	},
 	button: {
 		marginTop: "auto",
+	},
+	passwordInput: {
+		width: "100%",
+		borderWidth: 1,
+		borderColor: colors.lightGrey,
+		borderRadius: 8,
+		paddingHorizontal: 12,
+		paddingVertical: 10,
+		fontSize: 15,
+		marginVertical: 16,
 	},
 	loadingOverlay: {
 		flex: 1,

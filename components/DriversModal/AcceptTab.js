@@ -42,24 +42,24 @@ const AcceptTab = () => {
 		navigation.dispatch(DrawerActions.openDrawer());
 	};
 
-	// Listen to pending rides
+	// Listen to pending rides only when the driver is on an active ride
+	// (to allow queueing the next ride — not needed when idle, HomeTab handles that)
 	useEffect(() => {
-		const driverId = uid || VehicleId;
-		if (!driverId) return;
+		if (!uid || !acceptedRide) return;
 
 		const unsubscribe = listenToPendingRides((rides) => {
 			// Filter out rides this driver has declined and limit to 2
 			const filteredRides = rides
 				.filter(ride => {
 					const declinedBy = ride.declined_by || [];
-					return !declinedBy.includes(driverId);
+					return !declinedBy.includes(uid);
 				})
 				.slice(0, 2); // Limit to maximum 2 rides
 
 			setPendingRides(filteredRides);
-		}, driverId);
+		}, uid);
 		return unsubscribe;
-	}, [uid, VehicleId]);
+	}, [uid, acceptedRide]);
 
 	const RideEnded = async () => {
 		if (!acceptedRide?.rideId) {
@@ -151,28 +151,34 @@ const AcceptTab = () => {
 			const driverName = acceptedRide.driverName || fullName || 'Your driver';
 			console.log('📤 Notifying customer with driver name:', driverName);
 
-			// Update ride status in Firestore to mark driver as arrived
+			// Update ride status — mark arrived and transition to in_progress
 			const rideRef = doc(FIREBASE_DB, 'rides', acceptedRide.rideId);
 			await updateDoc(rideRef, {
 				hasArrived: true,
 				arrivedAt: serverTimestamp(),
+				status: 'in_progress',
 			});
 			console.log('✅ Ride updated with arrival status');
 
-			await notifyCustomerDriverArrived(
+			notifyCustomerDriverArrived(
 				acceptedRide.customerId,
 				driverName
-			);
+			).catch(err => console.warn('⚠️ Arrival push notification failed (non-fatal):', err.message));
 
 			setHasArrived(true);
-			Alert.alert('Success', 'Customer notified of your arrival. You can now complete the ride.');
+			Alert.alert('Success', 'You have arrived. You can now complete the ride.');
 		} catch (error) {
 			console.error('Error notifying arrival:', error);
-			Alert.alert('Error', 'Could not notify customer. Please try again.');
+			Alert.alert('Error', 'Could not update arrival status. Please try again.');
 		}
 	};
 
 	const AcceptNextRide = async (rideId) => {
+		if (!uid) {
+			alert("Driver account not loaded. Please log out and log back in.");
+			return;
+		}
+
 		// Check if bank details are verified
 		const driverDetails = useDriverDetails.getState();
 		if (!driverDetails.bankDetailsVerified) {
@@ -205,7 +211,7 @@ const AcceptTab = () => {
 			const rideRef = doc(FIREBASE_DB, "rides", rideId);
 			await updateDoc(rideRef, {
 				status: "accepted",
-				driverId: uid || VehicleId,
+				driverId: uid,
 				driverName: fullName || "Driver",
 				driverPhone: phone || "",
 				vehicleId: VehicleId || "",
@@ -217,7 +223,7 @@ const AcceptTab = () => {
 				rideId: rideId,
 				pickupCoords: pickup,
 				destinationCoords: destination,
-				driverId: uid || VehicleId,
+				driverId: uid,
 				driverName: fullName || "Driver",
 			});
 
@@ -266,7 +272,15 @@ const AcceptTab = () => {
 									<Text style={styles.time}>₦{calculateDriverEarnings(acceptedRide?.amount, acceptedRide?.numberOfPassengers) || "0"}</Text>
 								</View>
 							</View>
-							<Phone width={24} height={24} />
+							<TouchableOpacity
+								onPress={() => {
+									const customerPhone = acceptedRide?.customerPhone;
+									if (customerPhone) Linking.openURL(`tel:${customerPhone}`);
+								}}
+								disabled={!acceptedRide?.customerPhone}
+							>
+								<Phone width={24} height={24} />
+							</TouchableOpacity>
 						</View>
 
 						{acceptedRide && (

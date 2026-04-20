@@ -1,5 +1,6 @@
 import { FlatList, Image, StyleSheet, Text, View, Dimensions } from "react-native";
 import React, { useRef, useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { OnBoard } from "../constants/OnBoardData";
 import BottomSheet from "@gorhom/bottom-sheet";
 import Footer from "../components/Footer";
@@ -33,19 +34,13 @@ const OnBoarding = ({ navigation }) => {
 			setCurrentIndex(nextSlide);
 		}
 	};
-	// Skip button function
-	const SkipPage = () => {
-		navigation.replace("AuthStack", {
-			params: "AuthScreen",
-		});
+	const markSeenAndNavigate = async () => {
+		await AsyncStorage.setItem('has_seen_onboarding', 'true');
+		navigation.replace("AuthStack", { params: "AuthScreen" });
 	};
 
-	// function to navigate to home screen
-	const navigateToHome = () => {
-		navigation.replace("AuthStack", {
-			params: "AuthScreen",
-		});
-	};
+	const SkipPage = () => markSeenAndNavigate();
+	const navigateToHome = () => markSeenAndNavigate();
 
 	return (
 		<View style={styles.container}>

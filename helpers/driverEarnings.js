@@ -7,31 +7,13 @@ import { collection, query, where, getDocs } from "firebase/firestore";
  * @param {string} period - 'today', 'week', 'month', 'year'
  * @returns {Promise<Object>} Earnings data with statistics
  */
-export const getDriverEarnings = async (driverId, period = 'month') => {
+export const getDriverEarnings = async (driverId, period = 'month', year = null, month = null) => {
     try {
         const now = new Date();
-        let startDate;
-
-        // Calculate start date based on period
-        switch (period) {
-            case 'today':
-                startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                break;
-            case 'week':
-                const dayOfWeek = now.getDay();
-                startDate = new Date(now);
-                startDate.setDate(now.getDate() - dayOfWeek);
-                startDate.setHours(0, 0, 0, 0);
-                break;
-            case 'month':
-                startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-                break;
-            case 'year':
-                startDate = new Date(now.getFullYear(), 0, 1);
-                break;
-            default:
-                startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        }
+        const targetYear = year ?? now.getFullYear();
+        const targetMonth = month ?? now.getMonth();
+        const startDate = new Date(targetYear, targetMonth, 1);
+        const endDate = new Date(targetYear, targetMonth + 1, 1);
 
         console.log(`📊 Fetching earnings for driver ${driverId} from ${startDate.toISOString()}`);
 
@@ -41,7 +23,8 @@ export const getDriverEarnings = async (driverId, period = 'month') => {
             ridesRef,
             where("driverId", "==", driverId),
             where("status", "==", "completed"),
-            where("completedAt", ">=", startDate)
+            where("completedAt", ">=", startDate),
+            where("completedAt", "<", endDate)
         );
 
         const snapshot = await getDocs(q);

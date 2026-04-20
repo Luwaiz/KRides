@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../constants/styling';
 import { sp, fs, br } from '../constants/responsive';
@@ -9,25 +9,37 @@ const RideStatusBar = ({
     driverName,
     driverPhone,
     vehicleId,
-    hasArrived,
     onCancel,
     onViewDetails,
-    cancelling
+    cancelling,
 }) => {
     const [expanded, setExpanded] = useState(false);
+    const pulseAnim = useRef(new Animated.Value(1)).current;
 
-    // Debug logging
-    console.log('🎯 RideStatusBar render:', { status, driverName, driverPhone, vehicleId, hasArrived, cancelling });
+    useEffect(() => {
+        if (status === 'pending') {
+            const pulse = Animated.loop(
+                Animated.sequence([
+                    Animated.timing(pulseAnim, { toValue: 0.3, duration: 800, useNativeDriver: true }),
+                    Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+                ])
+            );
+            pulse.start();
+            return () => pulse.stop();
+        } else {
+            pulseAnim.setValue(1);
+        }
+    }, [status]);
+
 
     const getStatusText = () => {
         switch (status) {
             case 'pending':
                 return 'Searching for driver...';
             case 'accepted':
-                if (hasArrived) {
-                    return `${driverName || 'Driver'} has arrived!`;
-                }
                 return `${driverName || 'Driver'} is on the way!`;
+            case 'in_progress':
+                return `Ride in progress with ${driverName || 'your driver'}`;
             default:
                 return 'Processing...';
         }
@@ -48,11 +60,13 @@ const RideStatusBar = ({
         <View style={styles.container}>
             <View style={styles.mainBar}>
                 <View style={styles.content}>
-                    <Ionicons
-                        name={getStatusIcon()}
-                        size={20}
-                        color={colors.primaryBlue}
-                    />
+                    <Animated.View style={{ opacity: status === 'pending' ? pulseAnim : 1 }}>
+                        <Ionicons
+                            name={getStatusIcon()}
+                            size={20}
+                            color={colors.primaryBlue}
+                        />
+                    </Animated.View>
                     <Text style={styles.statusText} numberOfLines={1}>
                         {getStatusText()}
                     </Text>
@@ -65,9 +79,14 @@ const RideStatusBar = ({
                             disabled={cancelling}
                             style={styles.cancelButton}
                         >
-                            <Text style={styles.cancelText}>
-                                {cancelling ? 'Cancelling...' : 'Cancel'}
-                            </Text>
+                            {cancelling ? (
+                                <View style={styles.cancellingRow}>
+                                    <ActivityIndicator size="small" color="#d32f2f" />
+                                    <Text style={styles.cancelText}>Cancelling...</Text>
+                                </View>
+                            ) : (
+                                <Text style={styles.cancelText}>Cancel</Text>
+                            )}
                         </TouchableOpacity>
                     ) : (
                         <TouchableOpacity
@@ -86,7 +105,7 @@ const RideStatusBar = ({
             </View>
 
             {/* Driver Details Dropdown */}
-            {expanded && status === 'accepted' && (
+            {expanded && (status === 'accepted' || status === 'in_progress') && (
                 <View style={styles.dropdown}>
                     <View style={styles.divider} />
 
@@ -167,6 +186,11 @@ const styles = StyleSheet.create({
         paddingVertical: sp(8),
         backgroundColor: '#fee',
         borderRadius: br(8),
+    },
+    cancellingRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: sp(6),
     },
     cancelText: {
         color: '#d32f2f',

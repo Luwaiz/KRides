@@ -31,6 +31,7 @@ const HomePage = () => {
 	const isRideActive = useAcceptedRideStore((state) => state.isRideActive);
 	const navigation = useNavigation();
 	const mapRef = useRef(null);
+	const [mapReady, setMapReady] = useState(false);
 	const { uid } = useDriverDetails((state) => ({ uid: state.uid }));
 
 	// Request location permissions
@@ -133,50 +134,24 @@ const HomePage = () => {
 		}
 	}, [Accept]);
 
-	// Fit map to show route when ride is accepted
+	// Fit map once the map is ready and an active ride has coordinates
 	useEffect(() => {
-		if (isRideActive && acceptedRide?.pickupCoords && acceptedRide?.destinationCoords && mapRef.current) {
-			try {
-				// Validate coordinates before using them
-				const pickupLat = parseFloat(acceptedRide.pickupCoords.latitude);
-				const pickupLng = parseFloat(acceptedRide.pickupCoords.longitude);
-				const destLat = parseFloat(acceptedRide.destinationCoords.latitude);
-				const destLng = parseFloat(acceptedRide.destinationCoords.longitude);
+		if (!mapReady || !isRideActive || !mapRef.current) return;
+		const p = acceptedRide?.pickupCoords;
+		const d = acceptedRide?.destinationCoords;
+		if (!p || !d) return;
 
-				// Check if coordinates are valid numbers
-				if (isNaN(pickupLat) || isNaN(pickupLng) || isNaN(destLat) || isNaN(destLng)) {
-					console.error("❌ Invalid coordinates:", {
-						pickup: acceptedRide.pickupCoords,
-						destination: acceptedRide.destinationCoords
-					});
-					return;
-				}
+		const pickupLat = parseFloat(p.latitude);
+		const pickupLng = parseFloat(p.longitude);
+		const destLat = parseFloat(d.latitude);
+		const destLng = parseFloat(d.longitude);
+		if (isNaN(pickupLat) || isNaN(pickupLng) || isNaN(destLat) || isNaN(destLng)) return;
 
-				console.log("📍 Fitting map to coordinates:", {
-					pickup: { lat: pickupLat, lng: pickupLng },
-					destination: { lat: destLat, lng: destLng }
-				});
-
-				// Add a small delay to ensure map is fully rendered
-				setTimeout(() => {
-					if (mapRef.current) {
-						mapRef.current.fitToCoordinates(
-							[
-								{ latitude: pickupLat, longitude: pickupLng },
-								{ latitude: destLat, longitude: destLng }
-							],
-							{
-								edgePadding: { top: 50, right: 20, bottom: 50, left: 20 },
-								animated: true,
-							}
-						);
-					}
-				}, 500);
-			} catch (error) {
-				console.error("❌ Error fitting map to coordinates:", error);
-			}
-		}
-	}, [isRideActive, acceptedRide]);
+		mapRef.current.fitToCoordinates(
+			[{ latitude: pickupLat, longitude: pickupLng }, { latitude: destLat, longitude: destLng }],
+			{ edgePadding: { top: 50, right: 20, bottom: 50, left: 20 }, animated: true }
+		);
+	}, [mapReady, isRideActive, acceptedRide]);
 
 	return (
 		<View style={styles.container}>
@@ -193,6 +168,7 @@ const HomePage = () => {
 					showsMyLocationButton={true}
 					showsCompass={true}
 					loadingEnabled={true}
+					onMapReady={() => setMapReady(true)}
 				>
 					{/* Route line - only visible when ride is active */}
 					{isRideActive && acceptedRide?.pickupCoords && acceptedRide?.destinationCoords && (

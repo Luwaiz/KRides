@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, View, Text, StyleSheet, Animated, Vibration } from 'react-native';
+import { View, Text, StyleSheet, Animated, Vibration, StatusBar, TouchableOpacity } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import ActiveButton from '../buttons/ActiveButton';
-import DangerButton from '../buttons/DangerButton';
 import { colors } from '../../constants/styling';
 import { sp, fs, br } from '../../constants/responsive';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,7 +11,26 @@ const TIMEOUT_SECONDS = 20;
 const RideRequestModal = ({ visible, ride, onAccept, onDecline, onTimeout }) => {
     const [countdown, setCountdown] = useState(TIMEOUT_SECONDS);
     const [pulseAnim] = useState(new Animated.Value(1));
+    const [slideAnim] = useState(new Animated.Value(-200));
     const timerRef = React.useRef(null);
+
+    // Slide in/out animation
+    useEffect(() => {
+        if (visible) {
+            Animated.spring(slideAnim, {
+                toValue: 0,
+                tension: 80,
+                friction: 10,
+                useNativeDriver: true,
+            }).start();
+        } else {
+            Animated.timing(slideAnim, {
+                toValue: -200,
+                duration: 250,
+                useNativeDriver: true,
+            }).start();
+        }
+    }, [visible]);
 
     // Countdown timer
     useEffect(() => {
@@ -31,7 +48,6 @@ const RideRequestModal = ({ visible, ride, onAccept, onDecline, onTimeout }) => 
                 if (prev <= 1) {
                     clearInterval(timerRef.current);
                     timerRef.current = null;
-                    // Use setTimeout to avoid setState during render
                     setTimeout(() => onTimeout(ride?.rideId), 0);
                     return 0;
                 }
@@ -47,76 +63,33 @@ const RideRequestModal = ({ visible, ride, onAccept, onDecline, onTimeout }) => 
         };
     }, [visible, ride?.rideId]);
 
-    // Pulse animation for timer
+    // Pulse animation for timer when low
     useEffect(() => {
         if (visible && countdown <= 5) {
             Animated.sequence([
-                Animated.timing(pulseAnim, {
-                    toValue: 1.2,
-                    duration: 300,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(pulseAnim, {
-                    toValue: 1,
-                    duration: 300,
-                    useNativeDriver: true,
-                }),
+                Animated.timing(pulseAnim, { toValue: 1.3, duration: 200, useNativeDriver: true }),
+                Animated.timing(pulseAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
             ]).start();
         }
     }, [countdown, visible]);
 
-    // Play sound and vibrate when modal appears
+    // Haptic on appear
     useEffect(() => {
         if (visible) {
-            playNotificationSound();
-            triggerHaptic();
+            Vibration.vibrate([0, 200, 100, 200]);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
         }
     }, [visible]);
 
-    const playNotificationSound = async () => {
-        try {
-            // Create a simple beep sound programmatically
-            const { sound } = await Audio.Sound.createAsync(
-                { uri: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3' },
-                { shouldPlay: true, volume: 1.0 }
-            );
-
-            // Cleanup
-            setTimeout(() => {
-                sound.unloadAsync();
-            }, 2000);
-        } catch (error) {
-            console.log('Error playing sound:', error);
-            // Fallback to vibration
-            Vibration.vibrate([0, 200, 100, 200]);
-        }
-    };
-
-    const triggerHaptic = async () => {
-        try {
-            await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        } catch (error) {
-            console.log('Haptic feedback not available');
-        }
-    };
-
-    if (!ride) return null;
+    if (!visible || !ride) return null;
 
     const handleAccept = () => {
-        // Stop the countdown timer immediately
-        if (timerRef.current) {
-            clearInterval(timerRef.current);
-            timerRef.current = null;
-        }
+        if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
         onAccept(ride.rideId);
     };
 
     const handleDecline = () => {
-        // Stop the countdown timer immediately
-        if (timerRef.current) {
-            clearInterval(timerRef.current);
-            timerRef.current = null;
-        }
+        if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
         onDecline(ride.rideId);
     };
 
@@ -126,275 +99,191 @@ const RideRequestModal = ({ visible, ride, onAccept, onDecline, onTimeout }) => 
         return colors.primaryBlue;
     };
 
+    const pickupText = typeof ride.pickupLocation === 'string'
+        ? ride.pickupLocation
+        : (ride.pickupLocation?.name || ride.pickupLocation?.address || ride.pickupAddress || 'Pickup');
+
+    const destText = typeof ride.destination === 'string'
+        ? ride.destination
+        : (ride.destination?.name || ride.destination?.address || ride.destinationAddress || 'Destination');
+
+    const earnings = calculateDriverEarnings(ride.amount || 0, ride.numberOfPassengers || 1);
+
     return (
-        <Modal
-            visible={visible}
-            animationType="slide"
-            transparent={false}
-            statusBarTranslucent
-        >
-            <View style={styles.container}>
-                {/* Header */}
-                <View style={styles.header}>
-                    <Ionicons name="notifications" size={32} color={colors.primaryBlue} />
-                    <Text style={styles.headerText}>New Ride Request</Text>
+        <Animated.View style={[styles.card, { transform: [{ translateY: slideAnim }] }]}>
+            {/* Top row: icon + title + timer */}
+            <View style={styles.topRow}>
+                <View style={styles.titleRow}>
+                    <Ionicons name="notifications" size={18} color={colors.primaryBlue} />
+                    <Text style={styles.title}>New Ride Request</Text>
+                    {ride.customerName ? (
+                        <Text style={styles.customerName}> · {ride.customerName}</Text>
+                    ) : null}
                 </View>
-
-                {/* Countdown Timer */}
-                <Animated.View
-                    style={[
-                        styles.timerContainer,
-                        { transform: [{ scale: pulseAnim }] }
-                    ]}
+                <Animated.Text
+                    style={[styles.timer, { color: getTimerColor(), transform: [{ scale: pulseAnim }] }]}
                 >
-                    <Text style={[styles.timerText, { color: getTimerColor() }]}>
-                        {countdown}
-                    </Text>
-                    <Text style={styles.timerLabel}>seconds remaining</Text>
-                </Animated.View>
-
-                {/* Ride Details Card */}
-                <View style={styles.detailsCard}>
-                    {/* Customer Info */}
-                    <View style={styles.customerSection}>
-                        <View style={styles.avatarPlaceholder}>
-                            <Ionicons name="person" size={40} color={colors.primaryBlue} />
-                        </View>
-                        <View style={styles.customerInfo}>
-                            <Text style={styles.customerName}>{ride.customerName || 'Customer'}</Text>
-                            <Text style={styles.customerMeta}>{ride.numberOfPassengers || 1} passenger(s)</Text>
-                        </View>
-                    </View>
-
-                    {/* Divider */}
-                    <View style={styles.divider} />
-
-                    {/* Location Details */}
-                    <View style={styles.locationSection}>
-                        <View style={styles.locationRow}>
-                            <View style={styles.iconContainer}>
-                                <Ionicons name="location" size={24} color="#4caf50" />
-                            </View>
-                            <View style={styles.locationText}>
-                                <Text style={styles.locationLabel}>Pickup</Text>
-                                <Text style={styles.locationValue} numberOfLines={2}>
-                                    {typeof ride.pickupLocation === 'string'
-                                        ? ride.pickupLocation
-                                        : (ride.pickupLocation?.name || ride.pickupLocation?.address || ride.pickupAddress || 'Pickup location')}
-                                </Text>
-                            </View>
-                        </View>
-
-                        <View style={styles.locationRow}>
-                            <View style={styles.iconContainer}>
-                                <Ionicons name="flag" size={24} color="#1976D2" />
-                            </View>
-                            <View style={styles.locationText}>
-                                <Text style={styles.locationLabel}>Destination</Text>
-                                <Text style={styles.locationValue} numberOfLines={2}>
-                                    {typeof ride.destination === 'string'
-                                        ? ride.destination
-                                        : (ride.destination?.name || ride.destination?.address || ride.destinationAddress || 'Destination')}
-                                </Text>
-                            </View>
-                        </View>
-                    </View>
-
-                    {/* Divider */}
-                    <View style={styles.divider} />
-
-                    {/* Fare Section */}
-                    <View style={styles.fareSection}>
-                        <View style={styles.fareRow}>
-                            <Text style={styles.fareLabel}>Total Fare</Text>
-                            <Text style={styles.totalFareValue}>₦{ride.amount || 0}</Text>
-                        </View>
-                        <View style={styles.fareRow}>
-                            <Text style={styles.earningsLabel}>Your Earnings</Text>
-                            <Text style={styles.earningsValue}>
-                                ₦{calculateDriverEarnings(ride.amount || 0, ride.numberOfPassengers || 1)}
-                            </Text>
-                        </View>
-                        <Text style={styles.feeNote}>
-                            Platform fee: ₦{(ride.numberOfPassengers || 1) >= 3 ? '100' : '50'}
-                        </Text>
-                    </View>
-                </View>
-
-                {/* Action Buttons */}
-                <View style={styles.buttonsContainer}>
-                    <View style={styles.declineButtonWrapper}>
-                        <DangerButton
-                            title="Decline"
-                            onPress={handleDecline}
-                        />
-                    </View>
-                    <View style={styles.acceptButtonWrapper}>
-                        <ActiveButton
-                            title="Accept Ride"
-                            onPress={handleAccept}
-                        />
-                    </View>
-                </View>
-
-                {/* Auto-decline warning */}
-                <Text style={styles.warningText}>
-                    Ride will be automatically declined if not accepted
-                </Text>
+                    {countdown}s
+                </Animated.Text>
             </View>
-        </Modal>
+
+            {/* Route */}
+            <View style={styles.routeRow}>
+                <View style={styles.routeStop}>
+                    <Ionicons name="location" size={14} color="#4caf50" />
+                    <Text style={styles.routeText} numberOfLines={1}>{pickupText}</Text>
+                </View>
+                <Ionicons name="arrow-forward" size={12} color={colors.lightGrey3} style={styles.routeArrow} />
+                <View style={styles.routeStop}>
+                    <Ionicons name="flag" size={14} color={colors.primaryBlue} />
+                    <Text style={styles.routeText} numberOfLines={1}>{destText}</Text>
+                </View>
+            </View>
+
+            {/* Earnings + buttons */}
+            <View style={styles.bottomRow}>
+                <View style={styles.earningsBlock}>
+                    <Text style={styles.earningsLabel}>Your earnings</Text>
+                    <Text style={styles.earningsValue}>₦{earnings}</Text>
+                    <Text style={styles.passengersText}>
+                        {ride.numberOfPassengers || 1} pax
+                    </Text>
+                </View>
+                <View style={styles.buttonsBlock}>
+                    <TouchableOpacity style={styles.declineBtn} onPress={handleDecline} activeOpacity={0.7}>
+                        <Text style={styles.declineBtnText}>Decline</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.acceptBtn} onPress={handleAccept} activeOpacity={0.7}>
+                        <Text style={styles.acceptBtnText}>Accept</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+        </Animated.View>
     );
 };
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#f5f5f5',
-        padding: sp(20),
-        justifyContent: 'center',
-    },
-    header: {
-        alignItems: 'center',
-        marginBottom: sp(20),
-    },
-    headerText: {
-        fontSize: fs(24),
-        fontWeight: 'bold',
-        color: '#333',
-        marginTop: sp(10),
-    },
-    timerContainer: {
-        alignItems: 'center',
-        marginBottom: sp(30),
-    },
-    timerText: {
-        fontSize: fs(72),
-        fontWeight: 'bold',
-    },
-    timerLabel: {
-        fontSize: fs(16),
-        color: '#666',
-        marginTop: sp(5),
-    },
-    detailsCard: {
+    card: {
+        position: 'absolute',
+        top: (StatusBar.currentHeight || 24) + 152,
+        left: sp(12),
+        right: sp(12),
+        zIndex: 999,
         backgroundColor: 'white',
         borderRadius: br(16),
-        padding: sp(20),
+        padding: sp(14),
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
         shadowRadius: 8,
-        elevation: 5,
-        marginBottom: sp(30),
+        elevation: 12,
     },
-    customerSection: {
+    topRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: sp(20),
+        justifyContent: 'space-between',
+        marginBottom: sp(10),
     },
-    avatarPlaceholder: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        backgroundColor: colors.secondary,
+    titleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+        flexWrap: 'wrap',
+    },
+    title: {
+        fontSize: fs(14),
+        fontFamily: 'Albert-SemiBold',
+        color: '#333',
+        marginLeft: sp(6),
+    },
+    customerName: {
+        fontSize: fs(13),
+        fontFamily: 'Albert-Regular',
+        color: colors.lightGrey4,
+    },
+    timer: {
+        fontSize: fs(20),
+        fontFamily: 'Albert-Bold',
+        minWidth: 36,
+        textAlign: 'right',
+    },
+    routeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#f7f7f7',
+        borderRadius: br(8),
+        paddingHorizontal: sp(10),
+        paddingVertical: sp(8),
+        marginBottom: sp(10),
+    },
+    routeStop: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+        gap: sp(4),
+    },
+    routeText: {
+        fontSize: fs(12),
+        fontFamily: 'Albert-Regular',
+        color: '#444',
+        flex: 1,
+    },
+    routeArrow: {
+        marginHorizontal: sp(6),
+    },
+    bottomRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: sp(12),
+    },
+    earningsBlock: {
+        alignItems: 'flex-start',
+    },
+    earningsLabel: {
+        fontSize: fs(11),
+        fontFamily: 'Albert-Regular',
+        color: colors.lightGrey4,
+    },
+    earningsValue: {
+        fontSize: fs(22),
+        fontFamily: 'Albert-Bold',
+        color: '#4caf50',
+    },
+    passengersText: {
+        fontSize: fs(11),
+        fontFamily: 'Albert-Regular',
+        color: colors.lightGrey4,
+    },
+    buttonsBlock: {
+        flex: 1,
+        flexDirection: 'row',
+        gap: sp(8),
+    },
+    declineBtn: {
+        flex: 1,
+        height: 36,
+        borderRadius: br(8),
+        backgroundColor: '#fdecea',
         justifyContent: 'center',
         alignItems: 'center',
     },
-    customerInfo: {
-        marginLeft: sp(15),
-        flex: 1,
+    declineBtnText: {
+        fontSize: fs(13),
+        fontFamily: 'Albert-SemiBold',
+        color: '#d32f2f',
     },
-    customerName: {
-        fontSize: fs(20),
-        fontWeight: 'bold',
-        color: '#333',
-    },
-    customerMeta: {
-        fontSize: fs(14),
-        color: '#666',
-        marginTop: sp(4),
-    },
-    divider: {
-        height: 1,
-        backgroundColor: '#e0e0e0',
-        marginVertical: sp(15),
-    },
-    locationSection: {
-        marginBottom: sp(10),
-    },
-    locationRow: {
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        marginBottom: sp(15),
-    },
-    iconContainer: {
-        width: 40,
-        alignItems: 'center',
-    },
-    locationText: {
-        flex: 1,
-        marginLeft: sp(10),
-    },
-    locationLabel: {
-        fontSize: fs(12),
-        color: '#666',
-        marginBottom: sp(4),
-    },
-    locationValue: {
-        fontSize: fs(16),
-        color: '#333',
-        fontWeight: '500',
-    },
-    fareSection: {
-        paddingTop: sp(10),
-    },
-    fareRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: sp(8),
-    },
-    fareLabel: {
-        fontSize: fs(14),
-        color: '#999',
-    },
-    totalFareValue: {
-        fontSize: fs(18),
-        fontWeight: '600',
-        color: '#666',
-        textDecorationLine: 'line-through',
-    },
-    earningsLabel: {
-        fontSize: fs(16),
-        fontWeight: '600',
-        color: '#333',
-    },
-    earningsValue: {
-        fontSize: fs(32),
-        fontWeight: 'bold',
-        color: '#4caf50',
-    },
-    feeNote: {
-        fontSize: fs(11),
-        color: '#999',
-        fontStyle: 'italic',
-        marginTop: sp(4),
-    },
-    buttonsContainer: {
-        flexDirection: 'row',
-        gap: sp(12),
-        marginBottom: sp(15),
-    },
-    declineButtonWrapper: {
-        flex: 1,
-    },
-    acceptButtonWrapper: {
+    acceptBtn: {
         flex: 2,
+        height: 36,
+        borderRadius: br(8),
+        backgroundColor: colors.primaryBlue,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
-    warningText: {
-        textAlign: 'center',
-        fontSize: fs(12),
-        color: '#999',
+    acceptBtnText: {
+        fontSize: fs(13),
+        fontFamily: 'Albert-SemiBold',
+        color: 'white',
     },
 });
 

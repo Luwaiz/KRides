@@ -2,12 +2,13 @@
   "expo": {
     "name": "KRides",
     "slug": "KRides",
+    "owner": "luwaiz",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/adaptive-icon.png",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "./assets/splashscreen_logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -19,12 +20,7 @@
     },
     "plugins": [
       "expo-font",
-      [
-        "@rnmapbox/maps",
-        {
-          "RNMapboxMapsDownloadToken": "sk.eyJ1IjoiZWx1d2FpeiIsImEiOiJjbTVibXJsNWk0ZXE4MmpwN2FvNjJ2cmJ3In0.ITvpOypF_zViRDy3hHU8OA"
-        }
-      ]
+      "@rnmapbox/maps"
     ],
     "extra": {
       "eas": {
@@ -32,10 +28,11 @@
       }
     },
     "android": {
+      "googleServicesFile": "./google-services.json",
       "package": "com.eluwaiz.KRides",
       "versionCode": 1,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/icon.png",
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
       "permissions": [
@@ -54,9 +51,9 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "KRides needs your location to find nearby drivers and calculate routes.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "KRides needs your location to track rides and show driver arrival."
-  }
-}
-
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "KRides needs your location to track rides and show driver arrival.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    }
   }
 }

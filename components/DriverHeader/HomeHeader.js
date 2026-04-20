@@ -16,8 +16,7 @@ const HomeHeader = () => {
 
 	// Get driver ID from store
 	const uid = useDriverDetails((state) => state.uid);
-	const VehicleId = useDriverDetails((state) => state.vehicle_id);
-	const driverId = uid || VehicleId;
+	const driverId = uid;
 
 	// Online/Offline status
 	const isOnline = useDriverAvailability((state) => state.isOnline);

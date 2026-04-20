@@ -41,12 +41,6 @@ const HomeTab = () => {
 	const phone = useDriverDetails((state) => state.phone);
 	const uid = useDriverDetails((state) => state.uid);
 
-	console.log("🚗 Driver store state:");
-	console.log("   - fullName:", fullName || "MISSING");
-	console.log("   - vehicle_id:", VehicleId || "MISSING");
-	console.log("   - phone:", phone || "MISSING");
-	console.log("   - uid:", uid || "MISSING");
-
 	const navigation = useNavigation();
 
 	const setAcceptedRide = useAcceptedRideStore(
@@ -62,6 +56,7 @@ const HomeTab = () => {
 	const [rides, setRides] = useState([]);
 	const [currentRideRequest, setCurrentRideRequest] = useState(null);
 	const [showRideModal, setShowRideModal] = useState(false);
+	const processedRideIds = useRef(new Set());
 
 	// ✅ Listen to pending rides from Firestore (real-time)
 	useEffect(() => {
@@ -97,9 +92,8 @@ const HomeTab = () => {
 		// 3. No current ride request is set
 		// 4. Not currently accepting a ride
 		if (rides.length > 0 && !showRideModal && !currentRideRequest && !accepting) {
-			const firstRide = rides[0];
-			// Make sure we're not showing the same ride again
-			if (!currentRideRequest || currentRideRequest.rideId !== firstRide.rideId) {
+			const firstRide = rides.find(r => !processedRideIds.current.has(r.rideId));
+			if (firstRide) {
 				console.log('🔔 New ride available, showing modal:', firstRide.rideId);
 				setCurrentRideRequest(firstRide);
 				setShowRideModal(true);
@@ -140,7 +134,7 @@ const HomeTab = () => {
 	// Handle modal accept
 	const handleModalAccept = async (rideId) => {
 		console.log('✅ Modal accept - closing modal and clearing current request');
-		// Immediately close modal and clear current ride to prevent re-showing
+		processedRideIds.current.add(rideId);
 		setShowRideModal(false);
 		setCurrentRideRequest(null);
 		await AcceptRide(rideId);
@@ -149,6 +143,7 @@ const HomeTab = () => {
 	// Handle modal decline
 	const handleModalDecline = async (rideId) => {
 		console.log('❌ Modal decline - closing modal and clearing current request');
+		processedRideIds.current.add(rideId);
 		setShowRideModal(false);
 		setCurrentRideRequest(null);
 		await DeclineRide(rideId);
@@ -163,6 +158,11 @@ const HomeTab = () => {
 
 	// ✅ Accept ride using Firestore
 	const AcceptRide = async (rideId) => {
+		if (!uid) {
+			alert("Driver account not loaded. Please log out and log back in.");
+			return;
+		}
+
 		// Check if bank details are verified
 		const driverDetails = useDriverDetails.getState();
 		if (!driverDetails.bankDetailsVerified) {
@@ -172,13 +172,6 @@ const HomeTab = () => {
 			navigation.navigate("BankAccountDetails");
 			return;
 		}
-
-		console.log("🚗 Accepting ride:", rideId);
-		console.log("   Driver details:");
-		console.log("   - Full Name:", fullName || "MISSING");
-		console.log("   - Phone:", phone || "MISSING");
-		console.log("   - Vehicle ID:", VehicleId || "MISSING");
-		console.log("   - UID:", uid || "MISSING");
 
 		setAccepting(rideId);
 
@@ -197,7 +190,7 @@ const HomeTab = () => {
 			);
 
 			const driverData = {
-				driverId: uid || VehicleId,
+				driverId: uid,
 				driverName: fullName || "Driver",
 				driverPhone: phone || "",
 				vehicleId: VehicleId || "",
@@ -209,7 +202,7 @@ const HomeTab = () => {
 			const rideRef = doc(FIREBASE_DB, "rides", rideId);
 			await updateDoc(rideRef, {
 				status: "accepted",
-				driverId: uid || VehicleId,
+				driverId: uid,
 				driverName: fullName || "Driver",
 				driverPhone: phone || "",
 				vehicleId: VehicleId || "",
@@ -229,7 +222,7 @@ const HomeTab = () => {
 				rideId: rideId, // Ensure rideId is stored
 				pickupCoords: pickup,
 				destinationCoords: destination,
-				driverId: uid || VehicleId,
+				driverId: uid,
 				driverName: fullName || "Driver",
 			});
 
@@ -265,16 +258,20 @@ const HomeTab = () => {
 		}
 	};
 
-	// Optional: Track driver location (can be used for live tracking feature later)
+	// Track driver location and upload to Firestore so customers can see driver position
 	useEffect(() => {
+		if (!uid) return;
+
 		const watchId = Geolocation.watchPosition(
 			(position) => {
-				const coords = {
-					latitude: position.coords.latitude,
-					longitude: position.coords.longitude,
-				};
-				// Store or emit location updates if needed
-				console.log("📍 Driver location:", coords);
+				const driverRef = doc(FIREBASE_DB, "drivers", uid);
+				updateDoc(driverRef, {
+					location: {
+						latitude: position.coords.latitude,
+						longitude: position.coords.longitude,
+					},
+					locationUpdatedAt: serverTimestamp(),
+				}).catch(() => {});
 			},
 			(error) => {
 				console.warn("⚠️ Location tracking error:", error);
@@ -285,16 +282,12 @@ const HomeTab = () => {
 		return () => {
 			try {
 				Geolocation.clearWatch(watchId);
-				console.log("🛑 Stopped location tracking");
-			} catch (e) {
-				console.warn("Error clearing location watch:", e);
-			}
+			} catch (e) {}
 		};
-	}, []);
+	}, [uid]);
 
 	return (
 		<>
-			{/* Full-screen ride request modal */}
 			<RideRequestModal
 				visible={showRideModal}
 				ride={currentRideRequest}
@@ -304,7 +297,7 @@ const HomeTab = () => {
 			/>
 
 			<BottomSheet
-				snapPoints={rides.length > 1 ? ["76%"] : ["50%"]}
+				snapPoints={["76%"]}
 				backgroundStyle={{ borderRadius: 30 }}
 				handleComponent={null}
 			>

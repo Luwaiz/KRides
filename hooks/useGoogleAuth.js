@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
 import { FIREBASE_AUTH } from '../firebaseConfig';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /**
  * Custom hook for Google Sign-In
@@ -65,6 +66,10 @@ export function useGoogleAuth() {
 
             // Create Firebase credential
             const googleCredential = GoogleAuthProvider.credential(idToken);
+
+            // Store intended role BEFORE Firebase sign-in so Navigation.js
+            // reads it when onAuthStateChanged fires (before Firestore doc exists)
+            await AsyncStorage.setItem('pending_role', role);
 
             // Sign in to Firebase with Google credential
             console.log('🔥 Signing in to Firebase...');

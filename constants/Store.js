@@ -4,9 +4,8 @@ export const useBottomTabStore = create((set) => ({
 	passengerPage: false,
 	confirmPage: false,
 	AcceptRidePage: false,
-	PassengerPage: () =>
-		set((state) => ({ passengerPage: !state.passengerPage })),
-	setConfirmPage: () => set((state) => ({ confirmPage: !state.confirmPage })),
+	PassengerPage: () => set({ passengerPage: true }),
+	setConfirmPage: () => set({ confirmPage: true }),
 	setAcceptRidePage: () =>
 		set((state) => ({ AcceptRidePage: !state.AcceptRidePage })),
 	setDriverHome: () => set({ AcceptRidePage: false }),
@@ -18,7 +17,6 @@ export const useUserDetails = create((set) => ({
 	lastName: "",
 	phone: "",
 	email: "",
-	password: "",
 	UserId: "",
 	accessToken: "",
 	profileImageUrl: null,
@@ -27,7 +25,6 @@ export const useUserDetails = create((set) => ({
 	setLastName: (lastName) => set({ lastName }),
 	setPhone: (phone) => set({ phone }),
 	setEmail: (email) => set({ email }),
-	setPassword: (password) => set({ password }),
 	setUserId: (UserId) => set({ UserId }),
 	clearUser: () =>
 		set({
@@ -35,7 +32,6 @@ export const useUserDetails = create((set) => ({
 			lastName: "",
 			phone: "",
 			email: "",
-			password: "",
 			UserId: "",
 			accessToken: "",
 			profileImageUrl: null,
@@ -145,6 +141,7 @@ export const useRideStore = create((set) => ({
 	setPrice: (price) => set({ price }),
 	setRider: (rider) => set({ rider }),
 	clearRide: () => set({
+		rideId: "",
 		destination: "",
 		location: "",
 		numberOfPassenger: "",

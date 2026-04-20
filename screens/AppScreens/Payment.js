@@ -1,14 +1,9 @@
 import { StyleSheet, Text, View, TouchableOpacity } from "react-native";
 import { PayWithFlutterwave } from "flutterwave-react-native";
 import React from "react";
+import { FLUTTERWAVE_PUBLIC_KEY } from "@env";
 
 const Payment = ({ email, amount, name, phoneNumber, BookRide }) => {
-	console.log("💳 Payment component rendered with:");
-	console.log("   - Email:", email || "MISSING");
-	console.log("   - Amount:", amount);
-	console.log("   - Name:", name || "MISSING");
-	console.log("   - Phone:", phoneNumber || "MISSING");
-
 	// Safety check for required data
 	if (!amount || amount <= 0) {
 		console.error("❌ Invalid amount for payment:", amount);
@@ -20,15 +15,9 @@ const Payment = ({ email, amount, name, phoneNumber, BookRide }) => {
 	}
 
 	const handleOnRedirect = (data) => {
-		console.log("💳 Payment redirect data:", data);
-		console.log("💳 Payment status:", data?.status);
-
 		if (data.status === "completed" || data.status === "successful") {
-			// Handle successful payment
-			console.log("✅ Payment successful! Creating ride...");
-			BookRide();
-		} else {
-			console.log("❌ Payment was not completed. Status:", data.status);
+			const transactionId = data.transaction_id || data.flw_ref || data.tx_ref || null;
+			BookRide(transactionId);
 		}
 	};
 
@@ -46,20 +35,10 @@ const Payment = ({ email, amount, name, phoneNumber, BookRide }) => {
 
 	// Custom button component that receives onPress from Flutterwave
 	const CustomButton = ({ onPress, disabled, isInitializing }) => {
-		console.log("🔘 CustomButton rendered - onPress available:", !!onPress);
-
 		return (
 			<TouchableOpacity
 				style={[styles.payButton, disabled && styles.payButtonDisabled]}
-				onPress={() => {
-					console.log("🎯 Payment button pressed!");
-					if (onPress) {
-						console.log("✅ Calling Flutterwave onPress handler");
-						onPress();
-					} else {
-						console.log("❌ No onPress handler available");
-					}
-				}}
+				onPress={onPress}
 				disabled={disabled || isInitializing}
 			>
 				<Text style={styles.payButtonText}>
@@ -77,12 +56,12 @@ const Payment = ({ email, amount, name, phoneNumber, BookRide }) => {
 		<View style={styles.container}>
 			<PayWithFlutterwave
 				onRedirect={handleOnRedirect}
-				onAbort={() => console.log("❌ Payment aborted")}
-				onWillInitialize={() => console.log("🚀 Payment initializing...")}
-				onDidInitialize={() => console.log("✅ Payment initialized")}
+				onAbort={() => {}}
+				onWillInitialize={() => {}}
+				onDidInitialize={() => {}}
 				options={{
 					tx_ref: generateTransactionRef(10),
-					authorization: "FLWPUBK_TEST-1c7224ec1e2677cd1261b0fa3bbc0453-X",
+					authorization: FLUTTERWAVE_PUBLIC_KEY,
 					customer: {
 						email: email || "customer@kampusride.com",
 						name: name || "Customer",

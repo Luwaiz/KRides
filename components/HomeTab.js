@@ -13,9 +13,9 @@ import {
 	useRideDetailsStore,
 	useActiveRideStore,
 } from "../constants/Store";
-import { formatDate, parseISO } from "date-fns";
-import { FIREBASE_AUTH, FIREBASE_DB } from "../firebaseConfig";
-import { doc, onSnapshot } from "firebase/firestore";
+import { formatDate } from "date-fns";
+
+const TODAY_FORMATTED = formatDate(new Date(), "dd/MM/yyyy");
 
 const HomeTab = () => {
 	const Passengers = useBottomTabStore((state) => state.PassengerPage);
@@ -36,60 +36,9 @@ const HomeTab = () => {
 	const activeRide = useActiveRideStore(state => state.activeRide);
 	const hasActiveRide = !!activeRide;
 
-	const date = new Date();
-	const dateFormat = formatDate(date, "dd/MM/yyyy");
-	const [name, setName] = useState("");
-	const [loading, setLoading] = useState(false);
+	// Define canContinue based on location and destination selection
+	const canContinue = !!location && !!destination;
 
-	// Validation: Check if both pickup and destination are selected
-	const canContinue =
-		location && destination && pickupLocation && destinationCoords;
-
-	const fetchUserProfile = async () => {
-		try {
-			setLoading(true);
-			const auth = FIREBASE_AUTH;
-			const db = FIREBASE_DB;
-			const user = auth.currentUser;
-			if (user) {
-				const unsub = onSnapshot(
-					doc(db, "users", user.uid),
-					(docSnap) => {
-						if (docSnap.exists()) {
-							setName(docSnap.data()?.name);
-						}
-						setLoading(false);
-					},
-					(error) => {
-						// Silently handle permission-denied errors (happens during logout)
-						if (error.code === "permission-denied") {
-							console.log(
-								"🔒 Permission denied in HomeTab - user likely logged out"
-							);
-						} else {
-							console.error("❌ Error in HomeTab onSnapshot:", error);
-						}
-						setLoading(false);
-					}
-				);
-
-				// cleanup listener on unmount
-				return unsub;
-			}
-		} catch (e) {
-			console.error("Error fetching profile:", e);
-			setLoading(false);
-		}
-	};
-
-	useEffect(() => {
-		const unsubscribe = fetchUserProfile();
-		return () => {
-			if (unsubscribe && typeof unsubscribe === "function") {
-				unsubscribe();
-			}
-		};
-	}, []); // Only run once on mount
 	return (
 		<BottomSheet
 			snapPoints={["46%"]}
@@ -100,14 +49,14 @@ const HomeTab = () => {
 				<View style={styles.sheetCont}>
 					<View style={styles.topText}>
 						<Text style={styles.greet}>
-							Hello, <Text style={{ color: colors.primaryBlue }}>{name}</Text>
+							Hello, <Text style={{ color: colors.primaryBlue }}>{firstName || 'User'}</Text>
 						</Text>
 						<Text style={styles.where}>Where are you going?</Text>
 					</View>
 					<WhereTo disabled={hasActiveRide} />
 					<View style={styles.dateCont}>
 						<Feather name="calendar" size={ms(24)} color={colors.primaryBlue} />
-						<Text style={styles.date}>{dateFormat}</Text>
+						<Text style={styles.date}>{TODAY_FORMATTED}</Text>
 					</View>
 
 					{/* Show different messages based on state */}
