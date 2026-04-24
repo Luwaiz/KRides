@@ -9,6 +9,8 @@ import Terms from "../../components/Terms";
 import BackButton from "../../components/buttons/BackButton";
 import Firebase from "../../hooks/Firebase";
 import Toast from "react-native-toast-message";
+import { useGoogleAuth } from "../../hooks/useGoogleAuth";
+import useAuthStore from "../../constants/Store";
 
 const Signup = ({ navigation }) => {
 	const [email, setEmail] = useState("");
@@ -18,6 +20,8 @@ const Signup = ({ navigation }) => {
 	const [lastName, setLastName] = useState("");
 	const [confirmPassword, setConfirmPassword] = useState("");
 	const [loading, setLoading] = useState(false);
+	const { signInWithGoogle, loading: googleLoading } = useGoogleAuth();
+	const setAuthData = useAuthStore((state) => state.setAuthData);
 
 	const isPasswordValid = (password) => {
 		return password.length >= 8;
@@ -28,15 +32,34 @@ const Signup = ({ navigation }) => {
 	};
 
 	const isPhoneValid = (phone) => {
-		// Check if phone is exactly 11 digits
-		const phoneRegex = /^\d{11}$/;
-		return phoneRegex.test(phone);
+		// Accept 7–15 digits, with optional leading +
+		const phoneRegex = /^\+?\d{7,15}$/;
+		return phoneRegex.test(phone.replace(/\s/g, ""));
 	};
 
 	const isEmailValid = (email) => {
 		// Basic email validation
 		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 		return emailRegex.test(email);
+	};
+
+	const handleGoogleSignUp = async () => {
+		try {
+			const result = await signInWithGoogle('customer');
+			if (result && result.user) {
+				const { data: profile } = await Firebase.handleGoogleSignIn(result.user, result.googleUser, 'customer');
+				setAuthData(result.user, profile, 'customer');
+				Toast.show({
+					type: "tomatoToast",
+					text1: "Welcome!",
+					text2: "Signed up with Google",
+					position: "top",
+					visibilityTime: 2000,
+				});
+			}
+		} catch (error) {
+			Alert.alert("Google Sign-Up Failed", error.message || "Please try again.");
+		}
 	};
 
 	const handleSignUp = async () => {
@@ -65,7 +88,7 @@ const Signup = ({ navigation }) => {
 		if (!isPhoneValid(phone)) {
 			Alert.alert(
 				"Invalid Phone Number",
-				"Phone number must be exactly 11 digits (e.g., 08123456789)"
+				"Enter a valid phone number (e.g., 08123456789 or +2348123456789)"
 			);
 			return;
 		}
@@ -162,7 +185,7 @@ const Signup = ({ navigation }) => {
 							/>
 							<TextInput1
 								text={"Phone Number"}
-								placeholder={"08123456789"}
+								placeholder={"08123456789 or +2348123456789"}
 								onChangeText={(text) => setPhone(text)}
 								value={phone}
 								keyboardType="phone-pad"
@@ -200,7 +223,10 @@ const Signup = ({ navigation }) => {
 								<Text style={styles.OrText}>OR</Text>
 								<View style={styles.dash} />
 							</View>
-							<GoogleButton title={"Continue with Google"} />
+							<GoogleButton
+								title={googleLoading ? "Signing up..." : "Continue with Google"}
+								onPress={handleGoogleSignUp}
+							/>
 						</View>
 					</View>
 					<Terms />

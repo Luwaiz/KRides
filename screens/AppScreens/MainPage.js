@@ -194,6 +194,10 @@ const MainPage = () => {
 						rideId: activeRide.rideId,
 						driverId: rideData.driverId || activeRide.driverId,
 						driverName: rideData.driverName || activeRide.driverName || 'Driver',
+						pickupLocation: rideData.pickupLocation || activeRide.pickupLocation,
+						destination: rideData.destination || activeRide.destination,
+						amount: rideData.amount || activeRide.amount,
+						completedAt: rideData.completedAt || null,
 					});
 					setShowRatingModal(true);
 					clearActiveRide();
@@ -269,20 +273,23 @@ const MainPage = () => {
 							clearActiveRide();
 
 							if (result.refundStatus === "completed") {
+								const wasAccepted = rideStatus === "accepted";
 								Toast.show({
 									type: 'tomatoToast',
 									text1: 'Ride Cancelled & Refunded',
-									text2: `₦${result.refundAmount} will be refunded`,
+									text2: wasAccepted
+										? `₦${result.refundAmount} refund initiated — allow 3–5 business days`
+										: `Full refund of ₦${result.refundAmount} initiated — allow 3–5 business days`,
 									position: 'top',
-									visibilityTime: 4000,
+									visibilityTime: 5000,
 								});
 							} else {
 								Toast.show({
 									type: 'tomatoToast',
 									text1: 'Ride Cancelled',
-									text2: 'Your ride has been cancelled',
+									text2: 'Your ride has been cancelled. Any payment will be reviewed for refund.',
 									position: 'top',
-									visibilityTime: 3000,
+									visibilityTime: 4000,
 								});
 							}
 						} catch (error) {
@@ -389,6 +396,10 @@ const MainPage = () => {
 					rideId={completedRideData.rideId}
 					driverId={completedRideData.driverId}
 					driverName={completedRideData.driverName}
+					pickupLocation={completedRideData.pickupLocation}
+					destination={completedRideData.destination}
+					amount={completedRideData.amount}
+					completedAt={completedRideData.completedAt}
 				/>
 			)}
 		</View>

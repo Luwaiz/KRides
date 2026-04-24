@@ -23,7 +23,8 @@ const DriverEarnings = () => {
         uid: state.uid,
     }));
 
-    const [loading, setLoading] = useState(true);
+    const [initialLoading, setInitialLoading] = useState(true);
+    const [fetching, setFetching] = useState(false);
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
     const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
     const [earningsData, setEarningsData] = useState({
@@ -41,14 +42,19 @@ const DriverEarnings = () => {
 
     const fetchEarnings = async () => {
         if (!uid) return;
-        setLoading(true);
+        if (initialLoading) {
+            // first load — show full-screen spinner
+        } else {
+            setFetching(true);
+        }
         try {
             const data = await getDriverEarnings(uid, "month", selectedYear, selectedMonth);
             setEarningsData(data);
         } catch (error) {
             console.error("Error fetching earnings:", error);
         } finally {
-            setLoading(false);
+            setInitialLoading(false);
+            setFetching(false);
         }
     };
 
@@ -65,7 +71,7 @@ const DriverEarnings = () => {
 
     const getPeriodLabel = () => `${MONTHS[selectedMonth]} ${selectedYear}`;
 
-    if (loading) {
+    if (initialLoading) {
         return (
             <SafeAreaView style={styles.container}>
                 <BackButton text={<Text style={styles.headText}>Earnings</Text>} />
@@ -131,33 +137,41 @@ const DriverEarnings = () => {
                 {/* Earnings Summary Card */}
                 <View style={styles.summaryCard}>
                     <Text style={styles.periodLabel}>{getPeriodLabel()}</Text>
-                    <Text style={styles.netEarnings}>
-                        {formatCurrency(earningsData.netEarnings)}
-                    </Text>
-                    <Text style={styles.netEarningsLabel}>Net Earnings</Text>
-
-                    <View style={styles.statsRow}>
-                        <View style={styles.statItem}>
-                            <FontAwesome5 name="car" size={20} color={colors.primaryBlue} />
-                            <Text style={styles.statValue}>{earningsData.totalRides}</Text>
-                            <Text style={styles.statLabel}>Rides</Text>
-                        </View>
-                        <View style={styles.statDivider} />
-                        <View style={styles.statItem}>
-                            <MaterialIcons
-                                name="attach-money"
-                                size={24}
-                                color={colors.primaryBlue}
-                            />
-                            <Text style={styles.statValue}>
-                                {formatCurrency(earningsData.averagePerRide)}
+                    {fetching ? (
+                        <ActivityIndicator size="large" color={colors.primaryBlue} style={{ marginVertical: sp(24) }} />
+                    ) : (
+                        <>
+                            <Text style={styles.netEarnings}>
+                                {formatCurrency(earningsData.netEarnings)}
                             </Text>
-                            <Text style={styles.statLabel}>Avg/Ride</Text>
-                        </View>
-                    </View>
+                            <Text style={styles.netEarningsLabel}>Net Earnings</Text>
+
+                            <View style={styles.statsRow}>
+                                <View style={styles.statItem}>
+                                    <FontAwesome5 name="car" size={20} color={colors.primaryBlue} />
+                                    <Text style={styles.statValue}>{earningsData.totalRides}</Text>
+                                    <Text style={styles.statLabel}>Rides</Text>
+                                </View>
+                                <View style={styles.statDivider} />
+                                <View style={styles.statItem}>
+                                    <MaterialIcons
+                                        name="attach-money"
+                                        size={24}
+                                        color={colors.primaryBlue}
+                                    />
+                                    <Text style={styles.statValue}>
+                                        {formatCurrency(earningsData.averagePerRide)}
+                                    </Text>
+                                    <Text style={styles.statLabel}>Avg/Ride</Text>
+                                </View>
+                            </View>
+                        </>
+                    )}
                 </View>
 
-                {/* Earnings Breakdown */}
+                {/* Earnings Breakdown + Transactions — hidden while re-fetching */}
+                {!fetching && (
+                <>
                 <View style={styles.breakdownCard}>
                     <Text style={styles.sectionTitle}>Earnings Breakdown</Text>
                     <View style={styles.breakdownRow}>
@@ -230,6 +244,8 @@ const DriverEarnings = () => {
                         ))
                     )}
                 </View>
+                </>
+                )}
             </ScrollView>
         </SafeAreaView>
     );

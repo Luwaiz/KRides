@@ -255,23 +255,6 @@ const styles = StyleSheet.create({
 		width: "100%",
 		flex: 1,
 	},
-	OrContainer: {
-		flexDirection: "row",
-		alignItems: "center",
-		width: "100%",
-		height: 40,
-		justifyContent: "space-between",
-	},
-	dash: {
-		width: "47%",
-		height: 1,
-		backgroundColor: "black",
-	},
-	OrText: {
-		color: "black",
-		fontSize: 16,
-		fontWeight: "700",
-	},
 	bottomCont: {
 		backgroundColor: colors.secondary,
 		width: "100%",

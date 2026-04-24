@@ -18,7 +18,8 @@
         "FIREBASE_MESSAGING_SENDER_ID": "1054058095059",
         "FIREBASE_APP_ID": "1:1054058095059:web:ff2a3c61ad63d32d818f26",
         "FIREBASE_MEASUREMENT_ID": "G-GJK6Q51CPP",
-        "GOOGLE_MAPS_API_KEY": "AIzaSyB7fe6OfWqZs2BP0AoZS-2jLi5mIVbiYTM"
+        "GOOGLE_MAPS_API_KEY": "AIzaSyB7fe6OfWqZs2BP0AoZS-2jLi5mIVbiYTM",
+        "NOTIFICATION_API_KEY": "a282ae645ab255aa580ceea91dedd3c6bd92b9bafc8189bbb77b62e408c1c177"
       }
     },
     "preview": {
@@ -37,7 +38,8 @@
         "FIREBASE_MESSAGING_SENDER_ID": "1054058095059",
         "FIREBASE_APP_ID": "1:1054058095059:web:ff2a3c61ad63d32d818f26",
         "FIREBASE_MEASUREMENT_ID": "G-GJK6Q51CPP",
-        "GOOGLE_MAPS_API_KEY": "AIzaSyB7fe6OfWqZs2BP0AoZS-2jLi5mIVbiYTM"
+        "GOOGLE_MAPS_API_KEY": "AIzaSyB7fe6OfWqZs2BP0AoZS-2jLi5mIVbiYTM",
+        "NOTIFICATION_API_KEY": "krides-change-this-to-a-strong-random-secret"
       }
     }
   },

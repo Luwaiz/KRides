@@ -22,7 +22,6 @@ const Stack = createNativeStackNavigator();
 const Navigation = () => {
 	const [initializing, setInitializing] = useState(true);
 	const [user, setUser] = useState(null);
-	const [roleLoading, setRoleLoading] = useState(false);
 	const [hasSeenOnboarding, setHasSeenOnboarding] = useState(null);
 
 	useEffect(() => {
@@ -60,8 +59,10 @@ const Navigation = () => {
 
 				setUser(currentUser);
 
-				if (currentUser && !storeRole) {
-					setRoleLoading(true);
+				// Read role directly from store to avoid stale closure when customer
+				// signs out and driver signs in back-to-back in the same effect cycle.
+				const currentRole = useAuthStore.getState().role;
+				if (currentUser && !currentRole) {
 					try {
 						console.log("🔍 Fetching user profile for:", currentUser.uid);
 
@@ -90,13 +91,12 @@ const Navigation = () => {
 								setLastName(profile.lastName || "");
 							}
 						} else {
-							// Check pending_role set by Google sign-in before auth state fired
+							// Check pending_role set before auth state fired
 							const pendingRole = await AsyncStorage.getItem('pending_role');
 							await AsyncStorage.removeItem('pending_role');
 
 							if (pendingRole === 'customer') {
 								// Google sign-in explicitly requested customer — honour it
-								// even if a driver profile exists for this UID
 								setAuthData(currentUser, {
 									email: currentUser.email,
 									name: currentUser.displayName || "User",
@@ -107,7 +107,7 @@ const Navigation = () => {
 								setFirstName(nameParts[0] || "");
 								setLastName(nameParts.slice(1).join(" ") || "");
 							} else {
-								// Check in "drivers"
+								// pending_role='driver' (DriverLogin) OR unknown — check drivers first
 								const driverRef = doc(FIREBASE_DB, "drivers", currentUser.uid);
 								const driverSnap = await getDoc(driverRef);
 
@@ -115,11 +115,12 @@ const Navigation = () => {
 
 								if (driverSnap.exists()) {
 									const profile = driverSnap.data();
-									const role = profile.role || "driver";
+									const role = "driver";
 									setAuthData(currentUser, profile, role);
 									await AsyncStorage.setItem(`role_${currentUser.uid}`, role);
 									setDriverProfile({ ...profile, uid: currentUser.uid });
-								} else {
+								} else if (pendingRole !== 'driver') {
+									// Only fall back to customer if we weren't explicitly told it's a driver
 									setAuthData(currentUser, {
 										email: currentUser.email,
 										name: currentUser.displayName || "User"
@@ -160,7 +161,6 @@ const Navigation = () => {
 						setFirstName(nameParts[0] || "User");
 						setLastName(nameParts.slice(1).join(" ") || "");
 					} finally {
-						setRoleLoading(false);
 					}
 				} else if (!currentUser) {
 					if (mounted) {
@@ -181,7 +181,7 @@ const Navigation = () => {
 		};
 	}, [storeRole]);
 
-	if (initializing || (user && !storeRole && roleLoading) || hasSeenOnboarding === null) {
+	if (initializing || (user && !storeRole) || hasSeenOnboarding === null) {
 		return (
 			<View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
 				<ActivityIndicator size="large" color="#007bff" />

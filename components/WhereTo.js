@@ -1,4 +1,4 @@
-import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Image, StyleSheet, Text, TouchableOpacity, View, Alert } from "react-native";
 import React, { useState } from "react";
 import { colors } from "../constants/styling";
 import { sp, fs, br, hp, wp } from "../constants/responsive";
@@ -26,6 +26,10 @@ const WhereTo = ({ disabled = false }) => {
 	const navigation = useNavigation();
 
 	const handlePickupSelect = (selectedLocation) => {
+		if (destination && selectedLocation.name === destination) {
+			Alert.alert("Invalid Selection", "Pickup and destination cannot be the same location.");
+			return;
+		}
 		setLocation(selectedLocation.name);
 		setPickupLocation({
 			latitude: selectedLocation.latitude,
@@ -33,10 +37,13 @@ const WhereTo = ({ disabled = false }) => {
 			name: selectedLocation.name,
 			address: selectedLocation.address,
 		});
-		console.log("Pickup selected:", selectedLocation);
 	};
 
 	const handleDestinationSelect = (selectedLocation) => {
+		if (location && selectedLocation.name === location) {
+			Alert.alert("Invalid Selection", "Destination cannot be the same as your pickup location.");
+			return;
+		}
 		setDestination(selectedLocation.name);
 		setDestinationCoords({
 			latitude: selectedLocation.latitude,
@@ -44,7 +51,6 @@ const WhereTo = ({ disabled = false }) => {
 			name: selectedLocation.name,
 			address: selectedLocation.address,
 		});
-		console.log("Destination selected:", selectedLocation);
 	};
 
 	return (

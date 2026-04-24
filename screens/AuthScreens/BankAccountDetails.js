@@ -17,7 +17,7 @@ import BackButton from "../../components/buttons/BackButton";
 import { Picker } from "@react-native-picker/picker";
 import { FIREBASE_DB, FIREBASE_AUTH } from "../../firebaseConfig";
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
-import axios from "axios";
+const PAYMENTS_SERVER_URL = 'https://krides.onrender.com/api/payments';
 import { useDriverDetails } from "../../constants/Store";
 const { width, height } = Dimensions.get("window");
 const NIGERIAN_BANKS = [
@@ -82,38 +82,23 @@ const BankAccountDetails = ({ navigation, route }) => {
 
             console.log("Creating subaccount for driver:", driverId);
 
-            // WARNING: EXPOSING SECRET KEY ON CLIENT SIDE IS NOT SECURE FOR PRODUCTION
-            // TODO: Move this to a secure backend or use a proxy server when going live.
-            const FLUTTERWAVE_SECRET_KEY = "FLWSECK_TEST-f3c5c2ad9a10329d839b64ba46d167bd-X";
+            // Call our backend — secret key stays server-side
+            const response = await fetch(`${PAYMENTS_SERVER_URL}/create-subaccount`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    bankCode,
+                    accountNumber,
+                    accountName,
+                    businessName: fullName || accountName,
+                    phone,
+                }),
+            });
 
-            // 1. Call Flutterwave API directly
-            const payload = {
-                account_bank: bankCode,
-                account_number: accountNumber,
-                business_name: fullName || accountName,
-                business_email: `${phone}@rideapp.com`,
-                business_mobile: phone,
-                country: "NG",
-                split_type: "flat",
-                split_value: 50,
-            };
-            console.log("Sending payload to Flutterwave:", JSON.stringify(payload, null, 2));
-
-            const response = await axios.post(
-                "https://api.flutterwave.com/v3/subaccounts",
-                payload,
-                {
-                    headers: {
-                        Authorization: `Bearer ${FLUTTERWAVE_SECRET_KEY}`,
-                        "Content-Type": "application/json",
-                    },
-                }
-            );
-
-            const result = response.data;
+            const result = await response.json();
             console.log("Subaccount creation result:", result);
 
-            if (result.status === "success") {
+            if (result.success) {
                 const subaccountId = result.data.subaccount_id;
                 const verifiedBankName = result.data.bank_name || bankName;
 
@@ -152,15 +137,11 @@ const BankAccountDetails = ({ navigation, route }) => {
                     ]
                 );
             } else {
-                throw new Error(result.message || "Failed to create subaccount");
+                Alert.alert("Error", result.error || "Could not save bank details. Please check your account details and try again.");
             }
         } catch (error) {
             console.error("Error saving bank details:", error);
-            if (error.response) {
-                console.error("Flutterwave Error Response:", JSON.stringify(error.response.data, null, 2));
-            }
-            const errorMessage = error.response?.data?.message || error.message || "Could not save bank details.";
-            Alert.alert("Error", errorMessage);
+            Alert.alert("Error", error.message || "Could not save bank details.");
         } finally {
             setLoading(false);
         }

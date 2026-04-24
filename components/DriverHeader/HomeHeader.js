@@ -1,4 +1,4 @@
-import { StatusBar, StyleSheet, Text, View, Switch } from "react-native";
+import { StatusBar, StyleSheet, Text, View, Switch, Alert } from "react-native";
 import React, { useEffect, useState } from "react";
 import { Octicons } from "@expo/vector-icons";
 import { DrawerActions, useNavigation } from "@react-navigation/native";
@@ -8,11 +8,14 @@ import Cash from "../../assets/svg/Cash.svg";
 import Calendar from "../../assets/svg/Calendar.svg";
 import { getDriverTodayStats } from "../../helpers/driverStats";
 import { useDriverDetails, useDriverAvailability } from "../../constants/Store";
+import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { FIREBASE_DB } from "../../firebaseConfig";
 
 const HomeHeader = () => {
 	const navigation = useNavigation();
 	const [completedTrips, setCompletedTrips] = useState(0);
 	const [earnedToday, setEarnedToday] = useState(0);
+	const [togglingOnline, setTogglingOnline] = useState(false);
 
 	// Get driver ID from store
 	const uid = useDriverDetails((state) => state.uid);
@@ -23,8 +26,34 @@ const HomeHeader = () => {
 	const toggleAvailability = useDriverAvailability((state) => state.toggleAvailability);
 
 	const OpenDrawer = () => {
-		// Open the drawer instead of navigating to settings
 		navigation.dispatch(DrawerActions.openDrawer());
+	};
+
+	const handleToggle = async (newValue) => {
+		if (togglingOnline) return;
+		setTogglingOnline(true);
+		toggleAvailability(); // optimistic update
+		try {
+			if (uid) {
+				await updateDoc(doc(FIREBASE_DB, "drivers", uid), {
+					isOnline: newValue,
+					lastStatusChange: serverTimestamp(),
+				});
+			}
+		} catch (error) {
+			console.error("Error updating availability:", error);
+			toggleAvailability(); // rollback
+			Alert.alert(
+				"Connection Error",
+				"Could not update your availability status. Check your connection and try again.",
+				[
+					{ text: "Cancel", style: "cancel" },
+					{ text: "Retry", onPress: () => handleToggle(newValue) },
+				]
+			);
+		} finally {
+			setTogglingOnline(false);
+		}
 	};
 
 	const fetchDriverStats = async () => {
@@ -62,11 +91,12 @@ const HomeHeader = () => {
 				{/* Online/Offline Toggle */}
 				<View style={styles.statusBox}>
 					<Text style={styles.statusText}>
-						{isOnline ? '🟢 Online' : '🔴 Offline'}
+						{togglingOnline ? '⏳ Updating...' : isOnline ? '🟢 Online' : '🔴 Offline'}
 					</Text>
 					<Switch
 						value={isOnline}
-						onValueChange={toggleAvailability}
+						onValueChange={handleToggle}
+						disabled={togglingOnline}
 						trackColor={{ false: '#ccc', true: '#4caf50' }}
 						thumbColor={isOnline ? '#fff' : '#f4f3f4'}
 					/>

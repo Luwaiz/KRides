@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import {
+	Alert,
 	Modal,
 	View,
 	Text,
@@ -17,7 +18,7 @@ import { doc, updateDoc, arrayUnion, increment } from "firebase/firestore";
 
 const { width } = Dimensions.get("screen");
 
-const RatingModal = ({ visible, onClose, rideId, driverId, driverName }) => {
+const RatingModal = ({ visible, onClose, rideId, driverId, driverName, pickupLocation, destination, amount, completedAt }) => {
 	const [rating, setRating] = useState(0);
 	const [feedback, setFeedback] = useState("");
 	const [loading, setLoading] = useState(false);
@@ -67,9 +68,22 @@ const RatingModal = ({ visible, onClose, rideId, driverId, driverName }) => {
 	};
 
 	const handleClose = () => {
-		setRating(0);
-		setFeedback("");
-		onClose();
+		Alert.alert(
+			"Skip Rating?",
+			"Your rating helps drivers improve. Are you sure you want to skip?",
+			[
+				{ text: "Go Back", style: "cancel" },
+				{
+					text: "Skip",
+					style: "destructive",
+					onPress: () => {
+						setRating(0);
+						setFeedback("");
+						onClose();
+					},
+				},
+			]
+		);
 	};
 
 	return (
@@ -85,6 +99,25 @@ const RatingModal = ({ visible, onClose, rideId, driverId, driverName }) => {
 					<Text style={styles.subtitle}>
 						How was your experience with {driverName}?
 					</Text>
+
+					{/* Ride summary */}
+					{(pickupLocation || destination || amount) && (
+						<View style={styles.rideSummary}>
+							{pickupLocation && destination && (
+								<Text style={styles.rideSummaryRoute} numberOfLines={2}>
+									{pickupLocation} → {destination}
+								</Text>
+							)}
+							<View style={styles.rideSummaryRow}>
+								{amount ? <Text style={styles.rideSummaryAmount}>₦{amount}</Text> : null}
+								{completedAt?.toDate ? (
+									<Text style={styles.rideSummaryTime}>
+										{completedAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+									</Text>
+								) : null}
+							</View>
+						</View>
+					)}
 
 					{/* Star Rating */}
 					<View style={styles.starsContainer}>
@@ -180,6 +213,35 @@ const styles = StyleSheet.create({
 		textAlign: "center",
 		marginBottom: sp(24),
 		paddingHorizontal: sp(8),
+	},
+	rideSummary: {
+		width: '100%',
+		backgroundColor: '#f5f5f5',
+		borderRadius: br(10),
+		padding: sp(12),
+		marginBottom: sp(20),
+	},
+	rideSummaryRoute: {
+		fontSize: fs(13),
+		color: '#444',
+		fontFamily: 'Albert-Regular',
+		marginBottom: sp(6),
+		textAlign: 'center',
+	},
+	rideSummaryRow: {
+		flexDirection: 'row',
+		justifyContent: 'center',
+		gap: sp(16),
+	},
+	rideSummaryAmount: {
+		fontSize: fs(14),
+		fontFamily: 'Albert-SemiBold',
+		color: colors.primaryBlue,
+	},
+	rideSummaryTime: {
+		fontSize: fs(13),
+		color: colors.lightGrey3,
+		fontFamily: 'Albert-Regular',
 	},
 	starsContainer: {
 		flexDirection: "row",

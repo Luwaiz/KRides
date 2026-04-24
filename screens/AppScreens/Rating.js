@@ -8,7 +8,8 @@ import RideEndImage from "../../assets/svg/RideEnd.svg";
 import { AirbnbRating, Rating } from "react-native-ratings";
 import StarRating from "../../components/StarRating";
 
-const Ratings = () => {
+const Ratings = ({ route }) => {
+	const driverName = route?.params?.driverName || "Your Driver";
 	const handleRatingChange = (newRating) => {
 		console.log('New rating:', newRating);
 	  };
@@ -22,7 +23,7 @@ const Ratings = () => {
 			<View style={styles.bottomCont}>
 				<View style={styles.AvatarCont}>
 					<RideEndImage />
-					<Text style={styles.name}>Henry Ade</Text>
+					<Text style={styles.name}>{driverName}</Text>
 				</View>
 				<View style={styles.infoCont}>
 					<Text style={styles.Text1}>How was your Trip?</Text>

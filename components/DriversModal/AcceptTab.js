@@ -10,7 +10,7 @@ import { useAcceptedRideStore, useDriverDetails } from "../../constants/Store";
 import useAuthStore from "../../constants/Store";
 import Avatar from "../../assets/svg/Frame 77avatar.svg";
 import Arrival from "../modals/Arrival";
-import { updateRideStatus, listenToPendingRides } from "../../helpers/firebaseRides";
+import { updateRideStatus, listenToPendingRides, declineRide } from "../../helpers/firebaseRides";
 import { getRideCoordinates } from "../../helpers/getLocationCoordinates";
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { FIREBASE_DB } from "../../firebaseConfig";
@@ -36,6 +36,7 @@ const AcceptTab = () => {
 	const phone = useDriverDetails((state) => state.phone);
 	const VehicleId = useDriverDetails((state) => state.vehicle_id);
 	const uid = useDriverDetails((state) => state.uid);
+	const bankDetailsVerified = useDriverDetails((state) => state.bankDetailsVerified);
 
 	const navigation = useNavigation();
 	const OpenDrawer = () => {
@@ -61,46 +62,62 @@ const AcceptTab = () => {
 		return unsubscribe;
 	}, [uid, acceptedRide]);
 
-	const RideEnded = async () => {
-		if (!acceptedRide?.rideId) {
-			console.log("⚠️ No ride ID found to complete");
-			return;
-		}
+	const RideEnded = () => {
+		if (!acceptedRide?.rideId) return;
+		Alert.alert(
+			"Complete Ride",
+			"Are you sure you want to mark this ride as completed?",
+			[
+				{ text: "Not yet", style: "cancel" },
+				{ text: "Complete", style: "default", onPress: () => doCompleteRide() },
+			]
+		);
+	};
 
+	// Called when driver taps OK on the Arrival/completion modal
+	const handleRideCompleteDismiss = () => {
+		const queued = nextRide; // capture before state changes
+		if (queued) {
+			Alert.alert(
+				"Next Ride Ready",
+				`You have a queued ride from ${queued.customerName || "a customer"}.\n\n${queued.pickupLocation || "Pickup"} → ${queued.destination || "Destination"}\n₦${queued.amount || 0}\n\nStart this ride now?`,
+				[
+					{
+						text: "Decline",
+						style: "destructive",
+						onPress: async () => {
+							setHasArrived(false);
+							clearAcceptedRide();
+							try {
+								await declineRide(queued.rideId, uid);
+							} catch (e) {
+								console.warn("⚠️ Could not decline queued ride:", e.message);
+							}
+						},
+					},
+					{
+						text: "Accept",
+						onPress: () => {
+							activateNextRide();
+							setHasArrived(false);
+						},
+					},
+				],
+				{ cancelable: false }
+			);
+		} else {
+			clearAcceptedRide();
+			setHasArrived(false);
+		}
+	};
+
+	const doCompleteRide = async () => {
 		setLoading(true);
 		try {
-			console.log("✅ Completing ride:", acceptedRide.rideId);
-			console.log("📋 Next ride queued?:", !!nextRide);
-			if (nextRide) {
-				console.log("📋 Next ride details:", {
-					rideId: nextRide.rideId,
-					customer: nextRide.customerName,
-					amount: nextRide.amount
-				});
-			}
-
 			await updateRideStatus(acceptedRide.rideId, "completed");
 			console.log("✅ Ride marked as completed in Firestore");
-
-			// Show success modal
+			// Show the completion modal — next-ride logic runs after driver taps OK
 			setEndRide(true);
-
-			// Activate next ride after a brief delay
-			setTimeout(() => {
-				console.log("⏰ Timeout triggered - checking for next ride...");
-				if (nextRide) {
-					console.log('🔄 Activating next queued ride:', nextRide.rideId);
-					console.log('🔄 Before activation - acceptedRide:', acceptedRide?.rideId);
-					activateNextRide();
-					console.log('🔄 After activation called');
-					setEndRide(false); // Close modal
-					setHasArrived(false); // Reset arrival state for next ride
-				} else {
-					console.log('🏁 No next ride queued, clearing accepted ride');
-					clearAcceptedRide();
-					setHasArrived(false); // Reset arrival state
-				}
-			}, 1500);
 		} catch (error) {
 			console.error("❌ Error completing ride:", error);
 			alert("Unable to complete ride. Please check your connection and try again.");
@@ -134,17 +151,23 @@ const AcceptTab = () => {
 	};
 
 	// Notify customer that driver has arrived
-	const notifyArrival = async () => {
+	const notifyArrival = () => {
 		if (!acceptedRide?.customerId) {
 			Alert.alert('Error', 'Customer information not available');
 			return;
 		}
 
-		if (hasArrived) {
-			Alert.alert('Already Notified', 'You have already notified the customer of your arrival');
-			return;
-		}
+		Alert.alert(
+			"Confirm Arrival",
+			"Mark yourself as arrived at the pickup location? This will notify the customer and start the ride.",
+			[
+				{ text: "Not Yet", style: "cancel" },
+				{ text: "Yes, I've Arrived", onPress: doNotifyArrival },
+			]
+		);
+	};
 
+	const doNotifyArrival = async () => {
 		try {
 			// Use acceptedRide.driverName which was set when accepting the ride
 			// Fallback to fullName from store, then to 'Your driver'
@@ -190,7 +213,10 @@ const AcceptTab = () => {
 		}
 
 		if (nextRide) {
-			alert("You already have a ride queued. Complete the current rides first.");
+			Alert.alert(
+				"Queue Full",
+				`You can only queue 1 ride at a time. Complete your current ride first, then accept "${nextRide.customerName || 'the queued ride'}" before picking up another.`
+			);
 			return;
 		}
 
@@ -297,6 +323,22 @@ const AcceptTab = () => {
 										? acceptedRide.destination?.name || acceptedRide.destination?.address
 										: acceptedRide.destination || acceptedRide.destinationCoords?.name || "Unknown"}
 								</Text>
+								{(!acceptedRide.pickupCoords || !acceptedRide.destinationCoords) && (
+									<TouchableOpacity
+										style={styles.retryMapBtn}
+										onPress={() => {
+											const pickup = acceptedRide.pickupLocation || acceptedRide.location;
+											const dest = acceptedRide.destination;
+											getRideCoordinates(pickup, dest)
+												.then(({ pickup: p, destination: d }) => {
+													useAcceptedRideStore.getState().updateRideCoords(p, d);
+												})
+												.catch(() => Alert.alert("Error", "Could not load map route. Check your connection."));
+										}}
+									>
+										<Text style={styles.retryMapText}>Retry map route</Text>
+									</TouchableOpacity>
+								)}
 							</View>
 						)}
 
@@ -306,6 +348,11 @@ const AcceptTab = () => {
 								<Text style={styles.nextRideText}>
 									{nextRide.customerName} • ₦{calculateDriverEarnings(nextRide.amount, nextRide.numberOfPassengers)}
 								</Text>
+								{(nextRide.pickupLocation || nextRide.location) ? (
+									<Text style={styles.nextRidePickup} numberOfLines={1}>
+										From: {nextRide.pickupLocation || nextRide.location}
+									</Text>
+								) : null}
 							</View>
 						)}
 
@@ -326,6 +373,17 @@ const AcceptTab = () => {
 
 						{showPendingRides && (
 							<View style={styles.pendingRidesContainer}>
+								{!bankDetailsVerified && (
+									<View style={styles.bankWarning}>
+										<MaterialIcons name="warning" size={16} color="#b45309" />
+										<Text style={styles.bankWarningText}>
+											Add bank details to accept queued rides.{' '}
+											<Text style={styles.bankWarningLink} onPress={() => navigation.navigate('BankAccountDetails')}>
+												Set up now
+											</Text>
+										</Text>
+									</View>
+								)}
 								{pendingRides.length === 0 ? (
 									<Text style={styles.noPendingText}>No pending rides available</Text>
 								) : (
@@ -390,7 +448,7 @@ const AcceptTab = () => {
 					</View>
 				</BottomSheetScrollView>
 			</BottomSheet>
-			<Arrival modal={endRide} setModal={setEndRide} />
+			<Arrival modal={endRide} setModal={setEndRide} onDismiss={handleRideCompleteDismiss} />
 		</>
 	);
 };
@@ -484,6 +542,11 @@ const styles = StyleSheet.create({
 		fontSize: fs(14),
 		color: "black",
 	},
+	nextRidePickup: {
+		fontSize: fs(12),
+		color: colors.lightGrey3,
+		marginTop: sp(2),
+	},
 	collapsibleHeader: {
 		flexDirection: "row",
 		justifyContent: "space-between",
@@ -569,5 +632,33 @@ const styles = StyleSheet.create({
 		color: '#fff',
 		fontSize: fs(16),
 		fontWeight: '600',
+	},
+	retryMapBtn: {
+		marginTop: sp(8),
+		alignSelf: 'flex-start',
+	},
+	retryMapText: {
+		fontSize: fs(12),
+		fontFamily: 'Albert-SemiBold',
+		color: colors.primaryBlue,
+		textDecorationLine: 'underline',
+	},
+	bankWarning: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: sp(8),
+		backgroundColor: '#fef3c7',
+		borderRadius: br(8),
+		padding: sp(10),
+		marginBottom: sp(8),
+	},
+	bankWarningText: {
+		flex: 1,
+		fontSize: fs(13),
+		color: '#92400e',
+	},
+	bankWarningLink: {
+		fontFamily: 'Albert-SemiBold',
+		textDecorationLine: 'underline',
 	},
 });

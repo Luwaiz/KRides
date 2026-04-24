@@ -1,9 +1,9 @@
-import { StyleSheet, Text, View, TouchableOpacity } from "react-native";
+import { StyleSheet, Text, View, TouchableOpacity, Alert } from "react-native";
 import { PayWithFlutterwave } from "flutterwave-react-native";
 import React from "react";
 import { FLUTTERWAVE_PUBLIC_KEY } from "@env";
 
-const Payment = ({ email, amount, name, phoneNumber, BookRide }) => {
+const Payment = ({ email, amount, name, phoneNumber, BookRide, loading = false }) => {
 	// Safety check for required data
 	if (!amount || amount <= 0) {
 		console.error("❌ Invalid amount for payment:", amount);
@@ -18,7 +18,27 @@ const Payment = ({ email, amount, name, phoneNumber, BookRide }) => {
 		if (data.status === "completed" || data.status === "successful") {
 			const transactionId = data.transaction_id || data.flw_ref || data.tx_ref || null;
 			BookRide(transactionId);
+		} else if (data.status === "cancelled") {
+			Alert.alert(
+				"Payment Cancelled",
+				"You cancelled the payment. Tap 'Pay' below to try again.",
+				[{ text: "OK" }]
+			);
+		} else {
+			Alert.alert(
+				"Payment Failed",
+				"Your payment could not be completed. Please try again or use a different payment method.",
+				[{ text: "Try Again" }]
+			);
 		}
+	};
+
+	const handleOnAbort = () => {
+		Alert.alert(
+			"Payment Cancelled",
+			"You cancelled the payment. Tap 'Pay' below to try again.",
+			[{ text: "OK" }]
+		);
 	};
 
 	const generateTransactionRef = (length) => {
@@ -35,14 +55,17 @@ const Payment = ({ email, amount, name, phoneNumber, BookRide }) => {
 
 	// Custom button component that receives onPress from Flutterwave
 	const CustomButton = ({ onPress, disabled, isInitializing }) => {
+		const isDisabled = disabled || isInitializing || loading;
 		return (
 			<TouchableOpacity
-				style={[styles.payButton, disabled && styles.payButtonDisabled]}
+				style={[styles.payButton, isDisabled && styles.payButtonDisabled]}
 				onPress={onPress}
-				disabled={disabled || isInitializing}
+				disabled={isDisabled}
 			>
 				<Text style={styles.payButtonText}>
-					{isInitializing
+					{loading
+						? "Booking ride..."
+						: isInitializing
 						? "Initializing..."
 						: disabled
 						? "Processing..."
@@ -56,7 +79,7 @@ const Payment = ({ email, amount, name, phoneNumber, BookRide }) => {
 		<View style={styles.container}>
 			<PayWithFlutterwave
 				onRedirect={handleOnRedirect}
-				onAbort={() => {}}
+				onAbort={handleOnAbort}
 				onWillInitialize={() => {}}
 				onDidInitialize={() => {}}
 				options={{

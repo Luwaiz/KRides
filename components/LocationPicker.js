@@ -85,8 +85,11 @@ const LocationPicker = ({
 			} else {
 				Alert.alert(
 					'Error',
-					'Unable to load locations. Please try again later.',
-					[{ text: 'OK', onPress: onClose }]
+					'Unable to load locations. Please try again.',
+					[
+						{ text: 'Cancel', style: 'cancel', onPress: onClose },
+						{ text: 'Retry', onPress: fetchLocations },
+					]
 				);
 			}
 		}

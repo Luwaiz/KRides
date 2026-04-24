@@ -63,13 +63,14 @@ const RideRequestModal = ({ visible, ride, onAccept, onDecline, onTimeout }) => 
         };
     }, [visible, ride?.rideId]);
 
-    // Pulse animation for timer when low
+    // Pulse animation + haptic for last 5 seconds
     useEffect(() => {
-        if (visible && countdown <= 5) {
+        if (visible && countdown <= 5 && countdown > 0) {
             Animated.sequence([
                 Animated.timing(pulseAnim, { toValue: 1.3, duration: 200, useNativeDriver: true }),
                 Animated.timing(pulseAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
             ]).start();
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
         }
     }, [countdown, visible]);
 

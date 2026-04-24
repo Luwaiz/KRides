@@ -58,9 +58,14 @@ const HistoryCard = ({ history }) => {
 		}
 	};
 	return (
-		<View style={styles.historyContainer}>
+		<View style={[styles.historyContainer, selected === history?.rideId && styles.historyContainerSelected]}>
 			{history !== undefined && (
-				<Pressable onLongPress={() => onhold(history?.rideId)}>
+				<Pressable
+					onLongPress={() => onhold(history?.rideId)}
+					android_ripple={{ color: colors.lightGrey2, borderless: false }}
+					style={({ pressed }) => [pressed && styles.pressed]}
+				>
+					<Text style={styles.longPressHint}>Hold to select</Text>
 					<View style={styles.dateContainer}>
 						<Text style={styles.dayDate}>{dateFormat}</Text>
 						<Text style={styles.time}>{time}</Text>
@@ -147,6 +152,19 @@ const styles = StyleSheet.create({
 		width: "100%",
 		borderColor: colors.lightGrey2,
 		borderWidth: 2,
+	},
+	historyContainerSelected: {
+		borderColor: colors.primaryBlue,
+		backgroundColor: "#f0f7ff",
+	},
+	longPressHint: {
+		fontSize: 11,
+		color: colors.lightGrey3,
+		textAlign: "right",
+		marginBottom: 4,
+	},
+	pressed: {
+		opacity: 0.85,
 	},
 	dayDate: {
 		fontSize: 18,

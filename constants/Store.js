@@ -146,6 +146,7 @@ export const useRideStore = create((set) => ({
 		location: "",
 		numberOfPassenger: "",
 		price: "",
+		rider: "",
 	}),
 }));
 
@@ -180,6 +181,9 @@ export const useAcceptedRideStore = create((set) => ({
 	nextRide: null, // Next queued ride
 	isRideActive: false,
 	setAcceptedRide: (ride) => set({ acceptedRide: ride, isRideActive: true }),
+	updateRideCoords: (pickupCoords, destinationCoords) => set((state) => ({
+		acceptedRide: state.acceptedRide ? { ...state.acceptedRide, pickupCoords, destinationCoords } : state.acceptedRide,
+	})),
 	setNextRide: (ride) => set({ nextRide: ride }),
 	clearAcceptedRide: () => set({ acceptedRide: null, isRideActive: false }),
 	clearNextRide: () => set({ nextRide: null }),

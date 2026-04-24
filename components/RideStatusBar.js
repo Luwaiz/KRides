@@ -4,6 +4,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../constants/styling';
 import { sp, fs, br } from '../constants/responsive';
 
+const NO_DRIVER_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
+const STILL_SEARCHING_TIMEOUT_MS = 90 * 1000; // 1.5 minutes
+
 const RideStatusBar = ({
     status,
     driverName,
@@ -14,7 +17,11 @@ const RideStatusBar = ({
     cancelling,
 }) => {
     const [expanded, setExpanded] = useState(false);
+    const [noDriverAvailable, setNoDriverAvailable] = useState(false);
+    const [stillSearching, setStillSearching] = useState(false);
     const pulseAnim = useRef(new Animated.Value(1)).current;
+    const noDriverTimerRef = useRef(null);
+    const stillSearchingTimerRef = useRef(null);
 
     useEffect(() => {
         if (status === 'pending') {
@@ -25,14 +32,40 @@ const RideStatusBar = ({
                 ])
             );
             pulse.start();
-            return () => pulse.stop();
+
+            setNoDriverAvailable(false);
+            setStillSearching(false);
+
+            stillSearchingTimerRef.current = setTimeout(() => {
+                setStillSearching(true);
+            }, STILL_SEARCHING_TIMEOUT_MS);
+
+            noDriverTimerRef.current = setTimeout(() => {
+                setNoDriverAvailable(true);
+            }, NO_DRIVER_TIMEOUT_MS);
+
+            return () => {
+                pulse.stop();
+                clearTimeout(stillSearchingTimerRef.current);
+                clearTimeout(noDriverTimerRef.current);
+            };
         } else {
             pulseAnim.setValue(1);
+            setNoDriverAvailable(false);
+            setStillSearching(false);
+            clearTimeout(stillSearchingTimerRef.current);
+            clearTimeout(noDriverTimerRef.current);
         }
     }, [status]);
 
 
     const getStatusText = () => {
+        if (status === 'pending' && noDriverAvailable) {
+            return 'No drivers nearby — you can cancel and try again';
+        }
+        if (status === 'pending' && stillSearching) {
+            return 'Still searching for a driver nearby...';
+        }
         switch (status) {
             case 'pending':
                 return 'Searching for driver...';

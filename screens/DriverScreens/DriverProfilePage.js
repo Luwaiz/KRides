@@ -95,6 +95,8 @@ const DriverProfilePage = () => {
 
 	const uploadToCloudinary = async (imageAsset) => {
 		setUploadingImage(true);
+		const controller = new AbortController();
+		const timeoutId = setTimeout(() => controller.abort(), 30000);
 		try {
 			const cloudName = "dmutxmoj3";
 			const uploadPreset = "image_upload";
@@ -113,6 +115,7 @@ const DriverProfilePage = () => {
 						"content-type": "application/json",
 					},
 					method: "POST",
+					signal: controller.signal,
 				}
 			);
 
@@ -123,9 +126,14 @@ const DriverProfilePage = () => {
 				alert("Upload failed");
 			}
 		} catch (error) {
-			console.error("Error uploading image:", error);
-			alert("Error uploading image");
+			if (error.name === "AbortError") {
+				alert("Upload timed out. Please check your connection and try again.");
+			} else {
+				console.error("Error uploading image:", error);
+				alert("Error uploading image");
+			}
 		} finally {
+			clearTimeout(timeoutId);
 			setUploadingImage(false);
 		}
 	};

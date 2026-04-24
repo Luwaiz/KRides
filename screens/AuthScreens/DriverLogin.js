@@ -8,6 +8,7 @@ import Terms from "../../components/Terms";
 import BackButton from "../../components/buttons/BackButton";
 import { useDriverDetails } from "../../constants/Store";
 import Firebase from "../../hooks/Firebase";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const { height, width } = Dimensions.get('window');
 
@@ -34,6 +35,11 @@ const DriverLogin = ({ navigation }) => {
 		try {
 			// Look up the driver's real email from Firestore using phone number
 			const email = await Firebase.getDriverEmailByPhone(phone);
+
+			// Tell Navigation.js to treat this auth event as a driver login,
+			// guarding against the stale-closure race where a previous customer
+			// role is still in memory when onAuthStateChanged fires.
+			await AsyncStorage.setItem('pending_role', 'driver');
 
 			// Sign in with the real email
 			await Firebase.signInWithEmail(email, password);
@@ -72,7 +78,7 @@ const DriverLogin = ({ navigation }) => {
 					<View style={styles.textInputCont}>
 						<TextInput1
 							text={"Phone number"}
-							placeholder={"09182828281"}
+							placeholder={"08123456789 or +2348123456789"}
 							onChangeText={(text) => set_phone(text)}
 						/>
 						<TextInput1

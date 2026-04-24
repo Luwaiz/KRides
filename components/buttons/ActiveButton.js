@@ -16,7 +16,7 @@ const ActiveButton = ({ title, onPress, disabled, loading }) => {
 				{loading ? (
 					<ActivityIndicator color={colors.secondary} />
 				) : (
-					<Text style={styles.buttonText}>{title}</Text>
+					<Text style={[styles.buttonText, disabled && styles.buttonTextDisabled]}>{title}</Text>
 				)}
 			</View>
 		</TouchableOpacity>
@@ -35,8 +35,10 @@ const styles = StyleSheet.create({
 		justifyContent: "center",
 	},
 	buttonDisabled: {
-		backgroundColor: colors.lightGrey3,
-		opacity: 0.6,
+		backgroundColor: colors.lightGrey2,
+	},
+	buttonTextDisabled: {
+		color: colors.lightGrey3,
 	},
 	buttonText: {
 		color: colors.secondary,
