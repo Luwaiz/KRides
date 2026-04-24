@@ -14,6 +14,7 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 
 const History = () => {
 	const [loading, setLoading] = useState(false);
+	const [error, setError] = useState(false);
 	const [history, setHistory] = useState([]);
 	const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 	const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
@@ -26,14 +27,15 @@ const History = () => {
 		if (!userId) return;
 
 		setLoading(true);
+		setError(false);
 		try {
 			const result = isDriver
 				? await getDriverHistoryPaginated(userId, 200)
 				: await getCustomerHistoryPaginated(userId, 200);
 			setHistory(result.rides);
-		} catch (error) {
-			console.error("❌ Error fetching history:", error);
-			setHistory([]);
+		} catch (err) {
+			console.error("❌ Error fetching history:", err);
+			setError(true);
 		} finally {
 			setLoading(false);
 		}
@@ -112,6 +114,13 @@ const History = () => {
 
 			{loading ? (
 				<ActivityIndicator size={30} color={colors.primaryBlue} style={{ marginTop: 20 }} />
+			) : error ? (
+				<View style={styles.errorContainer}>
+					<Text style={styles.errorText}>Could not load ride history.</Text>
+					<TouchableOpacity style={styles.retryButton} onPress={getHistory}>
+						<Text style={styles.retryText}>Retry</Text>
+					</TouchableOpacity>
+				</View>
 			) : (
 				<FlatList
 					data={filteredHistory}
@@ -210,5 +219,28 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		fontFamily: "Albert-Regular",
 		color: colors.lightGrey3,
+	},
+	errorContainer: {
+		alignItems: "center",
+		marginTop: 48,
+		paddingHorizontal: 24,
+	},
+	errorText: {
+		fontSize: 16,
+		fontFamily: "Albert-Regular",
+		color: colors.lightGrey3,
+		textAlign: "center",
+		marginBottom: 16,
+	},
+	retryButton: {
+		paddingHorizontal: 28,
+		paddingVertical: 10,
+		backgroundColor: colors.primaryBlue,
+		borderRadius: 8,
+	},
+	retryText: {
+		color: "white",
+		fontSize: 15,
+		fontFamily: "Albert-SemiBold",
 	},
 });

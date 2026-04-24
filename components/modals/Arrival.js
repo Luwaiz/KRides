@@ -2,13 +2,11 @@ import { Image, Modal, StyleSheet, Text, View } from "react-native";
 import React from "react";
 import ActiveButton from "../buttons/ActiveButton";
 import Keke from "../../assets/svg/Keke.svg";
-import { useBottomTabStore } from "../../constants/Store";
 
-const Arrival = ({ modal, setModal }) => {
-	const ToHome = useBottomTabStore((state) => state.setDriverHome);
-
-	const Cancel = () => {
+const Arrival = ({ modal, setModal, onDismiss }) => {
+	const handleOK = () => {
 		setModal(false);
+		onDismiss?.();
 	};
 
 	return (
@@ -17,14 +15,15 @@ const Arrival = ({ modal, setModal }) => {
 			style={styles.cont}
 			transparent
 			statusBarTranslucent
-			onRequestClose={() => setModal(false)}
+			onRequestClose={handleOK}
 		>
 			<View style={styles.modal}>
 				<View style={styles.container}>
 					<Keke />
-					<Text style={styles.text}>Arrived at customers location</Text>
+					<Text style={styles.text}>Ride Completed!</Text>
+					<Text style={styles.subText}>Your earnings have been recorded.</Text>
 					<View style={styles.button}>
-						<ActiveButton title={"OK"} onPress={ToHome} />
+						<ActiveButton title={"OK"} onPress={handleOK} />
 					</View>
 				</View>
 			</View>
@@ -50,11 +49,17 @@ const styles = StyleSheet.create({
 		flex: 1,
 	},
 	text: {
-		fontWeight: "regular",
+		fontWeight: "700",
 		textAlign: "center",
-		fontSize: 16,
+		fontSize: 18,
 		color: "black",
 		marginVertical: 10,
+	},
+	subText: {
+		fontSize: 14,
+		color: "#666",
+		textAlign: "center",
+		marginBottom: 8,
 	},
 	container: {
 		backgroundColor: "white",

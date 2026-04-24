@@ -1,69 +1,104 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Users collection
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isAuth() && request.auth.uid == uid;
+    }
+
+    function isRatingUpdate() {
+      return request.resource.data.diff(resource.data)
+               .affectedKeys()
+               .hasOnly(['ratings', 'totalRatings', 'ratingSum']);
+    }
+
+    // ── Users (customers) ─────────────────────────────────────────────────────
     match /users/{userId} {
-      // Allow any authenticated user to read user profiles (needed for drivers to get push tokens)
-      allow read: if request.auth != null;
-      allow create: if request.auth != null && request.auth.uid == userId;
-      allow update: if request.auth != null && request.auth.uid == userId;
-      allow delete: if request.auth != null && request.auth.uid == userId;
+      // Users read and write only their own document.
+      // Push-token lookup for customers happens server-side (Admin SDK) so
+      // cross-user reads are no longer needed here.
+      allow read:   if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+      allow delete: if false;
     }
-    
-    // Drivers collection
+
+    // ── Drivers ───────────────────────────────────────────────────────────────
     match /drivers/{driverId} {
-      // Allow unauthenticated reads for login (to look up email by phone number)
-      // Allow authenticated users to read driver profiles (needed for customers to see driver info)
+      // Public (unauthenticated) read is required for the phone-to-email lookup
+      // that runs BEFORE Firebase Auth on the driver login screen.
+      // TODO: replace with a Firebase Cloud Function so this can be locked down.
       allow read: if true;
-      allow create: if request.auth != null && request.auth.uid == driverId;
-      // Allow driver to update their own profile, OR allow customers to add ratings
-      allow update: if request.auth != null && (
-        request.auth.uid == driverId || 
-        // Allow adding ratings (only specific fields can be updated by customers)
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ratings', 'totalRatings', 'ratingSum']))
-      );
-      allow delete: if request.auth != null && request.auth.uid == driverId;
+
+      allow create: if isOwner(driverId);
+      // Driver may update their own profile; authenticated customers may only
+      // write the rating fields.
+      allow update: if isOwner(driverId) || (isAuth() && isRatingUpdate());
+      allow delete: if false;
     }
-    
-    // Rides collection
+
+    // ── Rides ─────────────────────────────────────────────────────────────────
     match /rides/{rideId} {
-      // Any authenticated user can read rides
-      allow read: if request.auth != null;
-      
-      // Only authenticated users can create rides
-      allow create: if request.auth != null 
-                      && request.resource.data.customerId == request.auth.uid;
-      
-      // Customer or assigned driver can update
-      allow update: if request.auth != null && (
+      // Create: only the customer who will own the ride.
+      allow create: if isAuth()
+                    && request.resource.data.customerId == request.auth.uid;
+
+      // Read:
+      //   • The customer who booked the ride.
+      //   • The assigned driver.
+      //   • Any authenticated driver may read a pending ride to decide whether
+      //     to accept it (only status == 'pending' exposed at this stage).
+      allow read: if isAuth() && (
         resource.data.customerId == request.auth.uid ||
-        resource.data.driverId == request.auth.uid ||
-        // Allow a driver to accept a ride (assign themselves) if no driver is currently assigned
-        ((resource.data.driverId == null || resource.data.driverId == "") && request.resource.data.driverId == request.auth.uid) ||
-        // Allow any driver to decline a ride by adding themselves to declined_by array
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['declined_by']) && 
-         request.resource.data.declined_by is list)
+        resource.data.driverId   == request.auth.uid ||
+        resource.data.status     == 'pending'
       );
-      
-      // Only customer can delete their ride
-      allow delete: if request.auth != null 
-                      && resource.data.customerId == request.auth.uid;
+
+      // Update:
+      //   • Customer cancels their own ride.
+      //   • Assigned driver updates ride progress.
+      //   • Any authenticated driver may accept an unassigned pending ride
+      //     (sets driverId = themselves, status = 'accepted').
+      //   • Any authenticated driver may add themselves to declined_by.
+      allow update: if isAuth() && (
+        resource.data.customerId == request.auth.uid ||
+        resource.data.driverId   == request.auth.uid ||
+        (
+          resource.data.status == 'pending' &&
+          (resource.data.driverId == null || resource.data.driverId == '') &&
+          request.resource.data.driverId == request.auth.uid &&
+          request.resource.data.status   == 'accepted'
+        ) ||
+        (
+          request.resource.data.diff(resource.data)
+            .affectedKeys().hasOnly(['declined_by']) &&
+          request.resource.data.declined_by is list
+        )
+      );
+
+      // Only the booking customer may delete a ride.
+      allow delete: if isAuth()
+                    && resource.data.customerId == request.auth.uid;
     }
-    
-    // Driver locations
+
+    // ── Driver locations ──────────────────────────────────────────────────────
     match /driver_locations/{driverId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == driverId;
+      allow read:  if isAuth();
+      allow write: if isOwner(driverId);
     }
-    
-    // Locations collection
+
+    // ── Pickup / dropoff suggestions (admin-managed) ──────────────────────────
     match /locations/{locationId} {
-      allow read: if request.auth != null;
+      allow read:  if isAuth();
       allow write: if false;
     }
-    
-    // Default deny
+
+    // ── Catch-all: deny everything not listed above ───────────────────────────
     match /{document=**} {
       allow read, write: if false;
     }

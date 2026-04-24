@@ -1,5 +1,6 @@
 import {
 	ActivityIndicator,
+	Alert,
 	FlatList,
 	StyleSheet,
 	Text,
@@ -24,6 +25,7 @@ import Avatar from "../../assets/svg/Frame 77avatar.svg";
 import DangerButton from "../buttons/DangerButton";
 import Destination from "../Destination";
 import RideRequestModal from "../modals/RideRequestModal";
+import Toast from "react-native-toast-message";
 import axios from "axios";
 import API from "../../hooks/API";
 import { getRideCoordinates } from "../../helpers/getLocationCoordinates";
@@ -49,6 +51,7 @@ const HomeTab = () => {
 	const setAcceptRidePage = useBottomTabStore(
 		(state) => state.setAcceptRidePage
 	);
+	const isOnline = useDriverAvailability((state) => state.isOnline);
 	const [loading, setLoading] = useState(false);
 	const [refreshing, setRefreshing] = useState(false);
 	const [accepting, setAccepting] = useState(null);
@@ -116,7 +119,13 @@ const HomeTab = () => {
 		try {
 			await declineRide(rideId, uid);
 			console.log("✅ Ride declined successfully");
-			// Ride will automatically disappear from list via listener
+			Toast.show({
+				type: "tomatoToast",
+				text1: "Ride Declined",
+				text2: "The ride has been removed from your list.",
+				position: "top",
+				visibilityTime: 2500,
+			});
 		} catch (error) {
 			console.error("❌ Error declining ride:", error);
 
@@ -156,111 +165,88 @@ const HomeTab = () => {
 		await handleModalDecline(rideId);
 	};
 
-	// ✅ Accept ride using Firestore
+	// ✅ Accept ride — UI switches immediately, Firestore write runs in background
 	const AcceptRide = async (rideId) => {
 		if (!uid) {
 			alert("Driver account not loaded. Please log out and log back in.");
 			return;
 		}
 
-		// Check if bank details are verified
 		const driverDetails = useDriverDetails.getState();
 		if (!driverDetails.bankDetailsVerified) {
-			alert(
-				"Please complete your bank account details before accepting rides. Go to Settings > Bank Details to add your account information."
+			Alert.alert(
+				"Bank Details Required",
+				"You need to add your bank account details before accepting rides so you can receive payments.",
+				[
+					{ text: "Later", style: "cancel" },
+					{ text: "Set Up Now", onPress: () => navigation.navigate("BankAccountDetails") },
+				]
 			);
-			navigation.navigate("BankAccountDetails");
 			return;
 		}
 
-		setAccepting(rideId);
-
-		try {
-			// Find the ride from the list to get full details
-			const rideDetails = rides.find((r) => (r.rideId || r.id) === rideId);
-
-			if (!rideDetails) {
-				throw new Error("Ride not found in list");
-			}
-
-			// Fetch coordinates from Firestore based on location names
-			const { pickup, destination } = await getRideCoordinates(
-				rideDetails.pickupLocation,
-				rideDetails.destination
-			);
-
-			const driverData = {
-				driverId: uid,
-				driverName: fullName || "Driver",
-				driverPhone: phone || "",
-				vehicleId: VehicleId || "",
-			};
-
-			console.log("📤 Updating ride status in Firestore directly");
-
-			// Accept the ride via direct Firestore update
-			const rideRef = doc(FIREBASE_DB, "rides", rideId);
-			await updateDoc(rideRef, {
-				status: "accepted",
-				driverId: uid,
-				driverName: fullName || "Driver",
-				driverPhone: phone || "",
-				vehicleId: VehicleId || "",
-				acceptedAt: serverTimestamp(),
-			});
-
-			// Notify customer that ride was accepted
-			await notifyCustomerRideAccepted(
-				rideDetails.customerId,
-				rideId,
-				fullName || "Driver"
-			);
-
-			// Store the accepted ride details with coordinates
-			setAcceptedRide({
-				...rideDetails,
-				rideId: rideId, // Ensure rideId is stored
-				pickupCoords: pickup,
-				destinationCoords: destination,
-				driverId: uid,
-				driverName: fullName || "Driver",
-			});
-
-			console.log(
-				"✅ Ride accepted successfully with driver name:",
-				fullName || "Driver"
-			);
-
-			// Switch to AcceptTab immediately to show the "Complete Ride" button
-			setAcceptRidePage();
-			console.log("🔄 Switched to AcceptTab");
-			setAccepting(null);
-
-			// Remove from pending list (will be handled by listener automatically)
-		} catch (error) {
-			console.error("❌ Error accepting ride:", error);
-
-			// User-friendly error message
-			let errorMessage = "Unable to accept ride. Please try again.";
-
-			if (error.message?.includes("not found")) {
-				errorMessage = "This ride is no longer available.";
-			} else if (
-				error.message?.includes("network") ||
-				error.message?.includes("connection")
-			) {
-				errorMessage =
-					"Network error. Please check your connection and try again.";
-			}
-
-			alert(errorMessage);
-			setAccepting(null);
+		const rideDetails = rides.find((r) => (r.rideId || r.id) === rideId);
+		if (!rideDetails) {
+			alert("This ride is no longer available.");
+			return;
 		}
+
+		setAccepting(rideId); // triggers loading overlay
+
+		// 1. Switch to AcceptTab immediately — don't block on the network write
+		setAcceptedRide({
+			...rideDetails,
+			rideId,
+			pickupCoords: null,
+			destinationCoords: null,
+			driverId: uid,
+			driverName: fullName || "Driver",
+		});
+		setAcceptRidePage();
+		setAccepting(null);
+
+		// 2. Firestore write in background — retry once on failure
+		const rideRef = doc(FIREBASE_DB, "rides", rideId);
+		const writeUpdate = () => updateDoc(rideRef, {
+			status: "accepted",
+			driverId: uid,
+			driverName: fullName || "Driver",
+			driverPhone: phone || "",
+			vehicleId: VehicleId || "",
+			acceptedAt: serverTimestamp(),
+		});
+		writeUpdate().catch(() => {
+			setTimeout(() => writeUpdate().catch((err) => {
+				console.warn("⚠️ Firestore accept write failed after retry:", err.message);
+				Alert.alert(
+					"Sync Issue",
+					"The ride was accepted on your device but we couldn't confirm it with the server. Please check your connection — the customer may not see you yet.",
+					[{ text: "OK" }]
+				);
+			}), 3000);
+		});
+
+		// 3. Coords + notification in background
+		const fetchCoords = () =>
+			getRideCoordinates(rideDetails.pickupLocation, rideDetails.destination)
+				.then(({ pickup, destination }) => {
+					useAcceptedRideStore.getState().updateRideCoords(pickup, destination);
+				});
+		fetchCoords().catch(() => {
+			setTimeout(() => fetchCoords().catch((err) =>
+				console.warn("⚠️ Could not fetch ride coords after retry:", err.message)
+			), 5000);
+		});
+
+		notifyCustomerRideAccepted(rideDetails.customerId, rideId, fullName || "Driver")
+			.catch((err) => console.warn("⚠️ Customer notification failed:", err.message));
+
+		console.log("✅ Ride accepted, switched to AcceptTab");
 	};
 
-	// Track driver location and upload to Firestore so customers can see driver position
+	// Track driver location — only while online
 	useEffect(() => {
-		if (!uid) return;
+		if (!uid || !isOnline) return;
 
 		const watchId = Geolocation.watchPosition(
 			(position) => {
@@ -284,7 +270,7 @@ const HomeTab = () => {
 				Geolocation.clearWatch(watchId);
 			} catch (e) {}
 		};
-	}, [uid]);
+	}, [uid, isOnline]);
 
 	return (
 		<>
@@ -449,6 +435,23 @@ const styles = StyleSheet.create({
 		textAlign: "center",
 		marginVertical: sp(10),
 		paddingHorizontal: sp(16),
+	},
+	acceptingOverlay: {
+		position: "absolute",
+		top: 0,
+		left: 0,
+		right: 0,
+		bottom: 0,
+		backgroundColor: "rgba(0,0,0,0.55)",
+		justifyContent: "center",
+		alignItems: "center",
+		zIndex: 9999,
+		gap: sp(14),
+	},
+	acceptingText: {
+		color: "white",
+		fontSize: fs(16),
+		fontFamily: "Albert-SemiBold",
 	},
 });
 

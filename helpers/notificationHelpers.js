@@ -1,7 +1,13 @@
 import axios from 'axios';
+import { NOTIFICATION_API_KEY } from '@env';
 
 // Production server (Render.com)
 const NOTIFICATION_SERVER_URL = 'https://krides.onrender.com/api/notifications';
+
+// Axios instance with the shared API key attached to every request.
+const api = axios.create({
+    headers: { 'x-api-key': NOTIFICATION_API_KEY || '' },
+});
 
 // For local testing: Use your computer's IP address (not localhost)
 // To find your IP: Run 'ipconfig' on Windows or 'ifconfig' on Mac/Linux
@@ -91,7 +97,7 @@ export async function notifyDriversAboutNewRide(rideId, customerName, pickupLoca
     try {
         return await retryWithBackoff(
             async () => {
-                const response = await axios.post(`${NOTIFICATION_SERVER_URL}/notify-drivers`, {
+                const response = await api.post(`${NOTIFICATION_SERVER_URL}/notify-drivers`, {
                     rideId,
                     customerName,
                     pickupLocation,
@@ -126,7 +132,7 @@ export async function notifyCustomerRideAccepted(customerId, rideId, driverName)
     try {
         return await retryWithBackoff(
             async () => {
-                const response = await axios.post(`${NOTIFICATION_SERVER_URL}/ride-accepted`, {
+                const response = await api.post(`${NOTIFICATION_SERVER_URL}/ride-accepted`, {
                     customerId,
                     rideId,
                     driverName,
@@ -159,7 +165,7 @@ export async function notifyCustomerRideCompleted(customerId, rideId) {
     try {
         return await retryWithBackoff(
             async () => {
-                const response = await axios.post(`${NOTIFICATION_SERVER_URL}/ride-completed`, {
+                const response = await api.post(`${NOTIFICATION_SERVER_URL}/ride-completed`, {
                     customerId,
                     rideId,
                 });
@@ -192,7 +198,7 @@ export async function notifyDriverRideCancelled(driverId, rideId, customerName) 
     try {
         return await retryWithBackoff(
             async () => {
-                const response = await axios.post(`${NOTIFICATION_SERVER_URL}/send`, {
+                const response = await api.post(`${NOTIFICATION_SERVER_URL}/send`, {
                     userId: driverId,
                     role: 'driver',
                     title: 'Ride Cancelled ❌',
@@ -233,7 +239,7 @@ export async function sendNotificationToUser(userId, role, title, body, data = {
     try {
         return await retryWithBackoff(
             async () => {
-                const response = await axios.post(`${NOTIFICATION_SERVER_URL}/send`, {
+                const response = await api.post(`${NOTIFICATION_SERVER_URL}/send`, {
                     userId,
                     role,
                     title,
@@ -271,7 +277,7 @@ export const notifyCustomerDriverArrived = async (customerId, driverName) => {
     try {
         return await retryWithBackoff(
             async () => {
-                const response = await axios.post(`${NOTIFICATION_SERVER_URL}/notify-driver-arrived`, {
+                const response = await api.post(`${NOTIFICATION_SERVER_URL}/notify-driver-arrived`, {
                     customerId,
                     driverName,
                 });

@@ -63,7 +63,9 @@ const styles = StyleSheet.create({
 		marginTop: 8,
         flexDirection:"row",
         alignItems: "center",
-        justifyContent:"space-between"
+        justifyContent:"space-between",
+		borderWidth: 1,
+		borderColor: "transparent",
 	},
 	input: {
 		width: "90%",

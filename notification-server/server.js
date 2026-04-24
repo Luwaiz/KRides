@@ -11,6 +11,26 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
+// API key authentication — all /api/* routes require a valid key.
+// The key is shared with the mobile app via an environment variable so it
+// never appears in source control. Set NOTIFICATION_API_KEY in your .env
+// and as an EAS Secret for production builds.
+const API_KEY = process.env.NOTIFICATION_API_KEY;
+
+app.use('/api', (req, res, next) => {
+    if (!API_KEY) {
+        // Server misconfiguration — fail closed
+        console.error('❌ NOTIFICATION_API_KEY is not set');
+        return res.status(503).json({ error: 'Server not configured' });
+    }
+    const provided = req.headers['x-api-key'];
+    if (!provided || provided !== API_KEY) {
+        console.warn('🚫 Rejected request with invalid API key from', req.ip);
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+    next();
+});
+
 // Initialize Firebase Admin SDK
 const serviceAccount = require('./kampusride-firebase-adminsdk-fbsvc-c626e78acd.json');
 
@@ -519,6 +539,129 @@ app.post('/api/notifications/notify-driver-arrived', async (req, res) => {
             success: false,
             error: error.message
         });
+    }
+});
+
+// Process a refund via Flutterwave
+app.post('/api/payments/refund', async (req, res) => {
+    const { transactionId, amount, comments } = req.body;
+
+    if (!transactionId) {
+        return res.status(400).json({ error: 'transactionId is required' });
+    }
+
+    const secretKey = process.env.FLUTTERWAVE_SECRET_KEY;
+    if (!secretKey) {
+        return res.status(500).json({ error: 'Payment service not configured' });
+    }
+
+    try {
+        const payload = { comments: comments || 'Ride cancelled by customer' };
+        if (amount) payload.amount = amount;
+
+        const response = await fetch(
+            `https://api.flutterwave.com/v3/transactions/${transactionId}/refund`,
+            {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${secretKey}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            }
+        );
+
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            res.json({
+                success: true,
+                refundId: result.data.id,
+                status: result.data.status,
+                message: result.message,
+                data: result.data,
+            });
+        } else {
+            res.status(400).json({ success: false, error: result.message || 'Refund failed' });
+        }
+    } catch (error) {
+        console.error('❌ Flutterwave refund error:', error);
+        res.status(500).json({ success: false, error: 'Payment service unavailable. Please try again.' });
+    }
+});
+
+// Check refund status
+app.get('/api/payments/refund/:refundId', async (req, res) => {
+    const { refundId } = req.params;
+    const secretKey = process.env.FLUTTERWAVE_SECRET_KEY;
+
+    if (!secretKey) {
+        return res.status(500).json({ error: 'Payment service not configured' });
+    }
+
+    try {
+        const response = await fetch(`https://api.flutterwave.com/v3/refunds/${refundId}`, {
+            headers: {
+                Authorization: `Bearer ${secretKey}`,
+                'Content-Type': 'application/json',
+            },
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            res.json({ success: true, status: result.data.status, data: result.data });
+        } else {
+            res.status(400).json({ success: false, error: result.message });
+        }
+    } catch (error) {
+        console.error('❌ Flutterwave refund status error:', error);
+        res.status(500).json({ success: false, error: 'Payment service unavailable.' });
+    }
+});
+
+// Create Flutterwave subaccount for driver payouts
+app.post('/api/payments/create-subaccount', async (req, res) => {
+    const { bankCode, accountNumber, accountName, businessName, phone } = req.body;
+
+    if (!bankCode || !accountNumber || !accountName) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const secretKey = process.env.FLUTTERWAVE_SECRET_KEY;
+    if (!secretKey) {
+        return res.status(500).json({ error: 'Payment service not configured' });
+    }
+
+    try {
+        const response = await fetch('https://api.flutterwave.com/v3/subaccounts', {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${secretKey}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                account_bank: bankCode,
+                account_number: accountNumber,
+                business_name: businessName || accountName,
+                business_email: `${phone}@rideapp.com`,
+                business_mobile: phone,
+                country: 'NG',
+                split_type: 'flat',
+                split_value: 50,
+            }),
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            res.json({ success: true, data: result.data });
+        } else {
+            res.status(400).json({ error: result.message || 'Subaccount creation failed' });
+        }
+    } catch (error) {
+        console.error('❌ Flutterwave subaccount error:', error);
+        res.status(500).json({ error: 'Payment service unavailable. Please try again.' });
     }
 });
 

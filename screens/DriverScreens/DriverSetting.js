@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View, Image } from "react-native";
 import React, { useState, useEffect } from "react";
-import { useUserDetails } from "../../constants/Store";
+import { useDriverDetails } from "../../constants/Store";
 import Avatar from "../../assets/svg/Frame 91profile.svg";
 import Entypo from "@expo/vector-icons/Entypo";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
@@ -16,9 +16,8 @@ import { doc, onSnapshot } from "firebase/firestore";
 const DriverSettings = ({ navigation }) => {
 	const [modal, setModal] = useState(false);
 	const [profileUrl, setProfileUrl] = useState(null);
-	const { firstName, lastName, uid } = useUserDetails((state) => ({
-		firstName: state.firstName,
-		lastName: state.lastName,
+	const { fullName, uid } = useDriverDetails((state) => ({
+		fullName: state.fullName,
 		uid: state.uid,
 	}));
 	const [modalTitle, setModalTitle] = useState("");
@@ -52,7 +51,7 @@ const DriverSettings = ({ navigation }) => {
 	return (
 		<SafeAreaView style={styles.container}>
 			<View style={styles.topContainer}>
-				<Text style={styles.name}>{firstName + " " + lastName}</Text>
+				<Text style={styles.name}>{fullName || "Driver"}</Text>
 				{profileUrl ? (
 					<Image
 						source={{ uri: profileUrl }}

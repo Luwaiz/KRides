@@ -4,7 +4,6 @@ import React, { useEffect, useState, useMemo } from "react";
 import ActiveButton from "./buttons/ActiveButton";
 import { colors } from "../constants/styling";
 import { useNavigation } from "@react-navigation/native";
-import { Entypo } from "@expo/vector-icons";
 import Avatar from "../assets/svg/Frame 77avatar.svg";
 import Phone from "../assets/svg/Call.svg";
 import Star from "../assets/svg/Rating.svg";
@@ -32,7 +31,6 @@ import { signOut } from "firebase/auth";
 import useAuthStore from "../constants/Store";
 
 const ConfirmRide = () => {
-	const navigation = useNavigation();
 	const [selectRider, setSelectRider] = useState(false);
 	const [loading, setLoading] = useState(false);
 	const [cancelling, setCancelling] = useState(false);
@@ -85,16 +83,15 @@ const ConfirmRide = () => {
 		return calculateFare(dist, parseInt(numberOfPassenger));
 	}, [pickupLocation, destinationCoords, numberOfPassenger]);
 
-	const ToPromo = () => {
-		navigation.navigate("Promo");
-	};
 
 	// ✅ Create a new ride using Firebase helper
 	const BookRide = async (transactionId = null) => {
+		setLoading(true);
 		const currentUser = FIREBASE_AUTH.currentUser;
 
 		// Validation: Check if user is logged in
 		if (!UserId) {
+			setLoading(false);
 			Alert.alert(
 				"Session Expired",
 				"Please log in to book a ride.",
@@ -103,18 +100,9 @@ const ConfirmRide = () => {
 						text: "OK",
 						onPress: async () => {
 							try {
-								console.log("🔓 Logging out user...");
 								await signOut(FIREBASE_AUTH);
 								clearAuth();
 								clearUser();
-								console.log("✅ User logged out successfully");
-								Toast.show({
-									type: "tomatoToast",
-									text1: "Logged Out",
-									text2: "Please log in again",
-									position: "top",
-									visibilityTime: 2000,
-								});
 							} catch (error) {
 								console.error("❌ Logout error:", error);
 							}
@@ -128,12 +116,7 @@ const ConfirmRide = () => {
 
 		// Validation: Check if Firebase Auth user matches store user
 		if (!currentUser || currentUser.uid !== UserId) {
-			console.log(
-				"❌ Auth mismatch - Firebase UID:",
-				currentUser?.uid,
-				"Store UID:",
-				UserId
-			);
+			setLoading(false);
 			Alert.alert(
 				"Authentication Error",
 				"Your session is out of sync. Please log in again.",
@@ -145,13 +128,6 @@ const ConfirmRide = () => {
 								await signOut(FIREBASE_AUTH);
 								clearAuth();
 								clearUser();
-								Toast.show({
-									type: "tomatoToast",
-									text1: "Please Log In Again",
-									text2: "Session was out of sync",
-									position: "top",
-									visibilityTime: 2000,
-								});
 							} catch (error) {
 								console.error("❌ Logout error:", error);
 							}
@@ -165,15 +141,13 @@ const ConfirmRide = () => {
 
 		// Validation before booking
 		if (!pickupLocation || !destinationCoords) {
-			console.log("❌ Validation failed: Missing location information");
-			alert(
-				"Missing location information. Please go back and select pickup and destination again."
-			);
+			setLoading(false);
+			alert("Missing location information. Please go back and select pickup and destination again.");
 			return;
 		}
 
 		if (!numberOfPassenger) {
-			console.log("❌ Validation failed: No passengers selected");
+			setLoading(false);
 			alert("Please select number of passengers.");
 			return;
 		}
@@ -184,14 +158,14 @@ const ConfirmRide = () => {
 			console.log("   - Email:", email || "MISSING");
 			console.log("   - First Name:", firstName || "MISSING");
 			console.log("   - Last Name:", lastName || "MISSING");
+			setLoading(false);
 			Alert.alert(
 				"Profile Data Missing",
-				"Your profile information is incomplete. This might be due to Firestore security rules blocking data access.\n\nPlease ensure:\n1. Firestore rules allow authenticated users to read their profiles\n2. Your profile has been created properly\n\nDo you want to continue anyway?",
+				"Your profile information is incomplete. This might be due to Firestore security rules blocking data access.\n\nDo you want to continue anyway?",
 				[
 					{
 						text: "Cancel",
 						style: "cancel",
-						onPress: () => setLoading(false),
 					},
 					{
 						text: "Continue",
@@ -238,6 +212,15 @@ const ConfirmRide = () => {
 				driverPhone: null,
 				vehicleId: null,
 				hasArrived: false,
+			});
+
+			// Show booking confirmation toast before navigating
+			Toast.show({
+				type: "tomatoToast",
+				text1: "Ride Booked!",
+				text2: "Searching for a driver near you...",
+				position: "top",
+				visibilityTime: 3000,
 			});
 
 			// Navigate to home immediately after booking
@@ -373,19 +356,10 @@ const ConfirmRide = () => {
 						<Text style={styles.price}>₦ {Price}</Text>
 					</View>
 
-					{/* Promo link */}
-					<TouchableOpacity
-						onPress={ToPromo}
-						activeOpacity={0.6}
-						style={styles.promo}
-					>
-						<Text style={styles.promoText}>Enter promo code</Text>
-						<Entypo
-							name="chevron-small-right"
-							size={24}
-							color={colors.primaryBlue}
-						/>
-					</TouchableOpacity>
+					{/* Promo link — coming soon, shown dimmed */}
+					<View style={[styles.promo, styles.promoDisabled]}>
+						<Text style={[styles.promoText, styles.promoTextDisabled]}>Promo codes — coming soon</Text>
+					</View>
 
 					{/* Buttons */}
 					<View style={styles.button}>
@@ -412,6 +386,7 @@ const ConfirmRide = () => {
 								phoneNumber={phone}
 								name={`${firstName} ${lastName}`}
 								BookRide={BookRide}
+								loading={loading}
 							/>
 						)}
 					</View>
@@ -536,6 +511,14 @@ const styles = StyleSheet.create({
 		fontFamily: "Albert-SemiBold",
 		fontSize: fs(16),
 		color: colors.primaryBlue,
+	},
+	promoDisabled: {
+		opacity: 0.4,
+	},
+	promoTextDisabled: {
+		color: colors.lightGrey3,
+		fontFamily: "Albert-Regular",
+		fontSize: fs(13),
 	},
 });
 

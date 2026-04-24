@@ -1,88 +1,54 @@
-import axios from 'axios';
-import { FLUTTERWAVE_SECRET_KEY } from '@env';
+// Refund calls go through our server so the Flutterwave secret key
+// never touches the client bundle.
+const PAYMENTS_SERVER_URL = 'https://krides.onrender.com/api/payments';
 
 /**
- * Process refund via Flutterwave API
+ * Process refund via server → Flutterwave
  * @param {string} transactionId - Flutterwave transaction ID
- * @param {number} amount - Amount to refund (optional, defaults to full refund)
+ * @param {number|null} amount - Amount to refund (null = full refund)
  * @param {string} comments - Reason for refund
- * @returns {Promise<Object>} Refund response
  */
-export const processRefund = async (transactionId, amount = null, comments = "Ride cancelled by customer") => {
-    try {
-        console.log("💰 Processing refund for transaction:", transactionId);
-        console.log("   Amount:", amount || "Full refund");
-        console.log("   Reason:", comments);
+export const processRefund = async (transactionId, amount = null, comments = 'Ride cancelled by customer') => {
+    console.log('💰 Processing refund for transaction:', transactionId);
 
-        const url = `https://api.flutterwave.com/v3/transactions/${transactionId}/refund`;
+    const response = await fetch(`${PAYMENTS_SERVER_URL}/refund`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transactionId, amount, comments }),
+    });
 
-        const payload = {
-            ...(amount && { amount }), // Include amount only if specified (partial refund)
-            comments,
-        };
+    const result = await response.json();
 
-        console.log("📤 Sending refund request to Flutterwave...");
-
-        const response = await axios.post(url, payload, {
-            headers: {
-                'Authorization': `Bearer ${FLUTTERWAVE_SECRET_KEY || 'FLWSECK_TEST-f3c5c2ad9a10329d839b64ba46d167bd-X'}`,
-                'Content-Type': 'application/json',
-            },
-        });
-
-        console.log("✅ Refund response:", response.data);
-
-        if (response.data.status === "success") {
-            return {
-                success: true,
-                refundId: response.data.data.id,
-                status: response.data.data.status,
-                message: response.data.message,
-                data: response.data.data,
-            };
-        } else {
-            throw new Error(response.data.message || "Refund failed");
-        }
-    } catch (error) {
-        console.error("❌ Refund error:", error.response?.data || error.message);
-
-        // Extract meaningful error message
-        const errorMessage = error.response?.data?.message
-            || error.response?.data?.error
-            || error.message
-            || "Failed to process refund";
-
-        throw new Error(errorMessage);
+    if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Refund failed');
     }
+
+    console.log('✅ Refund processed:', result.refundId);
+    return {
+        success: true,
+        refundId: result.refundId,
+        status: result.status,
+        message: result.message,
+        data: result.data,
+    };
 };
 
 /**
- * Check refund status
+ * Check refund status via server → Flutterwave
  * @param {string} refundId - Flutterwave refund ID
- * @returns {Promise<Object>} Refund status
  */
 export const checkRefundStatus = async (refundId) => {
-    try {
-        console.log("🔍 Checking refund status for ID:", refundId);
+    console.log('🔍 Checking refund status for:', refundId);
 
-        const url = `https://api.flutterwave.com/v3/refunds/${refundId}`;
+    const response = await fetch(`${PAYMENTS_SERVER_URL}/refund/${refundId}`, {
+        headers: { 'Content-Type': 'application/json' },
+    });
 
-        const response = await axios.get(url, {
-            headers: {
-                'Authorization': `Bearer ${FLUTTERWAVE_SECRET_KEY || 'FLWSECK_TEST-f3c5c2ad9a10329d839b64ba46d167bd-X'}`,
-                'Content-Type': 'application/json',
-            },
-        });
+    const result = await response.json();
 
-        console.log("✅ Refund status:", response.data.data.status);
-
-        return {
-            success: true,
-            status: response.data.data.status,
-            data: response.data.data,
-        };
-    } catch (error) {
-        console.error("❌ Error checking refund status:", error.response?.data || error.message);
-        throw new Error(error.response?.data?.message || "Failed to check refund status");
+    if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Failed to check refund status');
     }
+
+    return { success: true, status: result.status, data: result.data };
 };

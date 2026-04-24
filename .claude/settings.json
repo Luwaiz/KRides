@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git fetch *)",
+      "Bash(git commit -m 'Merge origin/main into HomeScreens to resolve PR conflicts *)",
+      "Bash(git push *)"
+    ]
+  }
+}
