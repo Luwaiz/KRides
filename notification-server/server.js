@@ -38,7 +38,11 @@ if (!process.env.FIREBASE_ADMIN_SDK) {
     console.error('❌ FIREBASE_ADMIN_SDK environment variable is not set');
     process.exit(1);
 }
-const serviceAccount = JSON.parse(process.env.FIREBASE_ADMIN_SDK);
+// The value is stored as base64 to survive env var escaping issues with the
+// private key's newlines. Decode it before parsing.
+const serviceAccount = JSON.parse(
+    Buffer.from(process.env.FIREBASE_ADMIN_SDK, 'base64').toString('utf8')
+);
 
 admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
