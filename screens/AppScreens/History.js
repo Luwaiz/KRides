@@ -18,6 +18,7 @@ const History = () => {
 	const [history, setHistory] = useState([]);
 	const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 	const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+	const [selectedDay, setSelectedDay] = useState(null);
 	const UserId = useUserDetails((state) => state?.UserId);
 	const driverUid = useDriverDetails((state) => state?.uid);
 
@@ -45,22 +46,33 @@ const History = () => {
 		getHistory();
 	}, [UserId, driverUid]);
 
+	// Reset day selection when month or year changes
+	useEffect(() => {
+		setSelectedDay(null);
+	}, [selectedMonth, selectedYear]);
+
+	const daysInMonth = useMemo(
+		() => new Date(selectedYear, selectedMonth + 1, 0).getDate(),
+		[selectedYear, selectedMonth]
+	);
+
 	const filteredHistory = useMemo(() => {
 		return history.filter((ride) => {
 			const raw = ride.completedAt || ride.cancelledAt;
 			if (!raw) return false;
 			const date = raw.toDate ? raw.toDate() : new Date(raw);
-			return date.getFullYear() === selectedYear && date.getMonth() === selectedMonth;
+			if (date.getFullYear() !== selectedYear || date.getMonth() !== selectedMonth) return false;
+			if (selectedDay !== null && date.getDate() !== selectedDay) return false;
+			return true;
 		});
-	}, [history, selectedYear, selectedMonth]);
+	}, [history, selectedYear, selectedMonth, selectedDay]);
 
 	const renderEmpty = () => {
 		if (loading) return null;
-		return (
-			<Text style={styles.emptyText}>
-				No rides in {MONTHS[selectedMonth]} {selectedYear}
-			</Text>
-		);
+		const label = selectedDay !== null
+			? `${MONTHS[selectedMonth]} ${selectedDay}, ${selectedYear}`
+			: `${MONTHS[selectedMonth]} ${selectedYear}`;
+		return <Text style={styles.emptyText}>No rides on {label}</Text>;
 	};
 
 	return (
@@ -112,6 +124,41 @@ const History = () => {
 				})}
 			</ScrollView>
 
+			{/* Day picker */}
+			<ScrollView
+				horizontal
+				showsHorizontalScrollIndicator={false}
+				contentContainerStyle={styles.dayRow}
+				style={styles.dayScroll}
+			>
+				<TouchableOpacity
+					onPress={() => setSelectedDay(null)}
+					style={[styles.dayPill, selectedDay === null && styles.dayPillActive]}
+				>
+					<Text style={[styles.dayText, selectedDay === null && styles.dayTextActive]}>All</Text>
+				</TouchableOpacity>
+				{Array.from({ length: daysInMonth }, (_, i) => i + 1).map((d) => {
+					const now = new Date();
+					const isFuture =
+						selectedYear === now.getFullYear() &&
+						selectedMonth === now.getMonth() &&
+						d > now.getDate();
+					const isActive = selectedDay === d;
+					return (
+						<TouchableOpacity
+							key={d}
+							disabled={isFuture}
+							onPress={() => setSelectedDay(d)}
+							style={[styles.dayPill, isActive && styles.dayPillActive, isFuture && styles.dayPillDisabled]}
+						>
+							<Text style={[styles.dayText, isActive && styles.dayTextActive, isFuture && styles.dayTextDisabled]}>
+								{d}
+							</Text>
+						</TouchableOpacity>
+					);
+				})}
+			</ScrollView>
+
 			{loading ? (
 				<ActivityIndicator size={30} color={colors.primaryBlue} style={{ marginTop: 20 }} />
 			) : error ? (
@@ -128,7 +175,10 @@ const History = () => {
 					renderItem={({ item }) => <HistoryCard history={item} />}
 					ListHeaderComponent={
 						<Text style={styles.monthDate}>
-							{MONTHS[selectedMonth]} {selectedYear} · {filteredHistory.length} ride{filteredHistory.length !== 1 ? "s" : ""}
+							{selectedDay !== null
+								? `${MONTHS[selectedMonth]} ${selectedDay}, ${selectedYear}`
+								: `${MONTHS[selectedMonth]} ${selectedYear}`}{' '}
+							· {filteredHistory.length} ride{filteredHistory.length !== 1 ? "s" : ""}
 						</Text>
 					}
 					ListEmptyComponent={renderEmpty}
@@ -200,6 +250,42 @@ const styles = StyleSheet.create({
 		color: "white",
 	},
 	monthTextDisabled: {
+		color: colors.lightGrey3,
+	},
+	dayScroll: {
+		height: 40,
+		flexGrow: 0,
+		flexShrink: 0,
+		marginTop: 8,
+	},
+	dayRow: {
+		paddingHorizontal: 16,
+		alignItems: 'center',
+		gap: 6,
+	},
+	dayPill: {
+		minWidth: 36,
+		paddingHorizontal: 10,
+		paddingVertical: 6,
+		borderRadius: 18,
+		backgroundColor: colors.lightGrey2,
+		alignItems: 'center',
+	},
+	dayPillActive: {
+		backgroundColor: colors.primaryBlue,
+	},
+	dayPillDisabled: {
+		opacity: 0.35,
+	},
+	dayText: {
+		fontSize: 13,
+		fontFamily: "Albert-Regular",
+		color: colors.lightGrey4,
+	},
+	dayTextActive: {
+		color: "white",
+	},
+	dayTextDisabled: {
 		color: colors.lightGrey3,
 	},
 	monthDate: {

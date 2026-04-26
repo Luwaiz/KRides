@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, ActivityIndicator, Linking, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../constants/styling';
 import { sp, fs, br } from '../constants/responsive';
@@ -88,6 +88,13 @@ const RideStatusBar = ({
         return status === 'pending' ? 'search' : 'car';
     };
 
+    const callDriver = () => {
+        if (!driverPhone) return;
+        Linking.openURL(`tel:${driverPhone}`).catch(() => {
+            Alert.alert('Cannot Call', 'Unable to open the phone dialer.');
+        });
+    };
+
     const toggleExpanded = () => {
         setExpanded(!expanded);
         if (onViewDetails) {
@@ -128,17 +135,21 @@ const RideStatusBar = ({
                             )}
                         </TouchableOpacity>
                     ) : (
-                        <TouchableOpacity
-                            onPress={toggleExpanded}
-                            style={styles.viewButton}
-                        >
-                            <Text style={styles.viewText}>View</Text>
-                            <Ionicons
-                                name={expanded ? "chevron-up" : "chevron-down"}
-                                size={16}
-                                color={colors.primaryBlue}
-                            />
-                        </TouchableOpacity>
+                        <View style={styles.driverActions}>
+                            {driverPhone && (
+                                <TouchableOpacity onPress={callDriver} style={styles.callButton}>
+                                    <Ionicons name="call" size={18} color="#fff" />
+                                </TouchableOpacity>
+                            )}
+                            <TouchableOpacity onPress={toggleExpanded} style={styles.viewButton}>
+                                <Text style={styles.viewText}>View</Text>
+                                <Ionicons
+                                    name={expanded ? "chevron-up" : "chevron-down"}
+                                    size={16}
+                                    color={colors.primaryBlue}
+                                />
+                            </TouchableOpacity>
+                        </View>
                     )}
                 </View>
             </View>
@@ -158,13 +169,14 @@ const RideStatusBar = ({
                         </View>
 
                         {driverPhone && (
-                            <View style={styles.infoRow}>
+                            <TouchableOpacity onPress={callDriver} style={styles.infoRow} activeOpacity={0.7}>
                                 <Ionicons name="call" size={18} color={colors.primaryBlue} />
                                 <View style={styles.infoTextContainer}>
-                                    <Text style={styles.infoLabel}>Phone</Text>
-                                    <Text style={styles.infoValue}>{driverPhone}</Text>
+                                    <Text style={styles.infoLabel}>Phone — tap to call</Text>
+                                    <Text style={[styles.infoValue, styles.infoValueCallable]}>{driverPhone}</Text>
                                 </View>
-                            </View>
+                                <Ionicons name="chevron-forward" size={16} color={colors.primaryBlue} />
+                            </TouchableOpacity>
                         )}
 
                         {vehicleId && (
@@ -236,6 +248,18 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         fontSize: fs(13),
     },
+    driverActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: sp(8),
+    },
+    callButton: {
+        backgroundColor: '#4caf50',
+        borderRadius: br(8),
+        padding: sp(8),
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
     viewButton: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -249,6 +273,10 @@ const styles = StyleSheet.create({
         color: colors.primaryBlue,
         fontWeight: '600',
         fontSize: fs(13),
+    },
+    infoValueCallable: {
+        color: colors.primaryBlue,
+        textDecorationLine: 'underline',
     },
     dropdown: {
         paddingHorizontal: sp(14),

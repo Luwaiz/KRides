@@ -6,7 +6,10 @@
       "Bash(git push *)",
       "Bash(firebase deploy *)",
       "Read(//c/Users/Administrator/.claude/projects/c--Users-Administrator-Documents-REACTNATIVE-KRides/memory/**)",
-      "Bash(node -e \"const fs=require\\('fs'\\); console.log\\(JSON.stringify\\(JSON.parse\\(fs.readFileSync\\('kampusride-firebase-adminsdk-fbsvc-c626e78acd.json','utf8'\\)\\)\\)\\)\")"
+      "Bash(node -e \"const fs=require\\('fs'\\); console.log\\(JSON.stringify\\(JSON.parse\\(fs.readFileSync\\('kampusride-firebase-adminsdk-fbsvc-c626e78acd.json','utf8'\\)\\)\\)\\)\")",
+      "Bash(node -e \"const fs=require\\('fs'\\); process.stdout.write\\(Buffer.from\\(fs.readFileSync\\('kampusride-firebase-adminsdk-fbsvc-c626e78acd.json'\\)\\).toString\\('base64'\\)\\)\")",
+      "Read(//c/Users/Administrator/Downloads/**)",
+      "Bash(node -e \"const fs=require\\('fs'\\); process.stdout.write\\(Buffer.from\\(fs.readFileSync\\('C:/Users/Administrator/Downloads/kampusride-f546b40d90a1.json'\\)\\).toString\\('base64'\\)\\)\")"
     ],
     "additionalDirectories": [
       "c:\\Users\\Administrator\\.claude\\projects\\c--Users-Administrator-Documents-REACTNATIVE-KRides\\memory"

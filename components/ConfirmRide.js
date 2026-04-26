@@ -1,4 +1,5 @@
 import { StyleSheet, Text, TouchableOpacity, View, Alert, Linking, ActivityIndicator, Modal } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import BottomSheet from "@gorhom/bottom-sheet";
 import React, { useEffect, useState, useMemo, useRef } from "react";
 import ActiveButton from "./buttons/ActiveButton";
@@ -27,10 +28,11 @@ import Payment from "../screens/AppScreens/Payment";
 import { createRide, listenToRide, cancelRide, getRide } from "../helpers/firebaseRides";
 import { calculateDistance, calculateFare } from "../helpers/rideCalculations";
 import { FIREBASE_DB, FIREBASE_AUTH } from "../firebaseConfig";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, onSnapshot, updateDoc } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import useAuthStore from "../constants/Store";
-import { notifyDriverRideCancelled } from "../helpers/notificationHelpers";
+import { notifyDriversAboutNewRide, notifyDriverRideCancelled } from "../helpers/notificationHelpers";
+import { payWithWallet } from "../helpers/walletHelpers";
 
 const ConfirmRide = () => {
 	const [selectRider, setSelectRider] = useState(false);
@@ -39,14 +41,15 @@ const ConfirmRide = () => {
 	const [rideId, setRideId] = useState(null);
 	const [acceptedDriverName, setAcceptedDriverName] = useState("");
 	const [showRatingModal, setShowRatingModal] = useState(false);
+	const [walletBalance, setWalletBalance] = useState(null); // null = not yet loaded
+	const [paymentMethod, setPaymentMethod] = useState('flutterwave'); // 'flutterwave' | 'wallet'
 	const bookingInFlight = useRef(false);
+	const navigation = useNavigation();
 	const activeRide = useActiveRideStore((state) => state.activeRide);
 	const rideStatus = useActiveRideStore((state) => state.rideStatus);
 	const setHomePage = useBottomTabStore((state) => state.setHomePage);
 	const clearAuth = useAuthStore((state) => state.clearAuth);
 	const clearUser = useUserDetails((state) => state.clearUser);
-
-	const currentTime = new Date();
 
 	const { destination, location, rider, numberOfPassenger } = useRideStore(
 		(state) => ({
@@ -86,6 +89,65 @@ const ConfirmRide = () => {
 		return calculateFare(dist, parseInt(numberOfPassenger));
 	}, [pickupLocation, destinationCoords, numberOfPassenger]);
 
+	// Real-time wallet balance — updates the moment a top-up webhook fires
+	useEffect(() => {
+		if (!UserId) return;
+		const unsub = onSnapshot(
+			doc(FIREBASE_DB, 'users', UserId),
+			(snap) => { if (snap.exists()) setWalletBalance(snap.data().walletBalance ?? 0); },
+			() => {}
+		);
+		return () => unsub();
+	}, [UserId]);
+
+	// Pay for the ride by deducting the wallet balance server-side
+	const handleWalletPay = async () => {
+		if (!UserId || bookingInFlight.current) return;
+		bookingInFlight.current = true;
+		setLoading(true);
+		AsyncStorage.removeItem('pending_customer_rating').catch(() => {});
+		try {
+			const result = await payWithWallet({
+				customerName: `${firstName || ''} ${lastName || ''}`.trim() || 'Customer',
+				customerPhone: phone || '',
+				pickupLocation: location,
+				pickupCoords: pickupLocation,
+				destination,
+				destinationCoords,
+				numberOfPassengers: numberOfPassenger,
+				amount: Price,
+			});
+			setRideId(result.rideId);
+			useActiveRideStore.getState().setActiveRide({
+				rideId: result.rideId,
+				status: 'pending',
+				driverName: null,
+				driverId: null,
+				driverPhone: null,
+				vehicleId: null,
+				hasArrived: false,
+			});
+			Toast.show({ type: 'tomatoToast', text1: 'Ride Booked!', text2: 'Searching for a driver near you...', position: 'top', visibilityTime: 3000 });
+			setHomePage();
+			// Notify online drivers — fire-and-forget, same as the Flutterwave path
+			notifyDriversAboutNewRide(
+				result.rideId,
+				`${firstName || ''} ${lastName || ''}`.trim() || 'Customer',
+				location,
+				destination
+			).catch(() => {});
+		} catch (error) {
+			const data = error.response?.data;
+			if (data?.error === 'insufficient_balance') {
+				Alert.alert('Insufficient Balance', `You need ₦${data.shortfall?.toLocaleString('en-NG') ?? ''} more. Top up your wallet and try again.`);
+			} else {
+				Alert.alert('Payment Failed', 'Could not process wallet payment. Please try again.');
+			}
+		} finally {
+			bookingInFlight.current = false;
+			setLoading(false);
+		}
+	};
 
 	// ✅ Create a new ride using Firebase helper
 	const BookRide = async (transactionId = null) => {
@@ -387,14 +449,7 @@ const ConfirmRide = () => {
 					{/* Buttons */}
 					<View style={styles.button}>
 						{activeRide ? (
-							<View
-								style={{
-									alignItems: "center",
-									flexDirection: "row",
-									justifyContent: "space-between",
-									gap: 10,
-								}}
-							>
+							<View style={{ alignItems: "center", flexDirection: "row", justifyContent: "space-between", gap: 10 }}>
 								<DangerButton
 									title={cancelling ? "Cancelling..." : "Cancel Ride"}
 									onPress={handleCancelRide}
@@ -406,14 +461,62 @@ const ConfirmRide = () => {
 								/>
 							</View>
 						) : (
-							<Payment
-								amount={Price}
-								email={email}
-								phoneNumber={phone}
-								name={`${firstName} ${lastName}`}
-								BookRide={BookRide}
-								loading={loading}
-							/>
+							<>
+								{/* Payment method selector */}
+								<View style={styles.payMethodRow}>
+									<TouchableOpacity
+										onPress={() => setPaymentMethod('wallet')}
+										style={[styles.payMethodTab, paymentMethod === 'wallet' && styles.payMethodTabActive]}
+									>
+										<Ionicons name="wallet-outline" size={15} color={paymentMethod === 'wallet' ? 'white' : colors.lightGrey3} />
+										<Text style={[styles.payMethodText, paymentMethod === 'wallet' && styles.payMethodTextActive]}>
+											Wallet
+										</Text>
+										{walletBalance !== null && (
+											<Text style={[styles.payMethodBalance, paymentMethod === 'wallet' && styles.payMethodBalanceActive]}>
+												₦{walletBalance.toLocaleString('en-NG')}
+											</Text>
+										)}
+									</TouchableOpacity>
+									<TouchableOpacity
+										onPress={() => setPaymentMethod('flutterwave')}
+										style={[styles.payMethodTab, paymentMethod === 'flutterwave' && styles.payMethodTabActive]}
+									>
+										<Ionicons name="card-outline" size={15} color={paymentMethod === 'flutterwave' ? 'white' : colors.lightGrey3} />
+										<Text style={[styles.payMethodText, paymentMethod === 'flutterwave' && styles.payMethodTextActive]}>
+											Card / Transfer
+										</Text>
+									</TouchableOpacity>
+								</View>
+
+								{paymentMethod === 'wallet' ? (
+									walletBalance !== null && walletBalance < Price ? (
+										<View style={styles.insufficientBox}>
+											<Text style={styles.insufficientText}>
+												Insufficient balance — you need ₦{(Price - walletBalance).toLocaleString('en-NG')} more
+											</Text>
+											<TouchableOpacity onPress={() => navigation.navigate('Wallet')}>
+												<Text style={styles.topUpLink}>Top up wallet →</Text>
+											</TouchableOpacity>
+										</View>
+									) : (
+										<ActiveButton
+											title={`Pay ₦${Price?.toLocaleString('en-NG')} from wallet`}
+											onPress={handleWalletPay}
+											loading={loading}
+										/>
+									)
+								) : (
+									<Payment
+										amount={Price}
+										email={email}
+										phoneNumber={phone}
+										name={`${firstName} ${lastName}`}
+										BookRide={BookRide}
+										loading={loading}
+									/>
+								)}
+							</>
 						)}
 					</View>
 				</View>
@@ -578,6 +681,58 @@ const styles = StyleSheet.create({
 		fontSize: fs(16),
 		fontFamily: "Albert-SemiBold",
 		color: "#333",
+	},
+	payMethodRow: {
+		flexDirection: "row",
+		gap: sp(8),
+		marginBottom: sp(10),
+	},
+	payMethodTab: {
+		flex: 1,
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "center",
+		gap: sp(6),
+		paddingVertical: sp(10),
+		borderRadius: br(10),
+		backgroundColor: colors.lightGrey2,
+	},
+	payMethodTabActive: {
+		backgroundColor: colors.primaryBlue,
+	},
+	payMethodText: {
+		fontSize: fs(13),
+		fontFamily: "Albert-SemiBold",
+		color: colors.lightGrey3,
+	},
+	payMethodTextActive: {
+		color: "white",
+	},
+	payMethodBalance: {
+		fontSize: fs(11),
+		fontFamily: "Albert-Regular",
+		color: colors.lightGrey3,
+	},
+	payMethodBalanceActive: {
+		color: "rgba(255,255,255,0.8)",
+	},
+	insufficientBox: {
+		backgroundColor: "#FFF3E0",
+		borderRadius: br(10),
+		padding: sp(14),
+		alignItems: "center",
+		gap: sp(6),
+	},
+	insufficientText: {
+		fontSize: fs(13),
+		fontFamily: "Albert-Regular",
+		color: "#E65100",
+		textAlign: "center",
+	},
+	topUpLink: {
+		fontSize: fs(13),
+		fontFamily: "Albert-SemiBold",
+		color: colors.primaryBlue,
 	},
 });
 

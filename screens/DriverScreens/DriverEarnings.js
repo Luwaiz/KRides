@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
     View,
     Text,
@@ -27,6 +27,7 @@ const DriverEarnings = () => {
     const [fetching, setFetching] = useState(false);
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
     const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+    const [selectedDay, setSelectedDay] = useState(null);
     const [earningsData, setEarningsData] = useState({
         rides: [],
         totalRides: 0,
@@ -39,6 +40,39 @@ const DriverEarnings = () => {
     useEffect(() => {
         fetchEarnings();
     }, [uid, selectedYear, selectedMonth]);
+
+    // Reset day selection when month or year changes
+    useEffect(() => {
+        setSelectedDay(null);
+    }, [selectedMonth, selectedYear]);
+
+    const daysInMonth = useMemo(
+        () => new Date(selectedYear, selectedMonth + 1, 0).getDate(),
+        [selectedYear, selectedMonth]
+    );
+
+    // Derive per-day stats from the already-fetched month data (no extra Firestore reads)
+    const displayData = useMemo(() => {
+        if (selectedDay === null) return earningsData;
+        const dayRides = earningsData.rides.filter((ride) => {
+            const raw = ride.completedAt;
+            if (!raw) return false;
+            const d = raw.toDate ? raw.toDate() : new Date(raw);
+            return d.getDate() === selectedDay;
+        });
+        const platformFeePerRide = 50;
+        const grossEarnings = dayRides.reduce((s, r) => s + (r.amount || 0), 0);
+        const platformFees = dayRides.length * platformFeePerRide;
+        const netEarnings = grossEarnings - platformFees;
+        return {
+            rides: dayRides,
+            totalRides: dayRides.length,
+            grossEarnings,
+            platformFees,
+            netEarnings,
+            averagePerRide: dayRides.length > 0 ? grossEarnings / dayRides.length : 0,
+        };
+    }, [earningsData, selectedDay]);
 
     const fetchEarnings = async () => {
         if (!uid) return;
@@ -69,7 +103,10 @@ const DriverEarnings = () => {
         });
     };
 
-    const getPeriodLabel = () => `${MONTHS[selectedMonth]} ${selectedYear}`;
+    const getPeriodLabel = () =>
+        selectedDay !== null
+            ? `${MONTHS[selectedMonth]} ${selectedDay}, ${selectedYear}`
+            : `${MONTHS[selectedMonth]} ${selectedYear}`;
 
     if (initialLoading) {
         return (
@@ -134,6 +171,41 @@ const DriverEarnings = () => {
                     })}
                 </ScrollView>
 
+                {/* Day picker */}
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.dayRow}
+                    style={styles.dayScroll}
+                >
+                    <TouchableOpacity
+                        onPress={() => setSelectedDay(null)}
+                        style={[styles.dayPill, selectedDay === null && styles.dayPillActive]}
+                    >
+                        <Text style={[styles.dayText, selectedDay === null && styles.dayTextActive]}>All</Text>
+                    </TouchableOpacity>
+                    {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((d) => {
+                        const now = new Date();
+                        const isFuture =
+                            selectedYear === now.getFullYear() &&
+                            selectedMonth === now.getMonth() &&
+                            d > now.getDate();
+                        const isActive = selectedDay === d;
+                        return (
+                            <TouchableOpacity
+                                key={d}
+                                disabled={isFuture}
+                                onPress={() => setSelectedDay(d)}
+                                style={[styles.dayPill, isActive && styles.dayPillActive, isFuture && { opacity: 0.35 }]}
+                            >
+                                <Text style={[styles.dayText, isActive && styles.dayTextActive]}>
+                                    {d}
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                    })}
+                </ScrollView>
+
                 {/* Earnings Summary Card */}
                 <View style={styles.summaryCard}>
                     <Text style={styles.periodLabel}>{getPeriodLabel()}</Text>
@@ -142,14 +214,14 @@ const DriverEarnings = () => {
                     ) : (
                         <>
                             <Text style={styles.netEarnings}>
-                                {formatCurrency(earningsData.netEarnings)}
+                                {formatCurrency(displayData.netEarnings)}
                             </Text>
                             <Text style={styles.netEarningsLabel}>Net Earnings</Text>
 
                             <View style={styles.statsRow}>
                                 <View style={styles.statItem}>
                                     <FontAwesome5 name="car" size={20} color={colors.primaryBlue} />
-                                    <Text style={styles.statValue}>{earningsData.totalRides}</Text>
+                                    <Text style={styles.statValue}>{displayData.totalRides}</Text>
                                     <Text style={styles.statLabel}>Rides</Text>
                                 </View>
                                 <View style={styles.statDivider} />
@@ -160,7 +232,7 @@ const DriverEarnings = () => {
                                         color={colors.primaryBlue}
                                     />
                                     <Text style={styles.statValue}>
-                                        {formatCurrency(earningsData.averagePerRide)}
+                                        {formatCurrency(displayData.averagePerRide)}
                                     </Text>
                                     <Text style={styles.statLabel}>Avg/Ride</Text>
                                 </View>
@@ -177,20 +249,20 @@ const DriverEarnings = () => {
                     <View style={styles.breakdownRow}>
                         <Text style={styles.breakdownLabel}>Gross Earnings</Text>
                         <Text style={styles.breakdownValue}>
-                            {formatCurrency(earningsData.grossEarnings)}
+                            {formatCurrency(displayData.grossEarnings)}
                         </Text>
                     </View>
                     <View style={styles.breakdownRow}>
                         <Text style={styles.breakdownLabel}>Platform Fees</Text>
                         <Text style={[styles.breakdownValue, styles.feeValue]}>
-                            -{formatCurrency(earningsData.platformFees)}
+                            -{formatCurrency(displayData.platformFees)}
                         </Text>
                     </View>
                     <View style={styles.breakdownDivider} />
                     <View style={styles.breakdownRow}>
                         <Text style={styles.breakdownLabelBold}>Net Earnings</Text>
                         <Text style={styles.breakdownValueBold}>
-                            {formatCurrency(earningsData.netEarnings)}
+                            {formatCurrency(displayData.netEarnings)}
                         </Text>
                     </View>
                 </View>
@@ -198,7 +270,7 @@ const DriverEarnings = () => {
                 {/* Transaction List */}
                 <View style={styles.transactionsSection}>
                     <Text style={styles.sectionTitle}>Recent Transactions</Text>
-                    {earningsData.rides.length === 0 ? (
+                    {displayData.rides.length === 0 ? (
                         <View style={styles.emptyState}>
                             <FontAwesome5
                                 name="wallet"
@@ -211,7 +283,7 @@ const DriverEarnings = () => {
                             </Text>
                         </View>
                     ) : (
-                        earningsData.rides.map((ride, index) => (
+                        displayData.rides.map((ride, index) => (
                             <View key={index} style={styles.transactionCard}>
                                 <View style={styles.transactionHeader}>
                                     <View style={styles.transactionIcon}>
@@ -318,6 +390,36 @@ const styles = StyleSheet.create({
         color: colors.lightGrey4,
     },
     filterTabTextActive: {
+        color: "white",
+    },
+    dayScroll: {
+        height: sp(40),
+        flexGrow: 0,
+        flexShrink: 0,
+        marginTop: sp(8),
+    },
+    dayRow: {
+        paddingHorizontal: sp(16),
+        alignItems: 'center',
+        gap: sp(6),
+    },
+    dayPill: {
+        minWidth: sp(36),
+        paddingHorizontal: sp(10),
+        paddingVertical: sp(6),
+        borderRadius: br(18),
+        backgroundColor: colors.lightGrey2,
+        alignItems: 'center',
+    },
+    dayPillActive: {
+        backgroundColor: colors.primaryBlue,
+    },
+    dayText: {
+        fontSize: fs(13),
+        fontFamily: "Albert-Regular",
+        color: colors.lightGrey4,
+    },
+    dayTextActive: {
         color: "white",
     },
     summaryCard: {

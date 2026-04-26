@@ -13,12 +13,14 @@ import Promo from "../screens/AppScreens/Promo";
 import Ratings from "../screens/AppScreens/Rating";
 import HomePageNav from "./HomePageNav";
 import Settings from "../screens/AppScreens/Settings";
+import Wallet from "../screens/AppScreens/Wallet";
 
 const Stack = createNativeStackNavigator();
 const AppStack = () => {
 	return (
 		<Stack.Navigator screenOptions={{ headerShown: false }}>
 			<Stack.Screen name="Home" component={MainPage} />
+			<Stack.Screen name="Wallet" component={Wallet} />
 			<Stack.Screen
 				name="Settings"
 				component={Settings}

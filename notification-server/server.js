@@ -18,8 +18,10 @@ app.use(express.json());
 const API_KEY = process.env.NOTIFICATION_API_KEY;
 
 app.use('/api', (req, res, next) => {
+    // Flutterwave webhook uses its own signature verification — exempt from API key check
+    if (req.path === '/wallet/webhook') return next();
+
     if (!API_KEY) {
-        // Server misconfiguration — fail closed
         console.error('❌ NOTIFICATION_API_KEY is not set');
         return res.status(503).json({ error: 'Server not configured' });
     }
@@ -723,6 +725,336 @@ app.post('/api/auth/driver-email', async (req, res) => {
     } catch (error) {
         console.error('❌ Driver email lookup error:', error);
         return res.status(500).json({ error: 'Lookup failed. Please try again.' });
+    }
+});
+
+// ── Wallet ────────────────────────────────────────────────────────────────────
+
+/**
+ * POST /api/wallet/create-virtual-account
+ * Creates a permanent Flutterwave virtual account for a customer and stores
+ * the details in their Firestore document. If the account already exists the
+ * stored details are returned immediately — no second Flutterwave API call.
+ *
+ * Body: { userId, email, name }
+ */
+app.post('/api/wallet/create-virtual-account', async (req, res) => {
+    const { userId, email, name } = req.body;
+
+    if (!userId || !email) {
+        return res.status(400).json({ error: 'userId and email are required' });
+    }
+
+    const secretKey = process.env.FLUTTERWAVE_SECRET_KEY;
+    if (!secretKey) {
+        return res.status(500).json({ error: 'Payment service not configured' });
+    }
+
+    try {
+        const userRef = db.collection('users').doc(userId);
+        const userSnap = await userRef.get();
+
+        // Return cached account if one was already created — avoids duplicate VA creation
+        if (userSnap.exists()) {
+            const data = userSnap.data();
+            if (data.virtualAccountNumber && data.virtualAccountBank) {
+                console.log(`✅ Returning cached virtual account for ${userId}`);
+                return res.json({
+                    success: true,
+                    accountNumber: data.virtualAccountNumber,
+                    bankName: data.virtualAccountBank,
+                    accountName: data.virtualAccountName || name || 'KRides Wallet',
+                    cached: true,
+                });
+            }
+        }
+
+        // Split name into first/last for Flutterwave's required fields
+        const nameParts = (name || 'KRides User').trim().split(/\s+/);
+        const firstName = nameParts[0];
+        const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'User';
+        const txRef = `krides_va_${userId}`;
+
+        console.log(`🏦 Creating virtual account for user ${userId} (${email})`);
+
+        const response = await fetch('https://api.flutterwave.com/v3/virtual-account-numbers', {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${secretKey}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                email,
+                is_permanent: true,
+                tx_ref: txRef,
+                firstname: firstName,
+                lastname: lastName,
+                narration: `KRides Wallet - ${name || email}`,
+            }),
+        });
+
+        const result = await response.json();
+
+        if (result.status !== 'success') {
+            console.error('❌ Flutterwave VA creation failed:', result.message);
+            return res.status(400).json({
+                success: false,
+                error: result.message || 'Could not create virtual account',
+            });
+        }
+
+        const { account_number, bank_name } = result.data;
+        const accountName = `${firstName} ${lastName}`.trim();
+
+        // Persist to Firestore via Admin SDK (bypasses client-side rules)
+        await userRef.set({
+            virtualAccountNumber: account_number,
+            virtualAccountBank: bank_name,
+            virtualAccountRef: txRef,
+            virtualAccountName: accountName,
+            virtualAccountCreatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            walletBalance: 0,
+        }, { merge: true });
+
+        console.log(`✅ Virtual account created for ${userId}: ${account_number} (${bank_name})`);
+
+        return res.json({
+            success: true,
+            accountNumber: account_number,
+            bankName: bank_name,
+            accountName,
+        });
+
+    } catch (error) {
+        console.error('❌ Virtual account creation error:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Could not create virtual account. Please try again.',
+        });
+    }
+});
+
+/**
+ * POST /api/wallet/webhook
+ * Receives Flutterwave transfer notifications. No API-key auth — Flutterwave
+ * signs every request with a secret hash instead.
+ *
+ * Security model:
+ *  1. Verify verif-hash header matches FLUTTERWAVE_WEBHOOK_SECRET
+ *  2. Only process status==="successful" charge.completed events
+ *  3. Use flwTxId as the walletTransaction doc ID — idempotent by design
+ *     (a second delivery of the same webhook finds the doc already exists and exits)
+ */
+app.post('/api/wallet/webhook', async (req, res) => {
+    // Always respond 200 quickly so Flutterwave stops retrying
+    res.sendStatus(200);
+
+    const webhookSecret = process.env.FLUTTERWAVE_WEBHOOK_SECRET;
+    if (!webhookSecret) {
+        console.error('❌ FLUTTERWAVE_WEBHOOK_SECRET is not set — rejecting webhook');
+        return;
+    }
+
+    const signature = req.headers['verif-hash'];
+    if (!signature || signature !== webhookSecret) {
+        console.warn('🚫 Webhook rejected: invalid verif-hash');
+        return;
+    }
+
+    const { event, data } = req.body || {};
+
+    if (event !== 'charge.completed' || data?.status !== 'successful') {
+        console.log(`ℹ️ Ignoring webhook: event=${event} status=${data?.status}`);
+        return;
+    }
+
+    if (data.currency !== 'NGN') {
+        console.log(`ℹ️ Ignoring non-NGN webhook: ${data.currency}`);
+        return;
+    }
+
+    const txRef = data.tx_ref || '';
+    const flwTxId = String(data.id);
+    const amount = Number(data.amount);
+
+    if (!amount || amount <= 0 || isNaN(amount)) {
+        console.error(`❌ Webhook has invalid amount: ${data.amount}`);
+        return;
+    }
+
+    // tx_ref format: krides_va_{userId}
+    if (!txRef.startsWith('krides_va_')) {
+        console.log(`ℹ️ Ignoring unrelated tx_ref: ${txRef}`);
+        return;
+    }
+
+    const userId = txRef.replace('krides_va_', '');
+    if (!userId) {
+        console.error('❌ Could not parse userId from tx_ref:', txRef);
+        return;
+    }
+
+    console.log(`💰 Wallet top-up: userId=${userId} amount=₦${amount} flwTxId=${flwTxId}`);
+
+    try {
+        const userRef = db.collection('users').doc(userId);
+        // Use flwTxId as doc ID — attempting to create it inside a transaction
+        // is the idempotency lock: if it already exists the transaction aborts.
+        const txnRef = userRef.collection('walletTransactions').doc(flwTxId);
+
+        await db.runTransaction(async (txn) => {
+            const txnSnap = await txn.get(txnRef);
+            if (txnSnap.exists) {
+                console.log(`ℹ️ Webhook already processed: flwTxId=${flwTxId}`);
+                return; // idempotent — do nothing
+            }
+
+            const userSnap = await txn.get(userRef);
+            if (!userSnap.exists) {
+                throw new Error(`User not found: ${userId}`);
+            }
+
+            // Credit balance
+            txn.update(userRef, {
+                walletBalance: admin.firestore.FieldValue.increment(amount),
+            });
+
+            // Record the transaction
+            txn.set(txnRef, {
+                userId,
+                type: 'topup',
+                amount,
+                rideId: null,
+                flwTxRef: txRef,
+                flwTxId,
+                status: 'completed',
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+        });
+
+        console.log(`✅ Wallet credited: userId=${userId} +₦${amount}`);
+
+        // Non-critical: notify the student their balance updated
+        try {
+            const userSnap = await userRef.get();
+            const fcmToken = userSnap.data()?.fcmToken;
+            if (fcmToken) {
+                await sendFCMNotification(
+                    fcmToken,
+                    'Wallet Top-up Successful',
+                    `₦${amount.toLocaleString('en-NG')} has been added to your KRides wallet.`,
+                    { type: 'wallet_topup', amount: String(amount) }
+                );
+            }
+        } catch (notifErr) {
+            console.warn('⚠️ Could not send top-up notification:', notifErr.message);
+        }
+
+    } catch (error) {
+        console.error('❌ Webhook processing error:', error.message);
+    }
+});
+
+/**
+ * POST /api/wallet/pay-ride
+ * Atomically deducts the fare from the student's wallet and creates the ride
+ * document in a single Firestore transaction. The Firebase ID token in the
+ * request body is verified server-side — the server never trusts the client's
+ * self-reported userId.
+ *
+ * Body: { idToken, rideData: { customerName, customerPhone, pickupLocation,
+ *          pickupCoords, destination, destinationCoords, numberOfPassengers, amount } }
+ */
+app.post('/api/wallet/pay-ride', async (req, res) => {
+    const { idToken, rideData } = req.body;
+
+    if (!idToken || !rideData) {
+        return res.status(400).json({ error: 'idToken and rideData are required' });
+    }
+
+    let userId;
+    try {
+        const decoded = await admin.auth().verifyIdToken(idToken);
+        userId = decoded.uid;
+    } catch (err) {
+        console.warn('🚫 pay-ride: invalid ID token:', err.message);
+        return res.status(401).json({ error: 'Invalid or expired session. Please log in again.' });
+    }
+
+    const amount = Number(rideData.amount);
+    if (!amount || amount <= 0) {
+        return res.status(400).json({ error: 'Invalid fare amount' });
+    }
+
+    try {
+        const userRef = db.collection('users').doc(userId);
+        const rideRef = db.collection('rides').doc();
+
+        await db.runTransaction(async (txn) => {
+            const userSnap = await txn.get(userRef);
+            if (!userSnap.exists) throw new Error('USER_NOT_FOUND');
+
+            const balance = userSnap.data().walletBalance || 0;
+            if (balance < amount) throw new Error(`INSUFFICIENT_BALANCE:${balance}`);
+
+            // Create ride
+            txn.set(rideRef, {
+                customerId: userId,
+                customerName: rideData.customerName || 'Customer',
+                customerPhone: rideData.customerPhone || '',
+                pickupLocation: rideData.pickupLocation,
+                pickupCoords: rideData.pickupCoords || null,
+                destination: rideData.destination,
+                destinationCoords: rideData.destinationCoords || null,
+                numberOfPassengers: rideData.numberOfPassengers || 1,
+                amount,
+                paymentMethod: 'wallet',
+                transactionId: null,
+                status: 'pending',
+                driverId: null,
+                driverName: null,
+                driverPhone: null,
+                vehicleId: null,
+                declined_by: [],
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+            // Deduct wallet balance
+            txn.update(userRef, {
+                walletBalance: admin.firestore.FieldValue.increment(-amount),
+            });
+
+            // Record wallet transaction
+            const walletTxnRef = userRef.collection('walletTransactions').doc();
+            txn.set(walletTxnRef, {
+                userId,
+                type: 'ride_payment',
+                amount: -amount,
+                rideId: rideRef.id,
+                flwTxRef: null,
+                flwTxId: null,
+                status: 'completed',
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+        });
+
+        console.log(`✅ Wallet ride booked: userId=${userId} rideId=${rideRef.id} amount=₦${amount}`);
+        return res.json({ success: true, rideId: rideRef.id });
+
+    } catch (error) {
+        if (error.message === 'USER_NOT_FOUND') {
+            return res.status(404).json({ error: 'Account not found' });
+        }
+        if (error.message?.startsWith('INSUFFICIENT_BALANCE')) {
+            const balance = Number(error.message.split(':')[1] || 0);
+            return res.status(400).json({
+                error: 'insufficient_balance',
+                balance,
+                shortfall: amount - balance,
+            });
+        }
+        console.error('❌ Wallet pay-ride error:', error);
+        return res.status(500).json({ error: 'Could not process payment. Please try again.' });
     }
 });
 

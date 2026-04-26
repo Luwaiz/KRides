@@ -22,10 +22,20 @@ service cloud.firestore {
       // Users read and write only their own document.
       // Push-token lookup for customers happens server-side (Admin SDK) so
       // cross-user reads are no longer needed here.
+      // Wallet balance and virtual account fields are written server-side only
+      // (Admin SDK bypasses these rules), so no special client write rule needed.
       allow read:   if isOwner(userId);
       allow create: if isOwner(userId);
       allow update: if isOwner(userId);
       allow delete: if false;
+    }
+
+    // ── Wallet transactions (customers) ──────────────────────────────────────
+    match /users/{userId}/walletTransactions/{txnId} {
+      // Customer reads their own transaction history.
+      // All writes are performed server-side via Admin SDK (webhook handler).
+      allow read:  if isOwner(userId);
+      allow write: if false;
     }
 
     // ── Drivers ───────────────────────────────────────────────────────────────

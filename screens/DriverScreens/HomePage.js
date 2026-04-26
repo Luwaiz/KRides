@@ -11,7 +11,7 @@ import { colors } from "../../constants/styling";
 import { DrawerActions, useNavigation } from "@react-navigation/native";
 import HomeTab from "../../components/DriversModal/HomeTab";
 import HomeHeader from "../../components/DriverHeader/HomeHeader";
-import { useBottomTabStore, useAcceptedRideStore } from "../../constants/Store";
+import { useAcceptedRideStore } from "../../constants/Store";
 import AcceptTab from "../../components/DriversModal/AcceptTab";
 import AcceptHeader from "../../components/DriverHeader/AcceptHeader";
 import { GOOGLE_MAPS_API_KEY } from "@env";
@@ -25,8 +25,6 @@ import { FIREBASE_DB } from "../../firebaseConfig";
 import { useDriverDetails } from "../../constants/Store";
 
 const HomePage = () => {
-	const Accept = useBottomTabStore((state) => state.AcceptRidePage);
-	const ToHome = useBottomTabStore((state) => state.setHomePage);
 	const acceptedRide = useAcceptedRideStore((state) => state.acceptedRide);
 	const isRideActive = useAcceptedRideStore((state) => state.isRideActive);
 	const navigation = useNavigation();
@@ -143,21 +141,16 @@ const HomePage = () => {
 		longitudeDelta: 0.015,
 	};
 
+	// Use acceptedRide as the single source of truth — the AcceptRidePage flag in
+	// useBottomTabStore is never reset on ride completion, so relying on it caused
+	// the screen to stay stuck on AcceptTab after a ride ended.
 	const HeaderComponents = useMemo(() => {
-		if (Accept) {
-			return <AcceptHeader />;
-		} else {
-			return <HomeHeader />;
-		}
-	}, [Accept]);
+		return acceptedRide ? <AcceptHeader /> : <HomeHeader />;
+	}, [acceptedRide]);
 
 	const BottomSheetComponents = useMemo(() => {
-		if (Accept) {
-			return <AcceptTab />;
-		} else {
-			return <HomeTab />;
-		}
-	}, [Accept]);
+		return acceptedRide ? <AcceptTab /> : <HomeTab />;
+	}, [acceptedRide]);
 
 	// Fit map once the map is ready and valid ride coordinates are available
 	useEffect(() => {
