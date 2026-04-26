@@ -192,7 +192,7 @@ const HomeTab = () => {
 		}
 
 		const driverDetails = useDriverDetails.getState();
-		if (!driverDetails.bankDetailsVerified) {
+		if (!driverDetails.accountNumber) {
 			Alert.alert(
 				"Bank Details Required",
 				"You need to add your bank account details before accepting rides so you can receive payments.",

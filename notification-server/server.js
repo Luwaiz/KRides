@@ -1043,6 +1043,137 @@ app.post('/api/wallet/pay-ride', async (req, res) => {
 });
 
 
+/**
+ * POST /api/payments/complete-ride
+ * Marks a ride as completed and transfers the driver's earnings to their bank account.
+ * Platform keeps ₦50 (1–2 passengers) or ₦100 (3+ passengers) per ride.
+ *
+ * Body: { idToken, rideId }
+ */
+app.post('/api/payments/complete-ride', async (req, res) => {
+    const { idToken, rideId } = req.body;
+
+    if (!idToken || !rideId) {
+        return res.status(400).json({ error: 'idToken and rideId are required' });
+    }
+
+    // Verify driver identity
+    let driverId;
+    try {
+        const decoded = await admin.auth().verifyIdToken(idToken);
+        driverId = decoded.uid;
+    } catch (err) {
+        return res.status(401).json({ error: 'Invalid or expired session. Please log in again.' });
+    }
+
+    const secretKey = process.env.FLUTTERWAVE_SECRET_KEY;
+    if (!secretKey) {
+        return res.status(500).json({ error: 'Payment service not configured' });
+    }
+
+    try {
+        const rideRef = db.collection('rides').doc(rideId);
+        const rideSnap = await rideRef.get();
+
+        if (!rideSnap.exists) {
+            return res.status(404).json({ error: 'Ride not found' });
+        }
+
+        const ride = rideSnap.data();
+
+        if (ride.driverId !== driverId) {
+            return res.status(403).json({ error: 'You are not the driver for this ride' });
+        }
+
+        if (ride.status === 'completed') {
+            return res.json({ success: true, alreadyCompleted: true });
+        }
+
+        if (!['accepted', 'in_progress'].includes(ride.status)) {
+            return res.status(400).json({ error: `Cannot complete a ride with status: ${ride.status}` });
+        }
+
+        // Mark ride completed
+        await rideRef.update({
+            status: 'completed',
+            completedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        console.log(`✅ Ride ${rideId} marked as completed by driver ${driverId}`);
+
+        // Calculate driver earnings (platform takes ₦50 for <3 passengers, ₦100 for 3+)
+        const totalAmount = Number(ride.amount) || 0;
+        const passengers = Number(ride.numberOfPassengers) || 1;
+        const platformFee = passengers >= 3 ? 100 : 50;
+        const driverEarnings = Math.max(totalAmount - platformFee, 0);
+
+        // Only transfer if ride was paid digitally and driver has bank details
+        if (totalAmount <= 0) {
+            return res.json({ success: true, payout: null, reason: 'no_amount' });
+        }
+
+        const driverSnap = await db.collection('drivers').doc(driverId).get();
+        const driver = driverSnap.exists ? driverSnap.data() : null;
+
+        if (!driver?.bankCode || !driver?.accountNumber) {
+            console.warn(`⚠️ Driver ${driverId} has no bank details — skipping payout`);
+            return res.json({ success: true, payout: null, reason: 'no_bank_details' });
+        }
+
+        // Initiate Flutterwave transfer
+        const reference = `krides_payout_${rideId}`;
+        console.log(`💸 Transferring ₦${driverEarnings} to driver ${driverId} (${driver.accountNumber})`);
+
+        const transferResponse = await fetch('https://api.flutterwave.com/v3/transfers', {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${secretKey}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                account_bank: driver.bankCode,
+                account_number: driver.accountNumber,
+                amount: driverEarnings,
+                narration: `KRides ride payment - ${rideId.slice(0, 8)}`,
+                currency: 'NGN',
+                reference,
+            }),
+        });
+
+        const transferResult = await transferResponse.json();
+
+        if (transferResult.status === 'success' || transferResult.status === 'NEW') {
+            console.log(`✅ Payout initiated for driver ${driverId}: ₦${driverEarnings}`);
+
+            // Record the payout on the ride document
+            await rideRef.update({
+                payoutStatus: 'initiated',
+                payoutAmount: driverEarnings,
+                payoutReference: reference,
+            });
+
+            return res.json({
+                success: true,
+                payout: { amount: driverEarnings, reference },
+            });
+        } else {
+            console.error(`❌ Payout failed for driver ${driverId}:`, transferResult.message);
+            await rideRef.update({ payoutStatus: 'failed', payoutError: transferResult.message });
+            // Ride is still completed — payout failure is non-blocking
+            return res.json({
+                success: true,
+                payout: null,
+                reason: 'transfer_failed',
+                error: transferResult.message,
+            });
+        }
+
+    } catch (error) {
+        console.error('❌ complete-ride error:', error);
+        return res.status(500).json({ error: 'Could not complete ride. Please try again.' });
+    }
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', service: 'KRides Notification Server' });

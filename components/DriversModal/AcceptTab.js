@@ -13,7 +13,8 @@ import Arrival from "../modals/Arrival";
 import { updateRideStatus, listenToPendingRides, declineRide, getRide } from "../../helpers/firebaseRides";
 import { getRideCoordinates } from "../../helpers/getLocationCoordinates";
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
-import { FIREBASE_DB } from "../../firebaseConfig";
+import { FIREBASE_DB, FIREBASE_AUTH } from "../../firebaseConfig";
+import { NOTIFICATION_API_KEY } from "@env";
 import { DrawerActions, useNavigation } from "@react-navigation/native";
 import { calculateDriverEarnings } from "../../constants/commission";
 import { notifyCustomerDriverArrived } from "../../helpers/notificationHelpers";
@@ -133,9 +134,18 @@ const AcceptTab = () => {
 	const doCompleteRide = async () => {
 		setLoading(true);
 		try {
-			await updateRideStatus(acceptedRide.rideId, "completed");
-			console.log("✅ Ride marked as completed in Firestore");
-			// Show the completion modal — next-ride logic runs after driver taps OK
+			const idToken = await FIREBASE_AUTH.currentUser.getIdToken();
+			const response = await fetch('https://krides.onrender.com/api/payments/complete-ride', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'x-api-key': NOTIFICATION_API_KEY || '',
+				},
+				body: JSON.stringify({ idToken, rideId: acceptedRide.rideId }),
+			});
+			const result = await response.json();
+			if (!result.success) throw new Error(result.error || 'Could not complete ride');
+			console.log("✅ Ride completed. Payout:", result.payout ?? 'none');
 			setEndRide(true);
 		} catch (error) {
 			console.error("❌ Error completing ride:", error);
