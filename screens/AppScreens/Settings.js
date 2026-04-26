@@ -115,6 +115,12 @@ const Settings = ({ navigation }) => {
 					<Text style={styles.optionText}>Edit Profile</Text>
 				</Pressable>
 				<Pressable style={styles.options}
+					onPress={() => navigation.navigate("Wallet")}
+				>
+					<MaterialCommunityIcons name="wallet-outline" size={20} color="black" />
+					<Text style={styles.optionText}>Wallet</Text>
+				</Pressable>
+				<Pressable style={styles.options}
 					onPress={() => navigation.navigate("Support")}
 				>
 					<MaterialIcons name="support-agent" size={20} color="black" />
