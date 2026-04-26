@@ -7,6 +7,9 @@ import {
     ActivityIndicator,
     Share,
     ScrollView,
+    TextInput,
+    KeyboardAvoidingView,
+    Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -16,115 +19,78 @@ import { colors } from '../../constants/styling';
 import { sp, fs, br } from '../../constants/responsive';
 import { FIREBASE_AUTH, FIREBASE_DB } from '../../firebaseConfig';
 import { useUserDetails } from '../../constants/Store';
-import { createOrGetVirtualAccount } from '../../helpers/walletHelpers';
+import { createTopupAccount } from '../../helpers/walletHelpers';
+
+const MIN_TOPUP = 100;
 
 const Wallet = () => {
-    const [accountNumber, setAccountNumber] = useState(null);
-    const [bankName, setBankName] = useState(null);
-    const [accountName, setAccountName] = useState(null);
     const [balance, setBalance] = useState(0);
-    const [loading, setLoading] = useState(true);
-    const [creating, setCreating] = useState(false);
-    const [error, setError] = useState(null);
     const [transactions, setTransactions] = useState([]);
+
+    // Top-up flow state
+    const [topupAmount, setTopupAmount] = useState('');
+    const [creating, setCreating] = useState(false);
+    const [topupAccount, setTopupAccount] = useState(null); // { accountNumber, bankName, accountName, amount, expiryDate }
+    const [error, setError] = useState(null);
 
     const user = FIREBASE_AUTH.currentUser;
     const firstName = useUserDetails((s) => s.firstName);
     const lastName = useUserDetails((s) => s.lastName);
 
-    // Real-time listener on the user doc — balance and virtual account details
+    // Real-time balance listener
     useEffect(() => {
         if (!user) return;
-
         const unsub = onSnapshot(
             doc(FIREBASE_DB, 'users', user.uid),
-            (snap) => {
-                if (!snap.exists()) return;
-                const data = snap.data();
-                setBalance(data.walletBalance ?? 0);
-                if (data.virtualAccountNumber) {
-                    setAccountNumber(data.virtualAccountNumber);
-                    setBankName(data.virtualAccountBank || '');
-                    setAccountName(data.virtualAccountName || '');
-                    setLoading(false);
-                }
-            },
-            (err) => {
-                console.error('❌ Wallet snapshot error:', err);
-                setLoading(false);
-            }
+            (snap) => { if (snap.exists()) setBalance(snap.data().walletBalance ?? 0); },
+            () => {}
         );
-
         return () => unsub();
     }, [user?.uid]);
 
-    // Real-time transaction history — newest 50 entries
+    // Real-time transaction history
     useEffect(() => {
         if (!user) return;
-
         const q = query(
             collection(FIREBASE_DB, 'users', user.uid, 'walletTransactions'),
             orderBy('createdAt', 'desc'),
             limit(50)
         );
-
         const unsub = onSnapshot(q, (snap) => {
             setTransactions(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
         }, () => {});
-
         return () => unsub();
     }, [user?.uid]);
 
-    // If the snapshot finished loading and there's still no account number,
-    // trigger creation via the server.
-    useEffect(() => {
-        if (!loading || !user) return;
-
-        // Give the snapshot a moment to resolve from cache before hitting the server
-        const timer = setTimeout(async () => {
-            // Re-check: snapshot may have populated accountNumber by now
-            if (accountNumber) return;
-
-            setCreating(true);
-            setError(null);
-            try {
-                const fullName = `${firstName || ''} ${lastName || ''}`.trim();
-                const result = await createOrGetVirtualAccount(
-                    user.uid,
-                    user.email,
-                    fullName
-                );
-                // The onSnapshot listener will pick up the Firestore write and
-                // update state automatically, but set locally as a fast path.
-                setAccountNumber(result.accountNumber);
-                setBankName(result.bankName);
-                setAccountName(result.accountName);
-            } catch (err) {
-                console.error('❌ Virtual account creation error:', err);
-                setError('Could not set up your wallet. Please try again.');
-            } finally {
-                setCreating(false);
-                setLoading(false);
-            }
-        }, 1500);
-
-        return () => clearTimeout(timer);
-    }, [loading, user?.uid]);
-
-    const handleShare = async () => {
-        if (!accountNumber) return;
+    const handleGenerateAccount = async () => {
+        const amount = Number(topupAmount);
+        if (!amount || amount < MIN_TOPUP) {
+            setError(`Minimum top-up is ₦${MIN_TOPUP}`);
+            return;
+        }
+        setCreating(true);
+        setError(null);
+        setTopupAccount(null);
         try {
-            await Share.share({
-                message: `KRides Wallet\nBank: ${bankName}\nAccount number: ${accountNumber}\nAccount name: ${accountName}`,
-            });
+            const fullName = `${firstName || ''} ${lastName || ''}`.trim() || 'KRides User';
+            const result = await createTopupAccount(user.uid, user.email, fullName, amount);
+            setTopupAccount(result);
+            setTopupAmount('');
         } catch (err) {
-            // User dismissed share sheet — not an error
+            console.error('❌ Top-up account error:', err);
+            setError('Could not generate account. Please try again.');
+        } finally {
+            setCreating(false);
         }
     };
 
-    const handleRetry = () => {
-        setLoading(true);
-        setError(null);
+    const handleShare = async () => {
+        if (!topupAccount) return;
+        try {
+            await Share.share({
+                message: `KRides Wallet Top-up\nBank: ${topupAccount.bankName}\nAccount number: ${topupAccount.accountNumber}\nAccount name: ${topupAccount.accountName}\nAmount: ₦${topupAccount.amount?.toLocaleString('en-NG')}`,
+            });
+        } catch (_) {}
     };
 
     const formatBalance = (amount) =>
@@ -134,115 +100,150 @@ const Wallet = () => {
         <SafeAreaView style={styles.container}>
             <BackButton text={<Text style={styles.headText}>Wallet</Text>} />
 
-            <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-                {/* Balance card */}
-                <View style={styles.balanceCard}>
-                    <MaterialCommunityIcons name="wallet-outline" size={28} color="rgba(255,255,255,0.8)" />
-                    <Text style={styles.balanceLabel}>Available Balance</Text>
-                    <Text style={styles.balanceAmount}>{formatBalance(balance)}</Text>
-                </View>
-
-                {/* Virtual account section */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Add Money</Text>
-                    <Text style={styles.sectionSubtitle}>
-                        Transfer any amount to the account below. Your balance updates automatically within seconds.
-                    </Text>
-
-                    {loading || creating ? (
-                        <View style={styles.loadingCard}>
-                            <ActivityIndicator size="large" color={colors.primaryBlue} />
-                            <Text style={styles.loadingText}>
-                                {creating ? 'Setting up your wallet...' : 'Loading account details...'}
-                            </Text>
-                        </View>
-                    ) : error ? (
-                        <View style={styles.errorCard}>
-                            <Ionicons name="alert-circle-outline" size={32} color="#d32f2f" />
-                            <Text style={styles.errorText}>{error}</Text>
-                            <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
-                                <Text style={styles.retryText}>Try Again</Text>
-                            </TouchableOpacity>
-                        </View>
-                    ) : (
-                        <View style={styles.accountCard}>
-                            <View style={styles.accountRow}>
-                                <Text style={styles.accountLabel}>Bank</Text>
-                                <Text style={styles.accountValue}>{bankName}</Text>
-                            </View>
-
-                            <View style={styles.divider} />
-
-                            <View style={styles.accountRow}>
-                                <Text style={styles.accountLabel}>Account Number</Text>
-                                <View style={styles.accountNumberRow}>
-                                    <Text style={styles.accountNumberValue}>{accountNumber}</Text>
-                                </View>
-                            </View>
-
-                            <View style={styles.divider} />
-
-                            <View style={styles.accountRow}>
-                                <Text style={styles.accountLabel}>Account Name</Text>
-                                <Text style={styles.accountValue}>{accountName}</Text>
-                            </View>
-
-                            <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
-                                <Ionicons name="share-outline" size={18} color={colors.primaryBlue} />
-                                <Text style={styles.shareText}>Share Account Details</Text>
-                            </TouchableOpacity>
-                        </View>
-                    )}
-
-                    <View style={styles.noteBox}>
-                        <Ionicons name="information-circle-outline" size={18} color={colors.primaryBlue} />
-                        <Text style={styles.noteText}>
-                            This account number is unique to you. Any transfer made to it will be credited to your KRides wallet.
-                        </Text>
+            <KeyboardAvoidingView
+                style={{ flex: 1 }}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            >
+                <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                    {/* Balance card */}
+                    <View style={styles.balanceCard}>
+                        <MaterialCommunityIcons name="wallet-outline" size={28} color="rgba(255,255,255,0.8)" />
+                        <Text style={styles.balanceLabel}>Available Balance</Text>
+                        <Text style={styles.balanceAmount}>{formatBalance(balance)}</Text>
                     </View>
-                </View>
 
-                {/* Transaction history */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Recent Transactions</Text>
-                    {transactions.length === 0 ? (
-                        <View style={styles.emptyState}>
-                            <MaterialCommunityIcons name="receipt" size={48} color={colors.lightGrey3} />
-                            <Text style={styles.emptyText}>No transactions yet</Text>
-                            <Text style={styles.emptySubtext}>
-                                Your top-ups and ride payments will appear here.
+                    {/* Top-up section */}
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Add Money</Text>
+                        <Text style={styles.sectionSubtitle}>
+                            Enter the amount you want to add, then transfer exactly that amount to the generated account number.
+                        </Text>
+
+                        {/* Amount input */}
+                        {!topupAccount && (
+                            <View style={styles.inputCard}>
+                                <Text style={styles.inputLabel}>Amount (₦)</Text>
+                                <View style={styles.inputRow}>
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="e.g. 2000"
+                                        placeholderTextColor={colors.lightGrey3}
+                                        keyboardType="numeric"
+                                        value={topupAmount}
+                                        onChangeText={(t) => { setTopupAmount(t.replace(/[^0-9]/g, '')); setError(null); }}
+                                        maxLength={7}
+                                    />
+                                    <TouchableOpacity
+                                        style={[styles.generateBtn, creating && styles.generateBtnDisabled]}
+                                        onPress={handleGenerateAccount}
+                                        disabled={creating}
+                                    >
+                                        {creating
+                                            ? <ActivityIndicator size="small" color="white" />
+                                            : <Text style={styles.generateBtnText}>Generate Account</Text>
+                                        }
+                                    </TouchableOpacity>
+                                </View>
+                                {error && <Text style={styles.errorText}>{error}</Text>}
+                            </View>
+                        )}
+
+                        {/* Generated account details */}
+                        {topupAccount && (
+                            <View style={styles.accountCard}>
+                                <View style={styles.amountBadge}>
+                                    <Text style={styles.amountBadgeText}>
+                                        Transfer exactly ₦{topupAccount.amount?.toLocaleString('en-NG')}
+                                    </Text>
+                                </View>
+
+                                <View style={styles.accountRow}>
+                                    <Text style={styles.accountLabel}>Bank</Text>
+                                    <Text style={styles.accountValue}>{topupAccount.bankName}</Text>
+                                </View>
+                                <View style={styles.divider} />
+                                <View style={styles.accountRow}>
+                                    <Text style={styles.accountLabel}>Account Number</Text>
+                                    <Text style={styles.accountNumberValue}>{topupAccount.accountNumber}</Text>
+                                </View>
+                                <View style={styles.divider} />
+                                <View style={styles.accountRow}>
+                                    <Text style={styles.accountLabel}>Account Name</Text>
+                                    <Text style={styles.accountValue}>{topupAccount.accountName}</Text>
+                                </View>
+
+                                {topupAccount.expiryDate && (
+                                    <>
+                                        <View style={styles.divider} />
+                                        <View style={styles.accountRow}>
+                                            <Text style={styles.accountLabel}>Expires</Text>
+                                            <Text style={styles.accountValue}>{topupAccount.expiryDate}</Text>
+                                        </View>
+                                    </>
+                                )}
+
+                                <View style={styles.accountActions}>
+                                    <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
+                                        <Ionicons name="share-outline" size={18} color={colors.primaryBlue} />
+                                        <Text style={styles.shareText}>Share Details</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={styles.newTopupButton} onPress={() => setTopupAccount(null)}>
+                                        <Text style={styles.newTopupText}>New Top-up</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        )}
+
+                        <View style={styles.noteBox}>
+                            <Ionicons name="information-circle-outline" size={18} color={colors.primaryBlue} />
+                            <Text style={styles.noteText}>
+                                The account number is valid for one transfer of the exact amount shown. Your balance updates automatically within seconds of the transfer.
                             </Text>
                         </View>
-                    ) : (
-                        transactions.map((txn) => (
-                            <View key={txn.id} style={styles.txnCard}>
-                                <View style={styles.txnIconWrap}>
-                                    <MaterialCommunityIcons
-                                        name={txn.type === 'topup' ? 'arrow-down-circle' : txn.type === 'refund' ? 'refresh-circle' : 'car'}
-                                        size={24}
-                                        color={txn.type === 'topup' || txn.type === 'refund' ? '#4caf50' : colors.primaryBlue}
-                                    />
-                                </View>
-                                <View style={styles.txnInfo}>
-                                    <Text style={styles.txnTitle}>
-                                        {txn.type === 'topup' ? 'Wallet Top-up'
-                                            : txn.type === 'refund' ? 'Ride Refund'
-                                            : 'Ride Payment'}
-                                    </Text>
-                                    <Text style={styles.txnDate}>
-                                        {txn.createdAt?.toDate
-                                            ? txn.createdAt.toDate().toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-                                            : '—'}
-                                    </Text>
-                                </View>
-                                <Text style={[styles.txnAmount, txn.amount > 0 ? styles.txnAmountCredit : styles.txnAmountDebit]}>
-                                    {txn.amount > 0 ? '+' : ''}₦{Math.abs(txn.amount).toLocaleString('en-NG')}
+                    </View>
+
+                    {/* Transaction history */}
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Recent Transactions</Text>
+                        {transactions.length === 0 ? (
+                            <View style={styles.emptyState}>
+                                <MaterialCommunityIcons name="receipt" size={48} color={colors.lightGrey3} />
+                                <Text style={styles.emptyText}>No transactions yet</Text>
+                                <Text style={styles.emptySubtext}>
+                                    Your top-ups and ride payments will appear here.
                                 </Text>
                             </View>
-                        ))
-                    )}
-                </View>
-            </ScrollView>
+                        ) : (
+                            transactions.map((txn) => (
+                                <View key={txn.id} style={styles.txnCard}>
+                                    <View style={styles.txnIconWrap}>
+                                        <MaterialCommunityIcons
+                                            name={txn.type === 'topup' ? 'arrow-down-circle' : txn.type === 'refund' ? 'refresh-circle' : 'car'}
+                                            size={24}
+                                            color={txn.type === 'topup' || txn.type === 'refund' ? '#4caf50' : colors.primaryBlue}
+                                        />
+                                    </View>
+                                    <View style={styles.txnInfo}>
+                                        <Text style={styles.txnTitle}>
+                                            {txn.type === 'topup' ? 'Wallet Top-up'
+                                                : txn.type === 'refund' ? 'Ride Refund'
+                                                : 'Ride Payment'}
+                                        </Text>
+                                        <Text style={styles.txnDate}>
+                                            {txn.createdAt?.toDate
+                                                ? txn.createdAt.toDate().toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                                                : '—'}
+                                        </Text>
+                                    </View>
+                                    <Text style={[styles.txnAmount, txn.amount > 0 ? styles.txnAmountCredit : styles.txnAmountDebit]}>
+                                        {txn.amount > 0 ? '+' : ''}₦{Math.abs(txn.amount).toLocaleString('en-NG')}
+                                    </Text>
+                                </View>
+                            ))
+                        )}
+                    </View>
+                </ScrollView>
+            </KeyboardAvoidingView>
         </SafeAreaView>
     );
 };
@@ -305,55 +306,83 @@ const styles = StyleSheet.create({
         lineHeight: fs(20),
         marginBottom: sp(16),
     },
-    loadingCard: {
+    inputCard: {
         backgroundColor: 'white',
         borderRadius: br(16),
-        padding: sp(32),
-        alignItems: 'center',
-        gap: sp(12),
-        elevation: 2,
-    },
-    loadingText: {
-        fontSize: fs(14),
-        fontFamily: 'Albert-Regular',
-        color: colors.lightGrey3,
-    },
-    errorCard: {
-        backgroundColor: 'white',
-        borderRadius: br(16),
-        padding: sp(24),
-        alignItems: 'center',
-        gap: sp(12),
-        elevation: 2,
-    },
-    errorText: {
-        fontSize: fs(14),
-        fontFamily: 'Albert-Regular',
-        color: '#d32f2f',
-        textAlign: 'center',
-    },
-    retryButton: {
-        paddingHorizontal: sp(24),
-        paddingVertical: sp(10),
-        backgroundColor: colors.primaryBlue,
-        borderRadius: br(8),
-        marginTop: sp(4),
-    },
-    retryText: {
-        color: 'white',
-        fontSize: fs(14),
-        fontFamily: 'Albert-SemiBold',
-    },
-    accountCard: {
-        backgroundColor: 'white',
-        borderRadius: br(16),
-        paddingHorizontal: sp(20),
-        paddingVertical: sp(8),
+        padding: sp(16),
         elevation: 2,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.06,
         shadowRadius: 3,
+    },
+    inputLabel: {
+        fontSize: fs(13),
+        fontFamily: 'Albert-Regular',
+        color: colors.lightGrey3,
+        marginBottom: sp(8),
+    },
+    inputRow: {
+        flexDirection: 'row',
+        gap: sp(10),
+        alignItems: 'center',
+    },
+    input: {
+        flex: 1,
+        height: sp(48),
+        borderWidth: 1,
+        borderColor: colors.lightGrey2,
+        borderRadius: br(10),
+        paddingHorizontal: sp(14),
+        fontSize: fs(16),
+        fontFamily: 'Albert-SemiBold',
+        color: '#333',
+    },
+    generateBtn: {
+        height: sp(48),
+        paddingHorizontal: sp(16),
+        backgroundColor: colors.primaryBlue,
+        borderRadius: br(10),
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    generateBtnDisabled: {
+        opacity: 0.6,
+    },
+    generateBtnText: {
+        color: 'white',
+        fontSize: fs(13),
+        fontFamily: 'Albert-SemiBold',
+    },
+    errorText: {
+        fontSize: fs(12),
+        fontFamily: 'Albert-Regular',
+        color: '#d32f2f',
+        marginTop: sp(8),
+    },
+    accountCard: {
+        backgroundColor: 'white',
+        borderRadius: br(16),
+        paddingHorizontal: sp(20),
+        paddingTop: sp(4),
+        paddingBottom: sp(4),
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.06,
+        shadowRadius: 3,
+    },
+    amountBadge: {
+        backgroundColor: '#e8f5e9',
+        borderRadius: br(8),
+        padding: sp(10),
+        marginVertical: sp(12),
+        alignItems: 'center',
+    },
+    amountBadgeText: {
+        fontSize: fs(14),
+        fontFamily: 'Albert-SemiBold',
+        color: '#2e7d32',
     },
     accountRow: {
         flexDirection: 'row',
@@ -374,10 +403,6 @@ const styles = StyleSheet.create({
         flex: 2,
         textAlign: 'right',
     },
-    accountNumberRow: {
-        flex: 2,
-        alignItems: 'flex-end',
-    },
     accountNumberValue: {
         fontSize: fs(20),
         fontFamily: 'Albert-Bold',
@@ -388,20 +413,37 @@ const styles = StyleSheet.create({
         height: 1,
         backgroundColor: colors.lightGrey2,
     },
+    accountActions: {
+        flexDirection: 'row',
+        borderTopWidth: 1,
+        borderTopColor: colors.lightGrey2,
+        marginTop: sp(4),
+    },
     shareButton: {
+        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: sp(8),
+        gap: sp(6),
         paddingVertical: sp(14),
-        marginTop: sp(4),
-        borderTopWidth: 1,
-        borderTopColor: colors.lightGrey2,
     },
     shareText: {
         fontSize: fs(14),
         fontFamily: 'Albert-SemiBold',
         color: colors.primaryBlue,
+    },
+    newTopupButton: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: sp(14),
+        borderLeftWidth: 1,
+        borderLeftColor: colors.lightGrey2,
+    },
+    newTopupText: {
+        fontSize: fs(14),
+        fontFamily: 'Albert-SemiBold',
+        color: colors.lightGrey3,
     },
     noteBox: {
         flexDirection: 'row',

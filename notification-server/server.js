@@ -731,18 +731,23 @@ app.post('/api/auth/driver-email', async (req, res) => {
 // ── Wallet ────────────────────────────────────────────────────────────────────
 
 /**
- * POST /api/wallet/create-virtual-account
- * Creates a permanent Flutterwave virtual account for a customer and stores
- * the details in their Firestore document. If the account already exists the
- * stored details are returned immediately — no second Flutterwave API call.
+ * POST /api/wallet/create-topup-account
+ * Creates a one-time Flutterwave virtual account for a specific top-up amount.
+ * No BVN/NIN required (non-permanent accounts are exempt from that requirement).
+ * The tx_ref encodes the userId so the webhook can credit the right wallet.
  *
- * Body: { userId, email, name }
+ * Body: { userId, email, name, amount }
  */
-app.post('/api/wallet/create-virtual-account', async (req, res) => {
-    const { userId, email, name } = req.body;
+app.post('/api/wallet/create-topup-account', async (req, res) => {
+    const { userId, email, name, amount } = req.body;
 
-    if (!userId || !email) {
-        return res.status(400).json({ error: 'userId and email are required' });
+    if (!userId || !email || !amount) {
+        return res.status(400).json({ error: 'userId, email, and amount are required' });
+    }
+
+    const parsedAmount = Number(amount);
+    if (!parsedAmount || parsedAmount <= 0) {
+        return res.status(400).json({ error: 'amount must be a positive number' });
     }
 
     const secretKey = process.env.FLUTTERWAVE_SECRET_KEY;
@@ -751,31 +756,14 @@ app.post('/api/wallet/create-virtual-account', async (req, res) => {
     }
 
     try {
-        const userRef = db.collection('users').doc(userId);
-        const userSnap = await userRef.get();
+        // Unique ref per top-up so each transaction can be independently tracked
+        const txRef = `krides_topup_${userId}_${Date.now()}`;
 
-        // Return cached account if one was already created — avoids duplicate VA creation
-        if (userSnap.exists) {
-            const data = userSnap.data();
-            if (data.virtualAccountNumber && data.virtualAccountBank) {
-                console.log(`✅ Returning cached virtual account for ${userId}`);
-                return res.json({
-                    success: true,
-                    accountNumber: data.virtualAccountNumber,
-                    bankName: data.virtualAccountBank,
-                    accountName: data.virtualAccountName || name || 'KRides Wallet',
-                    cached: true,
-                });
-            }
-        }
-
-        // Split name into first/last for Flutterwave's required fields
         const nameParts = (name || 'KRides User').trim().split(/\s+/);
         const firstName = nameParts[0];
         const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'User';
-        const txRef = `krides_va_${userId}`;
 
-        console.log(`🏦 Creating virtual account for user ${userId} (${email})`);
+        console.log(`🏦 Creating top-up account for user ${userId} (${email}) amount=₦${parsedAmount}`);
 
         const response = await fetch('https://api.flutterwave.com/v3/virtual-account-numbers', {
             method: 'POST',
@@ -785,11 +773,12 @@ app.post('/api/wallet/create-virtual-account', async (req, res) => {
             },
             body: JSON.stringify({
                 email,
-                is_permanent: true,
+                is_permanent: false,
+                amount: parsedAmount,
                 tx_ref: txRef,
                 firstname: firstName,
                 lastname: lastName,
-                narration: `KRides Wallet - ${name || email}`,
+                narration: `KRides Wallet Top-up - ₦${parsedAmount}`,
             }),
         });
 
@@ -799,37 +788,29 @@ app.post('/api/wallet/create-virtual-account', async (req, res) => {
             console.error('❌ Flutterwave VA creation failed:', result.message);
             return res.status(400).json({
                 success: false,
-                error: result.message || 'Could not create virtual account',
+                error: result.message || 'Could not create top-up account',
             });
         }
 
-        const { account_number, bank_name } = result.data;
-        const accountName = `${firstName} ${lastName}`.trim();
+        const { account_number, bank_name, expiry_date } = result.data;
 
-        // Persist to Firestore via Admin SDK (bypasses client-side rules)
-        await userRef.set({
-            virtualAccountNumber: account_number,
-            virtualAccountBank: bank_name,
-            virtualAccountRef: txRef,
-            virtualAccountName: accountName,
-            virtualAccountCreatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            walletBalance: 0,
-        }, { merge: true });
-
-        console.log(`✅ Virtual account created for ${userId}: ${account_number} (${bank_name})`);
+        console.log(`✅ Top-up account created for ${userId}: ${account_number} (${bank_name})`);
 
         return res.json({
             success: true,
             accountNumber: account_number,
             bankName: bank_name,
-            accountName,
+            accountName: `${firstName} ${lastName}`.trim(),
+            amount: parsedAmount,
+            expiryDate: expiry_date || null,
+            txRef,
         });
 
     } catch (error) {
-        console.error('❌ Virtual account creation error:', error);
+        console.error('❌ Top-up account creation error:', error);
         return res.status(500).json({
             success: false,
-            error: 'Could not create virtual account. Please try again.',
+            error: 'Could not create top-up account. Please try again.',
         });
     }
 });
@@ -882,13 +863,16 @@ app.post('/api/wallet/webhook', async (req, res) => {
         return;
     }
 
-    // tx_ref format: krides_va_{userId}
-    if (!txRef.startsWith('krides_va_')) {
+    // tx_ref format: krides_topup_{userId}_{timestamp}
+    if (!txRef.startsWith('krides_topup_')) {
         console.log(`ℹ️ Ignoring unrelated tx_ref: ${txRef}`);
         return;
     }
 
-    const userId = txRef.replace('krides_va_', '');
+    // Strip prefix and suffix timestamp: krides_topup_{userId}_{ts}
+    const withoutPrefix = txRef.replace('krides_topup_', '');
+    const lastUnder = withoutPrefix.lastIndexOf('_');
+    const userId = lastUnder > 0 ? withoutPrefix.slice(0, lastUnder) : withoutPrefix;
     if (!userId) {
         console.error('❌ Could not parse userId from tx_ref:', txRef);
         return;

@@ -10,14 +10,15 @@ const api = axios.create({
 });
 
 /**
- * Fetches (or creates) the permanent virtual account for a customer.
- * The server returns cached details if the account already exists.
+ * Creates a one-time virtual account for a specific top-up amount.
+ * No BVN/NIN required (non-permanent Flutterwave accounts are exempt).
  */
-export const createOrGetVirtualAccount = async (userId, email, name) => {
-    const response = await api.post(`${SERVER_URL}/wallet/create-virtual-account`, {
+export const createTopupAccount = async (userId, email, name, amount) => {
+    const response = await api.post(`${SERVER_URL}/wallet/create-topup-account`, {
         userId,
         email,
         name,
+        amount,
     });
     return response.data;
 };
