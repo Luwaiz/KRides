@@ -755,7 +755,7 @@ app.post('/api/wallet/create-virtual-account', async (req, res) => {
         const userSnap = await userRef.get();
 
         // Return cached account if one was already created — avoids duplicate VA creation
-        if (userSnap.exists()) {
+        if (userSnap.exists) {
             const data = userSnap.data();
             if (data.virtualAccountNumber && data.virtualAccountBank) {
                 console.log(`✅ Returning cached virtual account for ${userId}`);

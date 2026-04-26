@@ -189,7 +189,7 @@ const DrawerComponent = (props) => {
 						</View>
 					</View>
 				</TouchableOpacity>
-				<View style={styles.bottomCont}>{/* <DrawerContent /> */}</View>
+				<View style={styles.bottomCont}><DrawerContent /></View>
 			</DrawerContentScrollView>
 		</View>
 	);
