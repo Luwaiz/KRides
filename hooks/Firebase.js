@@ -25,6 +25,9 @@ import {
 	where,
 } from "firebase/firestore";
 import { FIREBASE_APP, FIREBASE_DB, FIREBASE_AUTH } from "../firebaseConfig";
+import { NOTIFICATION_API_KEY } from "@env";
+
+const NOTIFICATION_SERVER = 'https://krides.onrender.com';
 
 /** ---------- AUTH ---------- **/
 
@@ -91,14 +94,15 @@ export async function signUpWithEmail({
 		console.error("Error code:", firestoreError.code);
 		console.error("Error message:", firestoreError.message);
 
-		// If Firestore write fails due to permission-denied, log but don't throw
-		// The user account is still created in Auth, Navigation will handle the read error
+		// Always throw so the signup screen shows an error instead of silently
+		// leaving the user in a broken state (Auth account exists, no profile).
 		if (firestoreError.code === "permission-denied") {
-			console.error("🚨 CRITICAL: Firestore permission denied on user creation!");
-			console.error("User auth account created, but Firestore document failed.");
-			console.error("Please update Firestore security rules to allow user creation.");
+			console.error("🚨 Firestore permission denied on profile creation — check security rules.");
+			throw new Error(
+				"Account was created but your profile could not be saved. " +
+				"Please contact support or try signing up again."
+			);
 		} else {
-			// For other errors, throw so the signup flow knows it failed
 			throw firestoreError;
 		}
 	}
@@ -207,33 +211,49 @@ export async function resetPassword(email) {
  * @param {string} phone - Driver's phone number
  * @returns {Promise<string>} Driver's email address
  */
+/**
+ * Normalize a Nigerian phone number to the 11-digit local format (08XXXXXXXXX).
+ * Accepts: 08123456789 · +2348123456789 · 2348123456789
+ */
+export function normalizeNigerianPhone(raw) {
+	const digits = String(raw).replace(/\D/g, "");
+	if (digits.startsWith("234") && digits.length === 13) {
+		return "0" + digits.slice(3);
+	}
+	// 11-digit local format (08XXXXXXXXX or 09XXXXXXXXX)
+	if (/^0[789]\d{9}$/.test(digits)) {
+		return digits;
+	}
+	return null; // unparseable — caller must handle
+}
+
 export async function getDriverEmailByPhone(phone) {
-	if (!phone) {
-		throw new Error("Phone number is required");
-	}
+	if (!phone) throw new Error("Phone number is required");
 
+	let response;
 	try {
-		const driversRef = collection(FIREBASE_DB, "drivers");
-		const q = query(driversRef, where("phone", "==", phone));
-		const querySnapshot = await getDocs(q);
-
-		if (querySnapshot.empty) {
-			throw new Error("No driver found with this phone number");
-		}
-
-		const driverDoc = querySnapshot.docs[0];
-		const driverData = driverDoc.data();
-
-		if (!driverData.email) {
-			throw new Error("Driver email not found");
-		}
-
-		console.log(`✅ Found driver email for phone ${phone}`);
-		return driverData.email;
-	} catch (error) {
-		console.error("Error looking up driver email:", error);
-		throw error;
+		response = await fetch(`${NOTIFICATION_SERVER}/api/auth/driver-email`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'x-api-key': NOTIFICATION_API_KEY || '',
+			},
+			body: JSON.stringify({ phone }),
+		});
+	} catch (networkError) {
+		console.error("Driver email lookup — network error:", networkError);
+		throw new Error("Unable to reach the server. Please check your internet connection.");
 	}
+
+	const data = await response.json();
+
+	if (!response.ok) {
+		if (response.status === 404) throw new Error("No driver found with this phone number");
+		throw new Error(data.error || "Driver lookup failed. Please try again.");
+	}
+
+	console.log(`✅ Driver email resolved for phone ${phone}`);
+	return data.email;
 }
 
 /** ---------- USER DOC FETCH ---------- **/

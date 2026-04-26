@@ -10,7 +10,7 @@ import { useAcceptedRideStore, useDriverDetails } from "../../constants/Store";
 import useAuthStore from "../../constants/Store";
 import Avatar from "../../assets/svg/Frame 77avatar.svg";
 import Arrival from "../modals/Arrival";
-import { updateRideStatus, listenToPendingRides, declineRide } from "../../helpers/firebaseRides";
+import { updateRideStatus, listenToPendingRides, declineRide, getRide } from "../../helpers/firebaseRides";
 import { getRideCoordinates } from "../../helpers/getLocationCoordinates";
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { FIREBASE_DB } from "../../firebaseConfig";
@@ -97,7 +97,26 @@ const AcceptTab = () => {
 					},
 					{
 						text: "Accept",
-						onPress: () => {
+						onPress: async () => {
+							// Re-fetch from Firestore to confirm the ride is still valid.
+							// The queued ride may have been cancelled or taken by another
+							// driver in the time since the driver queued it.
+							const freshRide = await getRide(queued.rideId).catch(() => null);
+							if (!freshRide || freshRide.status !== 'accepted' || freshRide.driverId !== uid) {
+								Alert.alert(
+									"Ride No Longer Available",
+									"This queued ride was cancelled or reassigned before you could start it.",
+									[{
+										text: "OK",
+										onPress: () => {
+											setNextRide(null);
+											clearAcceptedRide();
+											setHasArrived(false);
+										}
+									}]
+								);
+								return;
+							}
 							activateNextRide();
 							setHasArrived(false);
 						},
@@ -215,7 +234,7 @@ const AcceptTab = () => {
 		if (nextRide) {
 			Alert.alert(
 				"Queue Full",
-				`You can only queue 1 ride at a time. Complete your current ride first, then accept "${nextRide.customerName || 'the queued ride'}" before picking up another.`
+				`You already have "${nextRide.customerName || 'a ride'}" queued. Finish your current ride first — the queued ride will be offered to you automatically.`
 			);
 			return;
 		}

@@ -32,7 +32,13 @@ app.use('/api', (req, res, next) => {
 });
 
 // Initialize Firebase Admin SDK
-const serviceAccount = require('./kampusride-firebase-adminsdk-fbsvc-c626e78acd.json');
+// Load credentials from env var (JSON string) to avoid committing service account keys.
+// Set FIREBASE_ADMIN_SDK in your .env file and as a Render environment secret.
+if (!process.env.FIREBASE_ADMIN_SDK) {
+    console.error('❌ FIREBASE_ADMIN_SDK environment variable is not set');
+    process.exit(1);
+}
+const serviceAccount = JSON.parse(process.env.FIREBASE_ADMIN_SDK);
 
 admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
@@ -56,7 +62,7 @@ app.post('/api/notifications/notify-driver-arrived', async (req, res) => {
         if (!customerDoc.exists) {
             return res.status(404).json({ error: 'Customer not found' });
         }
-        const pushToken = customerDoc.data()?.fcmToken || customerDoc.data()?.pushToken;
+        const pushToken = customerDoc.data()?.fcmToken;
         if (!pushToken) {
             return res.json({ success: false, skipped: true, reason: 'no_push_token' });
         }
@@ -119,10 +125,20 @@ async function sendFCMNotification(fcmToken, title, body, data = {}) {
     };
 
     // Retry configuration
-    const maxRetries = 3;
+    const maxRetries = 2;
     const initialDelay = 500;
-    const maxDelay = 5000;
+    const maxDelay = 4000;
     const backoffMultiplier = 2;
+    // If a send times out we cannot know whether FCM queued it already,
+    // so we treat timeouts as ambiguous and do NOT retry to avoid duplicates.
+    const FCM_SEND_TIMEOUT_MS = 8000;
+
+    const permanentErrors = [
+        'messaging/invalid-registration-token',
+        'messaging/registration-token-not-registered',
+        'messaging/invalid-argument',
+        'messaging/invalid-recipient',
+    ];
 
     let lastError;
 
@@ -130,61 +146,47 @@ async function sendFCMNotification(fcmToken, title, body, data = {}) {
         try {
             console.log(`📤 Sending FCM notification to ${fcmToken.substring(0, 20)}...: ${title} (attempt ${attempt + 1}/${maxRetries + 1})`);
 
-            // Send via Firebase Admin SDK
-            const response = await admin.messaging().send(message);
+            // Race the send against a timeout. A timeout is treated as ambiguous —
+            // FCM may have already accepted the message, so we do NOT retry.
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('FCM_SEND_TIMEOUT')), FCM_SEND_TIMEOUT_MS)
+            );
+
+            const response = await Promise.race([
+                admin.messaging().send(message),
+                timeoutPromise,
+            ]);
 
             console.log('✅ FCM notification sent successfully:', response);
             return { success: true, messageId: response };
 
         } catch (error) {
             lastError = error;
+            console.log(`   ❌ FCM error:`, error.code || error.message);
 
-            // Log full error for debugging
-            console.log(`   ❌ FCM error:`, error.code, error.message);
+            // Timeout — ambiguous outcome, do not retry to prevent duplicate delivery
+            if (error.message === 'FCM_SEND_TIMEOUT') {
+                console.warn('⚠️ FCM send timed out — not retrying to avoid duplicate delivery');
+                return { success: false, error: 'timeout', message: 'Send timed out; message may have been delivered' };
+            }
 
-            // Check for permanent errors (don't retry)
-            const permanentErrors = [
-                'messaging/invalid-registration-token',
-                'messaging/registration-token-not-registered',
-                'messaging/invalid-argument',
-                'messaging/invalid-recipient',
-            ];
-
+            // Permanent errors — retrying will never help
             if (permanentErrors.includes(error.code)) {
                 console.warn(`🚫 Permanent error (${error.code}), not retrying`);
-                return {
-                    success: false,
-                    error: error.code,
-                    message: error.message,
-                    permanent: true
-                };
+                return { success: false, error: error.code, message: error.message, permanent: true };
             }
 
-            // If this was the last attempt, return failure
             if (attempt === maxRetries) {
-                console.error(`❌ Error sending FCM notification (all ${maxRetries + 1} attempts failed):`, error.message);
-                return {
-                    success: false,
-                    error: error.code || 'unknown',
-                    message: error.message
-                };
+                console.error(`❌ FCM notification failed after ${maxRetries + 1} attempts:`, error.message);
+                return { success: false, error: error.code || 'unknown', message: error.message };
             }
 
-            // Calculate delay with exponential backoff
-            const delay = Math.min(
-                initialDelay * Math.pow(backoffMultiplier, attempt),
-                maxDelay
-            );
-
-            console.log(`⚠️ Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms`);
-            console.log(`   Error: ${error.message}`);
-
-            // Wait before retrying
+            const delay = Math.min(initialDelay * Math.pow(backoffMultiplier, attempt), maxDelay);
+            console.log(`⚠️ Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms — ${error.message}`);
             await new Promise(resolve => setTimeout(resolve, delay));
         }
     }
 
-    // This shouldn't be reached, but just in case
     return {
         success: false,
         error: lastError?.code || 'unknown',
@@ -227,7 +229,7 @@ app.post('/api/notifications/send', async (req, res) => {
         }
 
         const userData = userDoc.data();
-        const pushToken = userData.fcmToken || userData.pushToken;
+        const pushToken = userData.fcmToken;
 
         if (!pushToken) {
             return res.json({ success: false, skipped: true, reason: 'no_push_token' });
@@ -278,7 +280,7 @@ app.post('/api/notifications/send-bulk', async (req, res) => {
 
             if (userDoc.exists) {
                 const userData = userDoc.data();
-                const pushToken = userData.fcmToken || userData.pushToken;
+                const pushToken = userData.fcmToken;
 
                 if (pushToken) {
                     const result = await sendFCMNotification(pushToken, title, body, data || {});
@@ -330,13 +332,17 @@ app.post('/api/notifications/notify-drivers', async (req, res) => {
             });
         }
 
-        // Get all drivers
-        const driversSnapshot = await db.collection('drivers').get();
+        // Only notify drivers who are currently online — avoids scanning the
+        // entire drivers collection on every booking.
+        const driversSnapshot = await db.collection('drivers')
+            .where('isOnline', '==', true)
+            .limit(100)
+            .get();
         const results = [];
 
         for (const doc of driversSnapshot.docs) {
             const driver = doc.data();
-            const pushToken = driver.fcmToken || driver.pushToken; // Support both field names
+            const pushToken = driver.fcmToken;
 
             if (pushToken) {
                 const result = await sendFCMNotification(
@@ -402,7 +408,7 @@ app.post('/api/notifications/ride-accepted', async (req, res) => {
         }
 
         const customer = customerDoc.data();
-        const pushToken = customer.fcmToken || customer.pushToken;
+        const pushToken = customer.fcmToken;
 
         if (!pushToken) {
             return res.json({ success: false, skipped: true, reason: 'no_push_token' });
@@ -458,7 +464,7 @@ app.post('/api/notifications/ride-completed', async (req, res) => {
         }
 
         const customer = customerDoc.data();
-        const pushToken = customer.fcmToken || customer.pushToken;
+        const pushToken = customer.fcmToken;
 
         if (!pushToken) {
             return res.json({ success: false, skipped: true, reason: 'no_push_token' });
@@ -515,7 +521,7 @@ app.post('/api/notifications/notify-driver-arrived', async (req, res) => {
         }
 
         const customer = customerDoc.data();
-        const pushToken = customer.fcmToken || customer.pushToken;
+        const pushToken = customer.fcmToken;
 
         if (!pushToken) {
             return res.json({ success: false, skipped: true, reason: 'no_push_token' });
@@ -662,6 +668,57 @@ app.post('/api/payments/create-subaccount', async (req, res) => {
     } catch (error) {
         console.error('❌ Flutterwave subaccount error:', error);
         res.status(500).json({ error: 'Payment service unavailable. Please try again.' });
+    }
+});
+
+/**
+ * POST /api/auth/driver-email
+ * Look up a driver's email by phone number.
+ * Used by the driver login screen before Firebase Auth is called.
+ * Runs with Admin SDK so the Firestore drivers collection can be locked to
+ * owner-only reads on the client side.
+ *
+ * Body: { phone: string }
+ * Response: { email: string }
+ */
+app.post('/api/auth/driver-email', async (req, res) => {
+    const { phone } = req.body;
+    if (!phone || typeof phone !== 'string' || !phone.trim()) {
+        return res.status(400).json({ error: 'phone is required' });
+    }
+
+    // Normalize: accept 08XXXXXXXXX, +234XXXXXXXXXX, 234XXXXXXXXXX
+    const normalized = (() => {
+        const digits = phone.replace(/\D/g, '');
+        if (digits.startsWith('234') && digits.length === 13) return '0' + digits.slice(3);
+        if (/^0[789]\d{9}$/.test(digits)) return digits;
+        return null;
+    })();
+
+    if (!normalized) {
+        return res.status(400).json({ error: 'Invalid Nigerian phone number format' });
+    }
+
+    try {
+        const snapshot = await db.collection('drivers')
+            .where('phone', '==', normalized)
+            .limit(1)
+            .get();
+
+        if (snapshot.empty) {
+            return res.status(404).json({ error: 'No driver found with this phone number' });
+        }
+
+        const driver = snapshot.docs[0].data();
+        if (!driver.email) {
+            console.error('⚠️ Driver document has no email field:', snapshot.docs[0].id);
+            return res.status(500).json({ error: 'Driver account is incomplete' });
+        }
+
+        return res.json({ email: driver.email });
+    } catch (error) {
+        console.error('❌ Driver email lookup error:', error);
+        return res.status(500).json({ error: 'Lookup failed. Please try again.' });
     }
 });
 

@@ -26,9 +26,9 @@ const DriverSignup = ({ navigation }) => {
 	}));
 
 	const isPhoneValid = (phone) => {
-		// Check if phone is exactly 11 digits
-		const phoneRegex = /^\d{11}$/;
-		return phoneRegex.test(phone);
+		// Accept 11-digit local format or international +234 format
+		const phoneRegex = /^\+?\d{7,15}$/;
+		return phoneRegex.test(phone.replace(/\s/g, ""));
 	};
 
 	const isNameValid = (name) => {
@@ -81,7 +81,7 @@ const DriverSignup = ({ navigation }) => {
 		if (!isPhoneValid(phone)) {
 			Alert.alert(
 				"Oops! Invalid Phone Number",
-				"Phone number must be exactly 11 digits (e.g., 08123456789) 📞"
+				"Enter a valid phone number (e.g., 08123456789 or +2348123456789) 📞"
 			);
 			return false;
 		}
@@ -124,10 +124,17 @@ const DriverSignup = ({ navigation }) => {
 			return;
 		}
 
+		// Normalize phone to local 11-digit format before storing
+		const normalizedPhone = Firebase.normalizeNigerianPhone(phone);
+		if (!normalizedPhone) {
+			Alert.alert("Invalid Phone Number", "Please enter a valid Nigerian phone number (e.g. 08012345678).");
+			return;
+		}
+
 		try {
 			const user = await Firebase.signUpDriver({
 				email,
-				phone,
+				phone: normalizedPhone,
 				password,
 				fullname: fullName,
 				vehicle_id,
@@ -136,7 +143,7 @@ const DriverSignup = ({ navigation }) => {
 			// Update local state with the user info
 			setFullName(fullName);
 			setVehicleId(vehicle_id);
-			setPhone(phone);
+			setPhone(normalizedPhone);
 
 			// Register FCM token for notifications
 			await Firebase.registerFcmToken(user.uid);

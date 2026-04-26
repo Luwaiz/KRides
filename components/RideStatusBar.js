@@ -22,9 +22,13 @@ const RideStatusBar = ({
     const pulseAnim = useRef(new Animated.Value(1)).current;
     const noDriverTimerRef = useRef(null);
     const stillSearchingTimerRef = useRef(null);
+    // Guards timer callbacks so a stale fire after status change is ignored
+    const isPendingRef = useRef(false);
 
     useEffect(() => {
         if (status === 'pending') {
+            isPendingRef.current = true;
+
             const pulse = Animated.loop(
                 Animated.sequence([
                     Animated.timing(pulseAnim, { toValue: 0.3, duration: 800, useNativeDriver: true }),
@@ -37,19 +41,21 @@ const RideStatusBar = ({
             setStillSearching(false);
 
             stillSearchingTimerRef.current = setTimeout(() => {
-                setStillSearching(true);
+                if (isPendingRef.current) setStillSearching(true);
             }, STILL_SEARCHING_TIMEOUT_MS);
 
             noDriverTimerRef.current = setTimeout(() => {
-                setNoDriverAvailable(true);
+                if (isPendingRef.current) setNoDriverAvailable(true);
             }, NO_DRIVER_TIMEOUT_MS);
 
             return () => {
+                isPendingRef.current = false;
                 pulse.stop();
                 clearTimeout(stillSearchingTimerRef.current);
                 clearTimeout(noDriverTimerRef.current);
             };
         } else {
+            isPendingRef.current = false;
             pulseAnim.setValue(1);
             setNoDriverAvailable(false);
             setStillSearching(false);
@@ -64,7 +70,7 @@ const RideStatusBar = ({
             return 'No drivers nearby — you can cancel and try again';
         }
         if (status === 'pending' && stillSearching) {
-            return 'Still searching for a driver nearby...';
+            return 'Taking a little longer — still searching...';
         }
         switch (status) {
             case 'pending':

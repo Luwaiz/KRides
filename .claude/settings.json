@@ -3,7 +3,13 @@
     "allow": [
       "Bash(git fetch *)",
       "Bash(git commit -m 'Merge origin/main into HomeScreens to resolve PR conflicts *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(firebase deploy *)",
+      "Read(//c/Users/Administrator/.claude/projects/c--Users-Administrator-Documents-REACTNATIVE-KRides/memory/**)",
+      "Bash(node -e \"const fs=require\\('fs'\\); console.log\\(JSON.stringify\\(JSON.parse\\(fs.readFileSync\\('kampusride-firebase-adminsdk-fbsvc-c626e78acd.json','utf8'\\)\\)\\)\\)\")"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\Administrator\\.claude\\projects\\c--Users-Administrator-Documents-REACTNATIVE-KRides\\memory"
     ]
   }
 }

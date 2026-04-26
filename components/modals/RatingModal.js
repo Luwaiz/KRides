@@ -9,16 +9,19 @@ import {
 	StyleSheet,
 	Dimensions,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+export const PENDING_RATING_KEY = "pending_customer_rating";
 import { AntDesign } from "@expo/vector-icons";
 import ActiveButton from "../buttons/ActiveButton";
 import { colors } from "../../constants/styling";
 import { sp, fs, br, wp, ms } from "../../constants/responsive";
 import { FIREBASE_DB } from "../../firebaseConfig";
-import { doc, updateDoc, arrayUnion, increment } from "firebase/firestore";
+import { doc, getDoc, updateDoc, setDoc, arrayUnion, increment } from "firebase/firestore";
 
 const { width } = Dimensions.get("screen");
 
-const RatingModal = ({ visible, onClose, rideId, driverId, driverName, pickupLocation, destination, amount, completedAt }) => {
+const RatingModal = ({ visible, onClose, rideId, driverId, driverName, pickupLocation, destination, amount, completedAt, isReminder = false }) => {
 	const [rating, setRating] = useState(0);
 	const [feedback, setFeedback] = useState("");
 	const [loading, setLoading] = useState(false);
@@ -31,6 +34,13 @@ const RatingModal = ({ visible, onClose, rideId, driverId, driverName, pickupLoc
 
 		setLoading(true);
 		try {
+			// Guard against duplicate submissions
+			const rideSnap = await getDoc(doc(FIREBASE_DB, "rides", rideId));
+			if (rideSnap.exists() && rideSnap.data()?.customerRating) {
+				alert("You've already rated this ride.");
+				onClose();
+				return;
+			}
 			// Update driver's rating
 			const driverRef = doc(FIREBASE_DB, "drivers", driverId);
 			await updateDoc(driverRef, {
@@ -44,15 +54,18 @@ const RatingModal = ({ visible, onClose, rideId, driverId, driverName, pickupLoc
 				ratingSum: increment(rating),
 			});
 
-			// Update ride with rating
+			// Update ride with rating — use setDoc/merge so the write succeeds
+			// even if the ride document was archived after completion.
 			const rideRef = doc(FIREBASE_DB, "rides", rideId);
-			await updateDoc(rideRef, {
+			await setDoc(rideRef, {
 				customerRating: rating,
 				customerFeedback: feedback.trim(),
 				ratedAt: new Date(),
-			});
+			}, { merge: true });
 
 			console.log("✅ Rating submitted successfully");
+			// Clear any pending reminder now that rating is submitted
+			await AsyncStorage.removeItem(PENDING_RATING_KEY).catch(() => {});
 			alert("Thank you for your feedback!");
 
 			// Reset and close
@@ -67,16 +80,37 @@ const RatingModal = ({ visible, onClose, rideId, driverId, driverName, pickupLoc
 		}
 	};
 
-	const handleClose = () => {
+	const handleRateLater = async () => {
+		if (isReminder) {
+			// Second dismissal — treat as a permanent skip
+			await AsyncStorage.removeItem(PENDING_RATING_KEY).catch(() => {});
+			setRating(0);
+			setFeedback("");
+			onClose();
+			return;
+		}
+
 		Alert.alert(
-			"Skip Rating?",
-			"Your rating helps drivers improve. Are you sure you want to skip?",
+			"Rate Later?",
+			"Your rating helps drivers improve. We'll remind you the next time you open the app.",
 			[
-				{ text: "Go Back", style: "cancel" },
+				{ text: "Rate Now", style: "cancel" },
 				{
-					text: "Skip",
-					style: "destructive",
-					onPress: () => {
+					text: "Remind Me Later",
+					onPress: async () => {
+						// Persist the ride details so we can re-surface the modal on next open
+						const pendingRating = {
+							rideId,
+							driverId,
+							driverName,
+							pickupLocation,
+							destination,
+							amount,
+						};
+						await AsyncStorage.setItem(
+							PENDING_RATING_KEY,
+							JSON.stringify(pendingRating)
+						).catch(() => {});
 						setRating(0);
 						setFeedback("");
 						onClose();
@@ -91,7 +125,7 @@ const RatingModal = ({ visible, onClose, rideId, driverId, driverName, pickupLoc
 			visible={visible}
 			transparent
 			animationType="fade"
-			onRequestClose={handleClose}
+			onRequestClose={handleRateLater}
 		>
 			<View style={styles.overlay}>
 				<View style={styles.container}>
@@ -164,10 +198,12 @@ const RatingModal = ({ visible, onClose, rideId, driverId, driverName, pickupLoc
 					<View style={styles.buttonsContainer}>
 						<TouchableOpacity
 							style={styles.skipButton}
-							onPress={handleClose}
+							onPress={handleRateLater}
 							disabled={loading}
 						>
-							<Text style={styles.skipText}>Skip</Text>
+							<Text style={styles.skipText}>
+								{isReminder ? "Skip" : "Later"}
+							</Text>
 						</TouchableOpacity>
 						<View style={styles.submitButton}>
 							<ActiveButton

@@ -3,6 +3,7 @@ import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-si
 import { GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
 import { FIREBASE_AUTH } from '../firebaseConfig';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { GOOGLE_WEB_CLIENT_ID } from '@env';
 
 /**
  * Custom hook for Google Sign-In
@@ -15,7 +16,7 @@ export function useGoogleAuth() {
     // Configure Google Sign-In on mount
     useEffect(() => {
         GoogleSignin.configure({
-            webClientId: '1054058095059-6j788gaiqicduqgt1jo322hsvb7ums7b.apps.googleusercontent.com',
+            webClientId: GOOGLE_WEB_CLIENT_ID,
             offlineAccess: true,
         });
         console.log('✅ Google Sign-In configured');
@@ -48,8 +49,7 @@ export function useGoogleAuth() {
 
             const userInfo = await GoogleSignin.signIn();
 
-            // Log the full response to debug
-            console.log('📦 Google Sign-In response:', JSON.stringify(userInfo, null, 2));
+            console.log('📦 Google Sign-In response received');
 
             // Extract user data - handle different response structures
             const googleUser = userInfo.user || userInfo.data?.user || userInfo;

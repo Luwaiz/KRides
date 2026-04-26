@@ -45,7 +45,10 @@ class NotificationManager {
 
             if (token) {
                 this.currentToken = token;
-                // Save token to Firestore
+                // Clear any stale token from a previous account on this device
+                // before writing the new one, so the server never routes to a
+                // token that belongs to a different user.
+                await this.clearStaleTokenIfNeeded(uid, token, role);
                 await this.saveTokenToFirestore(uid, token, role);
             }
 
@@ -106,6 +109,28 @@ class NotificationManager {
     }
 
     /**
+     * If the Firestore doc already holds a different token, null it out first.
+     * This handles shared-device scenarios where a previous user's token would
+     * otherwise linger and receive notifications meant for this user.
+     */
+    async clearStaleTokenIfNeeded(uid, newToken, role) {
+        try {
+            const collectionName = role === 'driver' ? 'drivers' : 'users';
+            const userRef = doc(FIREBASE_DB, collectionName, uid);
+            const snap = await getDoc(userRef);
+            if (!snap.exists()) return;
+            const existingToken = snap.data()?.fcmToken;
+            if (existingToken && existingToken !== newToken) {
+                await updateDoc(userRef, { fcmToken: null });
+                console.log('🔄 Cleared stale FCM token before saving new one');
+            }
+        } catch (error) {
+            // Non-fatal — the new token write that follows will overwrite it anyway
+            console.warn('⚠️ Could not clear stale token:', error.message);
+        }
+    }
+
+    /**
      * Save push token to Firestore
      * @param {string} uid - User ID
      * @param {string} token - FCM Token
@@ -125,20 +150,23 @@ class NotificationManager {
             const userSnap = await getDoc(userRef);
 
             if (userSnap.exists()) {
-                // Update existing document
+                // Skip write if token hasn't changed (idempotent registration)
+                if (userSnap.data()?.fcmToken === token) {
+                    console.log(`✅ FCM token unchanged, skipping write for ${collectionName}/${uid}`);
+                    return;
+                }
                 await updateDoc(userRef, {
-                    pushToken: token,
-                    pushTokenUpdatedAt: new Date().toISOString(),
+                    fcmToken: token,
+                    fcmTokenUpdatedAt: new Date().toISOString(),
                 });
-                console.log(`✅ Push token saved to ${collectionName}/${uid}`);
+                console.log(`✅ FCM token saved to ${collectionName}/${uid}`);
             } else {
-                // Create document if it doesn't exist (shouldn't happen, but safety check)
                 await setDoc(userRef, {
                     uid,
-                    pushToken: token,
-                    pushTokenUpdatedAt: new Date().toISOString(),
+                    fcmToken: token,
+                    fcmTokenUpdatedAt: new Date().toISOString(),
                 }, { merge: true });
-                console.log(`✅ Push token saved to new ${collectionName}/${uid}`);
+                console.log(`✅ FCM token saved to new ${collectionName}/${uid}`);
             }
         } catch (error) {
             console.error('❌ Error saving push token to Firestore:', error);
@@ -202,9 +230,9 @@ class NotificationManager {
                 const collectionName = role === 'driver' ? 'drivers' : 'users';
                 const userRef = doc(FIREBASE_DB, collectionName, uid);
                 await updateDoc(userRef, {
-                    pushToken: null,
+                    fcmToken: null,
                 });
-                console.log('✅ Push token removed from Firestore');
+                console.log('✅ FCM token removed from Firestore');
             } catch (error) {
                 // Silently handle permission errors during logout
                 // The token will be overwritten on next login anyway

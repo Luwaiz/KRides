@@ -30,14 +30,13 @@ service cloud.firestore {
 
     // ── Drivers ───────────────────────────────────────────────────────────────
     match /drivers/{driverId} {
-      // Public (unauthenticated) read is required for the phone-to-email lookup
-      // that runs BEFORE Firebase Auth on the driver login screen.
-      // TODO: replace with a Firebase Cloud Function so this can be locked down.
-      allow read: if true;
-
+      // Only the driver reads their own document.
+      // Phone-to-email lookup for login now runs server-side via Admin SDK
+      // (POST /api/auth/driver-email on the notification server), so the
+      // public read that was previously required here is no longer needed.
+      allow read:   if isOwner(driverId);
       allow create: if isOwner(driverId);
-      // Driver may update their own profile; authenticated customers may only
-      // write the rating fields.
+      // Driver updates own profile; authenticated customers write rating fields only.
       allow update: if isOwner(driverId) || (isAuth() && isRatingUpdate());
       allow delete: if false;
     }

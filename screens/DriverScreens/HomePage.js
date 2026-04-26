@@ -20,7 +20,7 @@ import MapViewDirections from "react-native-maps-directions";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Geolocation from "@react-native-community/geolocation";
 import { registerForPushNotificationsAsync } from "../../helpers/pushNotifications";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, updateDoc, getDoc } from "firebase/firestore";
 import { FIREBASE_DB } from "../../firebaseConfig";
 import { useDriverDetails } from "../../constants/Store";
 
@@ -93,15 +93,20 @@ const HomePage = () => {
 				if (token) {
 					console.log("✅ Driver FCM token obtained:", token.substring(0, 30) + "...");
 
-					// Store token in Firestore
 					const driverRef = doc(FIREBASE_DB, "drivers", uid);
-					await updateDoc(driverRef, {
-						fcmToken: token,
-						lastTokenUpdate: new Date(),
-					});
-					console.log("✅ Driver FCM token saved to Firestore");
+					const snap = await getDoc(driverRef);
+					if (snap.exists() && snap.data()?.fcmToken === token) {
+						console.log("✅ Driver FCM token unchanged, skipping write");
+					} else {
+						await updateDoc(driverRef, {
+							fcmToken: token,
+							lastTokenUpdate: new Date(),
+						});
+						console.log("✅ Driver FCM token saved to Firestore");
+					}
 				} else {
-					console.log("⚠️ Failed to get FCM token");
+					console.warn("⚠️ Failed to get FCM token");
+					// Non-critical: driver still works, just won't get push notifications
 				}
 			} catch (error) {
 				console.error("❌ Error setting up notifications:", error);
@@ -110,6 +115,26 @@ const HomePage = () => {
 
 		setupNotifications();
 	}, [uid]);
+
+	// Validated, stable coordinate objects — prevent NaN from reaching the map
+	// when acceptedRide coords are missing or malformed.
+	const pickupCoords = useMemo(() => {
+		const p = acceptedRide?.pickupCoords;
+		if (!p) return null;
+		const lat = parseFloat(p.latitude);
+		const lng = parseFloat(p.longitude);
+		if (isNaN(lat) || isNaN(lng) || lat < 2 || lat > 14 || lng < 3 || lng > 15) return null;
+		return { latitude: lat, longitude: lng };
+	}, [acceptedRide?.pickupCoords]);
+
+	const destCoords = useMemo(() => {
+		const d = acceptedRide?.destinationCoords;
+		if (!d) return null;
+		const lat = parseFloat(d.latitude);
+		const lng = parseFloat(d.longitude);
+		if (isNaN(lat) || isNaN(lng) || lat < 2 || lat > 14 || lng < 3 || lng > 15) return null;
+		return { latitude: lat, longitude: lng };
+	}, [acceptedRide?.destinationCoords]);
 
 	const BABCOCK_COORDINATES = {
 		latitude: 6.8935,
@@ -134,24 +159,14 @@ const HomePage = () => {
 		}
 	}, [Accept]);
 
-	// Fit map once the map is ready and an active ride has coordinates
+	// Fit map once the map is ready and valid ride coordinates are available
 	useEffect(() => {
-		if (!mapReady || !isRideActive || !mapRef.current) return;
-		const p = acceptedRide?.pickupCoords;
-		const d = acceptedRide?.destinationCoords;
-		if (!p || !d) return;
-
-		const pickupLat = parseFloat(p.latitude);
-		const pickupLng = parseFloat(p.longitude);
-		const destLat = parseFloat(d.latitude);
-		const destLng = parseFloat(d.longitude);
-		if (isNaN(pickupLat) || isNaN(pickupLng) || isNaN(destLat) || isNaN(destLng)) return;
-
+		if (!mapReady || !isRideActive || !mapRef.current || !pickupCoords || !destCoords) return;
 		mapRef.current.fitToCoordinates(
-			[{ latitude: pickupLat, longitude: pickupLng }, { latitude: destLat, longitude: destLng }],
+			[pickupCoords, destCoords],
 			{ edgePadding: { top: 50, right: 20, bottom: 50, left: 20 }, animated: true }
 		);
-	}, [mapReady, isRideActive, acceptedRide]);
+	}, [mapReady, isRideActive, pickupCoords, destCoords]);
 
 	return (
 		<View style={styles.container}>
@@ -170,18 +185,12 @@ const HomePage = () => {
 					loadingEnabled={true}
 					onMapReady={() => setMapReady(true)}
 				>
-					{/* Route line - only visible when ride is active */}
-					{isRideActive && acceptedRide?.pickupCoords && acceptedRide?.destinationCoords && (
+					{/* Route line — only rendered when both coords are valid */}
+					{isRideActive && pickupCoords && destCoords && (
 						<MapViewDirections
-							origin={{
-								latitude: parseFloat(acceptedRide.pickupCoords.latitude),
-								longitude: parseFloat(acceptedRide.pickupCoords.longitude)
-							}}
-							destination={{
-								latitude: parseFloat(acceptedRide.destinationCoords.latitude),
-								longitude: parseFloat(acceptedRide.destinationCoords.longitude)
-							}}
-							apikey={GOOGLE_MAPS_API_KEY || "AIzaSyCPMwyZl3iso7lmMGhQt0QwGJXWdqxcqiw"}
+							origin={pickupCoords}
+							destination={destCoords}
+							apikey={GOOGLE_MAPS_API_KEY}
 							strokeWidth={5}
 							strokeColor="#007AFF"
 							optimizeWaypoints={true}
@@ -195,13 +204,10 @@ const HomePage = () => {
 						/>
 					)}
 
-					{/* Pickup marker - only visible when ride is active */}
-					{isRideActive && acceptedRide?.pickupCoords && (
+					{/* Pickup marker — only rendered when coords are valid */}
+					{isRideActive && pickupCoords && (
 						<Marker
-							coordinate={{
-								latitude: parseFloat(acceptedRide.pickupCoords.latitude),
-								longitude: parseFloat(acceptedRide.pickupCoords.longitude),
-							}}
+							coordinate={pickupCoords}
 							title="Pickup Location"
 							description={
 								typeof acceptedRide.pickupLocation === 'object'
@@ -212,13 +218,10 @@ const HomePage = () => {
 						/>
 					)}
 
-					{/* Destination marker - only visible when ride is active */}
-					{isRideActive && acceptedRide?.destinationCoords && (
+					{/* Destination marker — only rendered when coords are valid */}
+					{isRideActive && destCoords && (
 						<Marker
-							coordinate={{
-								latitude: parseFloat(acceptedRide.destinationCoords.latitude),
-								longitude: parseFloat(acceptedRide.destinationCoords.longitude),
-							}}
+							coordinate={destCoords}
 							title="Destination"
 							description={
 								typeof acceptedRide.destination === 'object'

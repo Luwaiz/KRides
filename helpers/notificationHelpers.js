@@ -4,9 +4,10 @@ import { NOTIFICATION_API_KEY } from '@env';
 // Production server (Render.com)
 const NOTIFICATION_SERVER_URL = 'https://krides.onrender.com/api/notifications';
 
-// Axios instance with the shared API key attached to every request.
+// Axios instance with the shared API key and a 10-second timeout on every request.
 const api = axios.create({
     headers: { 'x-api-key': NOTIFICATION_API_KEY || '' },
+    timeout: 10000,
 });
 
 // For local testing: Use your computer's IP address (not localhost)
