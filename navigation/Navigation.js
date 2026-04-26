@@ -179,7 +179,7 @@ const Navigation = () => {
 			mounted = false;
 			unsubscribe();
 		};
-	}, [storeRole]);
+	}, []); // No deps — onAuthStateChanged is persistent; role is read via getState() not closure
 
 	if (initializing || (user && !storeRole) || hasSeenOnboarding === null) {
 		return (

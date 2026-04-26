@@ -9,6 +9,7 @@ import BackButton from "../../components/buttons/BackButton";
 import { useDriverDetails } from "../../constants/Store";
 import Firebase from "../../hooks/Firebase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { checkRateLimit, recordAttempt, clearAttempts } from "../../helpers/authRateLimiter";
 
 const { height, width } = Dimensions.get('window');
 
@@ -31,9 +32,16 @@ const DriverLogin = ({ navigation }) => {
 			return;
 		}
 
+		const identifier = phone.trim();
+		const rateCheck = checkRateLimit(identifier);
+		if (rateCheck.blocked) {
+			alert(`Too many failed attempts. Please wait ${rateCheck.minutesRemaining} minute${rateCheck.minutesRemaining === 1 ? '' : 's'} before trying again.`);
+			return;
+		}
+
 		setLoading(true);
 		try {
-			// Look up the driver's real email from Firestore using phone number
+			// Look up the driver's real email via the notification server (Admin SDK)
 			const email = await Firebase.getDriverEmailByPhone(phone);
 
 			// Tell Navigation.js to treat this auth event as a driver login,
@@ -44,24 +52,27 @@ const DriverLogin = ({ navigation }) => {
 			// Sign in with the real email
 			await Firebase.signInWithEmail(email, password);
 
-			// Navigation.js will automatically handle routing based on Firebase Auth
+			clearAttempts(identifier);
 			console.log("✅ Driver logged in successfully");
 		} catch (error) {
 			setLoading(false);
+			recordAttempt(identifier);
 			console.log("Login Error:", error);
 
 			let errorMessage = "Login failed. Please try again.";
-			if (
-				error.code === "auth/invalid-credential" ||
+			if (error.message === "No driver found with this phone number") {
+				errorMessage = "No driver account found with that phone number. Check the number or sign up.";
+			} else if (
 				error.code === "auth/wrong-password" ||
-				error.code === "auth/user-not-found" ||
-				error.code === "auth/invalid-email"
+				error.code === "auth/invalid-credential"
 			) {
-				errorMessage = "Invalid phone number or password";
+				errorMessage = "Incorrect password. Please try again or use 'Forgot password'.";
+			} else if (error.code === "auth/user-not-found") {
+				errorMessage = "No account found with these details. Please sign up.";
+			} else if (error.code === "auth/invalid-email") {
+				errorMessage = "The phone number format is not recognised. Try 08123456789 or +2348123456789.";
 			} else if (error.code === "auth/too-many-requests") {
-				errorMessage = "Too many failed attempts. Please try again later.";
-			} else if (error.message === "No driver found with this phone number") {
-				errorMessage = "Invalid phone number or password";
+				errorMessage = "Too many failed attempts. Please wait a few minutes and try again.";
 			}
 
 			alert(errorMessage);

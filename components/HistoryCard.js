@@ -28,23 +28,24 @@ const HistoryCard = ({ history }) => {
 	const timestamp =
 		history?.completedAt || history?.cancelledAt || history?.createdAt;
 
-	let date;
+	let date = null;
 	try {
-		date = timestamp?.toDate ? timestamp.toDate() : new Date();
+		if (timestamp?.toDate) date = timestamp.toDate();
 	} catch (error) {
 		console.error("Error parsing date:", error);
-		date = new Date();
 	}
 
-	// Format date and time
-	let dateFormat = "N/A";
-	let time = "N/A";
+	// Format date and time — use explicit fallback so stale rides never show "today"
+	let dateFormat = "Unknown date";
+	let time = "—";
 
-	try {
-		dateFormat = format(date, "dd MMMM yyyy");
-		time = format(date, "hh:mm a");
-	} catch (error) {
-		console.error("Error formatting date:", error);
+	if (date) {
+		try {
+			dateFormat = format(date, "dd MMMM yyyy");
+			time = format(date, "hh:mm a");
+		} catch (error) {
+			console.error("Error formatting date:", error);
+		}
 	}
 
 	// Determine if ride was completed or cancelled

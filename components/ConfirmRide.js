@@ -1,6 +1,6 @@
-import { StyleSheet, Text, TouchableOpacity, View, Alert, Linking } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View, Alert, Linking, ActivityIndicator, Modal } from "react-native";
 import BottomSheet from "@gorhom/bottom-sheet";
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import ActiveButton from "./buttons/ActiveButton";
 import { colors } from "../constants/styling";
 import { useNavigation } from "@react-navigation/native";
@@ -13,6 +13,7 @@ import RideConfirm from "./modals/RideConfirm";
 import RatingModal from "./modals/RatingModal";
 import { sp, fs, br, ms } from "../constants/responsive";
 import Toast from "react-native-toast-message";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
 	useRideStore,
 	useUserDetails,
@@ -23,12 +24,13 @@ import {
 import InActiveButton from "./buttons/InActiveButton";
 import DangerButton from "./buttons/DangerButton";
 import Payment from "../screens/AppScreens/Payment";
-import { createRide, listenToRide, cancelRide } from "../helpers/firebaseRides";
+import { createRide, listenToRide, cancelRide, getRide } from "../helpers/firebaseRides";
 import { calculateDistance, calculateFare } from "../helpers/rideCalculations";
 import { FIREBASE_DB, FIREBASE_AUTH } from "../firebaseConfig";
 import { doc, updateDoc } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import useAuthStore from "../constants/Store";
+import { notifyDriverRideCancelled } from "../helpers/notificationHelpers";
 
 const ConfirmRide = () => {
 	const [selectRider, setSelectRider] = useState(false);
@@ -37,6 +39,7 @@ const ConfirmRide = () => {
 	const [rideId, setRideId] = useState(null);
 	const [acceptedDriverName, setAcceptedDriverName] = useState("");
 	const [showRatingModal, setShowRatingModal] = useState(false);
+	const bookingInFlight = useRef(false);
 	const activeRide = useActiveRideStore((state) => state.activeRide);
 	const rideStatus = useActiveRideStore((state) => state.rideStatus);
 	const setHomePage = useBottomTabStore((state) => state.setHomePage);
@@ -160,17 +163,11 @@ const ConfirmRide = () => {
 			console.log("   - Last Name:", lastName || "MISSING");
 			setLoading(false);
 			Alert.alert(
-				"Profile Data Missing",
-				"Your profile information is incomplete. This might be due to Firestore security rules blocking data access.\n\nDo you want to continue anyway?",
+				"Profile Incomplete",
+				"Some of your profile information couldn't be loaded. This is usually temporary.\n\nDo you want to continue booking anyway?",
 				[
-					{
-						text: "Cancel",
-						style: "cancel",
-					},
-					{
-						text: "Continue",
-						onPress: () => continueBooking(transactionId),
-					},
+					{ text: "Cancel", style: "cancel" },
+					{ text: "Continue Anyway", onPress: () => continueBooking(transactionId) },
 				]
 			);
 			return;
@@ -180,7 +177,11 @@ const ConfirmRide = () => {
 	};
 
 	const continueBooking = async (transactionId = null) => {
+		if (bookingInFlight.current) return;
+		bookingInFlight.current = true;
 		setLoading(true);
+		// Clear any deferred rating reminder so it doesn't pop up mid-new-ride
+		AsyncStorage.removeItem('pending_customer_rating').catch(() => {});
 		try {
 			const rideData = {
 				customerId: UserId,
@@ -234,10 +235,22 @@ const ConfirmRide = () => {
 					"The Firestore security rules are blocking ride creation. This is a Firebase Console configuration issue, not an app issue.\n\nPlease:\n1. Open Firebase Console\n2. Go to Firestore → Rules\n3. Update and publish the security rules.",
 					[{ text: "OK" }]
 				);
+			} else if (
+				error.name === "AbortError" ||
+				error.message?.toLowerCase().includes("network") ||
+				error.message?.toLowerCase().includes("internet") ||
+				error.code === "unavailable"
+			) {
+				Alert.alert(
+					"No Internet Connection",
+					"Please check your connection and try again.",
+					[{ text: "OK" }]
+				);
 			} else {
 				alert("Failed to create ride. Please try again.");
 			}
 		} finally {
+			bookingInFlight.current = false;
 			setLoading(false);
 		}
 	};
@@ -268,8 +281,18 @@ const ConfirmRide = () => {
 					onPress: async () => {
 						setCancelling(true);
 						try {
+							const rideSnapshot = await getRide(cancelRideId);
 							await cancelRide(cancelRideId);
 							console.log("✅ Ride cancelled successfully");
+
+							// Notify driver if one had already accepted
+							if (rideSnapshot?.driverId) {
+								notifyDriverRideCancelled(
+									rideSnapshot.driverId,
+									cancelRideId,
+									`${firstName} ${lastName}`.trim() || 'Customer'
+								).catch(() => {});
+							}
 
 							// Reset local states
 							setSelectRider(false);
@@ -377,7 +400,10 @@ const ConfirmRide = () => {
 									onPress={handleCancelRide}
 									disabled={cancelling}
 								/>
-								<ActiveButton title={"Ride Pending..."} disabled={true} />
+								<ActiveButton
+									title={rideStatus === 'accepted' ? "Ride accepted" : "Waiting for driver..."}
+									disabled={true}
+								/>
 							</View>
 						) : (
 							<Payment
@@ -393,7 +419,16 @@ const ConfirmRide = () => {
 				</View>
 			</BottomSheet>
 
-			{/* RideConfirm modal removed - navigation to home happens automatically */}
+			{/* Booking-in-progress overlay — shown while Firestore write is pending
+			    after Flutterwave payment completes. Prevents a blank 1-3 second gap. */}
+			<Modal visible={loading} transparent animationType="fade">
+				<View style={styles.loadingOverlay}>
+					<View style={styles.loadingCard}>
+						<ActivityIndicator size="large" color={colors.primaryBlue} />
+						<Text style={styles.loadingText}>Booking your ride...</Text>
+					</View>
+				</View>
+			</Modal>
 
 			{showRatingModal && (
 				<RatingModal
@@ -519,6 +554,30 @@ const styles = StyleSheet.create({
 		color: colors.lightGrey3,
 		fontFamily: "Albert-Regular",
 		fontSize: fs(13),
+	},
+	loadingOverlay: {
+		flex: 1,
+		backgroundColor: "rgba(0,0,0,0.45)",
+		justifyContent: "center",
+		alignItems: "center",
+	},
+	loadingCard: {
+		backgroundColor: "white",
+		borderRadius: br(16),
+		paddingVertical: sp(32),
+		paddingHorizontal: sp(40),
+		alignItems: "center",
+		gap: sp(16),
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: 4 },
+		shadowOpacity: 0.2,
+		shadowRadius: 8,
+		elevation: 8,
+	},
+	loadingText: {
+		fontSize: fs(16),
+		fontFamily: "Albert-SemiBold",
+		color: "#333",
 	},
 });
 

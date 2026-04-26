@@ -1,4 +1,64 @@
 import { FIREBASE_DB } from "../firebaseConfig";
+
+// ── Validation ────────────────────────────────────────────────────────────────
+
+const VALID_STATUSES = new Set(['pending', 'accepted', 'in_progress', 'completed', 'cancelled']);
+
+function isValidCoord(lat, lng) {
+	return (
+		typeof lat === 'number' && isFinite(lat) && lat >= -90 && lat <= 90 &&
+		typeof lng === 'number' && isFinite(lng) && lng >= -180 && lng <= 180
+	);
+}
+
+function validateRideData(data) {
+	const errors = [];
+
+	if (!data.customerId || typeof data.customerId !== 'string') {
+		errors.push('customerId is required');
+	}
+
+	const amount = Number(data.amount);
+	if (!isFinite(amount) || amount <= 0) {
+		errors.push(`amount must be a positive number (got ${data.amount})`);
+	}
+
+	const passengers = Number(data.numberOfPassengers);
+	if (!Number.isInteger(passengers) || passengers < 1 || passengers > 10) {
+		errors.push(`numberOfPassengers must be 1–10 (got ${data.numberOfPassengers})`);
+	}
+
+	if (!data.pickupLocation || !String(data.pickupLocation).trim()) {
+		errors.push('pickupLocation is required');
+	}
+
+	if (!data.destination || !String(data.destination).trim()) {
+		errors.push('destination is required');
+	}
+
+	if (!data.pickupCoords) {
+		errors.push('pickupCoords are required');
+	} else {
+		const { latitude: lat, longitude: lng } = data.pickupCoords;
+		if (!isValidCoord(lat, lng)) {
+			errors.push(`pickupCoords are invalid (lat=${lat}, lng=${lng})`);
+		}
+	}
+
+	if (!data.destinationCoords) {
+		errors.push('destinationCoords are required');
+	} else {
+		const { latitude: lat, longitude: lng } = data.destinationCoords;
+		if (!isValidCoord(lat, lng)) {
+			errors.push(`destinationCoords are invalid (lat=${lat}, lng=${lng})`);
+		}
+	}
+
+	return errors;
+}
+
+// ── Imports ───────────────────────────────────────────────────────────────────
+
 import {
 	collection,
 	doc,
@@ -13,6 +73,7 @@ import {
 	serverTimestamp,
 	getDocs,
 	getDoc,
+	runTransaction,
 } from "firebase/firestore";
 import {
 	notifyDriversAboutNewRide,
@@ -51,6 +112,13 @@ import {
  * @returns {Promise<string>} rideId
  */
 export const createRide = async (rideData) => {
+	const validationErrors = validateRideData(rideData);
+	if (validationErrors.length > 0) {
+		const message = `Ride data invalid: ${validationErrors.join('; ')}`;
+		console.error('❌ createRide validation failed:', message);
+		throw new Error(message);
+	}
+
 	try {
 		// Import FIREBASE_AUTH to check current user
 		const { FIREBASE_AUTH } = require("../firebaseConfig");
@@ -103,12 +171,19 @@ export const createRide = async (rideData) => {
 
 		await setDoc(rideDoc, ride);
 		console.log("✅ Ride created:", rideId);
+
+		// Fire-and-forget: if notification fails, mark the ride so the
+		// customer's listener can surface a warning instead of silently waiting.
 		notifyDriversAboutNewRide(
 			rideId,
 			rideData.customerName,
 			rideData.pickupLocation,
 			rideData.destination
-		).catch(err => console.warn("⚠️ Driver notification failed:", err.message));
+		).catch(async (err) => {
+			console.warn("⚠️ Driver notification failed:", err.message);
+			updateDoc(rideDoc, { notificationFailed: true }).catch(() => {});
+		});
+
 		return rideId;
 	} catch (error) {
 		console.error("❌ Error creating ride:", error);
@@ -155,6 +230,12 @@ export const acceptRide = async (rideId, driverData) => {
  * @returns {Promise<void>}
  */
 export const updateRideStatus = async (rideId, status) => {
+	if (!VALID_STATUSES.has(status)) {
+		throw new Error(
+			`Invalid ride status: "${status}". Must be one of: ${[...VALID_STATUSES].join(', ')}`
+		);
+	}
+
 	try {
 		const rideRef = doc(FIREBASE_DB, "rides", rideId);
 		const updates = { status };
@@ -223,77 +304,85 @@ export const cancelRide = async (rideId, cancelledBy = 'customer', reason = '') 
  * @returns {Promise<Object>} Cancellation result with refund status
  */
 export const cancelRideWithRefund = async (rideId, cancelledBy = 'customer', reason = '') => {
+	const { processRefund } = require('./flutterwaveRefund');
+	const rideRef = doc(FIREBASE_DB, "rides", rideId);
+
+	// Atomically claim the cancellation slot. If another request already
+	// set refundProcessing=true or already cancelled, we bail out early —
+	// this prevents a double-refund when the user taps Cancel twice or when
+	// two code paths race.
+	let rideData;
 	try {
-		const { processRefund } = require('./flutterwaveRefund');
-
-		const rideRef = doc(FIREBASE_DB, "rides", rideId);
-
-		// Get current ride data
-		const rideDoc = await getDoc(rideRef);
-		if (!rideDoc.exists()) {
-			throw new Error("Ride not found");
+		await runTransaction(FIREBASE_DB, async (txn) => {
+			const snap = await txn.get(rideRef);
+			if (!snap.exists()) throw new Error("RIDE_NOT_FOUND");
+			const data = snap.data();
+			if (data.status === 'cancelled') throw new Error("ALREADY_CANCELLED");
+			if (data.refundProcessing === true) throw new Error("REFUND_IN_PROGRESS");
+			txn.update(rideRef, { refundProcessing: true });
+			rideData = data;
+		});
+	} catch (err) {
+		if (err.message === "ALREADY_CANCELLED") {
+			console.log("ℹ️ Ride already cancelled — no action taken");
+			return { status: "cancelled", alreadyCancelled: true };
 		}
-
-		const rideData = rideDoc.data();
-
-		// Prepare cancellation updates
-		const updates = {
-			status: "cancelled",
-			cancelledAt: serverTimestamp(),
-			cancelledBy,
-		};
-
-		if (reason) {
-			updates.cancellationReason = reason;
+		if (err.message === "REFUND_IN_PROGRESS") {
+			console.log("ℹ️ Cancellation already in progress — no action taken");
+			return { status: "pending", refundProcessing: true };
 		}
+		if (err.message === "RIDE_NOT_FOUND") throw new Error("Ride not found");
+		throw err;
+	}
 
-		// Process refund if payment was made via Flutterwave
-		if (rideData.transactionId && rideData.paymentMethod === 'flutterwave') {
-			try {
-				console.log("💰 Processing refund for cancelled ride...");
-				console.log("   Transaction ID:", rideData.transactionId);
-				console.log("   Amount:", rideData.amount);
+	const updates = {
+		status: "cancelled",
+		cancelledAt: serverTimestamp(),
+		cancelledBy,
+		refundProcessing: false, // Release the lock regardless of outcome
+	};
 
-				const refundResult = await processRefund(
-					rideData.transactionId,
-					null, // Full refund
-					reason || `Ride cancelled by ${cancelledBy}`
-				);
+	if (reason) updates.cancellationReason = reason;
 
-				if (refundResult.success) {
-					updates.refundStatus = "completed";
-					updates.refundId = refundResult.refundId;
-					updates.refundedAt = serverTimestamp();
-					updates.refundAmount = rideData.amount;
+	// Process refund if payment was made via Flutterwave
+	if (rideData.transactionId && rideData.paymentMethod === 'flutterwave') {
+		try {
+			console.log("💰 Processing refund for cancelled ride...");
+			console.log("   Transaction ID:", rideData.transactionId);
+			console.log("   Amount:", rideData.amount);
 
-					console.log("✅ Refund processed successfully:", refundResult.refundId);
-				}
-			} catch (refundError) {
-				console.error("❌ Refund failed:", refundError.message);
+			const refundResult = await processRefund(
+				rideData.transactionId,
+				null, // Full refund
+				reason || `Ride cancelled by ${cancelledBy}`
+			);
 
-				// Still cancel the ride, but mark refund as failed
-				updates.refundStatus = "failed";
-				updates.refundError = refundError.message;
+			if (refundResult.success) {
+				updates.refundStatus = "completed";
+				updates.refundId = refundResult.refundId;
+				updates.refundedAt = serverTimestamp();
+				updates.refundAmount = rideData.amount;
+				console.log("✅ Refund processed:", refundResult.refundId);
 			}
-		} else {
-			console.log("ℹ️ No payment to refund (cash payment or no transaction ID)");
+		} catch (refundError) {
+			console.error("❌ Refund failed:", refundError.message);
+			updates.refundStatus = "failed";
+			updates.refundError = refundError.message;
 		}
+	} else {
+		console.log("ℹ️ No payment to refund (cash or no transaction ID)");
+	}
 
-		// Update ride document
+	try {
 		await updateDoc(rideRef, updates);
 		console.log(`✅ Ride cancelled by ${cancelledBy}:`, rideId);
-
-		// Send cancellation notification to customer with refund info
-		// Removed notification logic
-
-		// If driver was assigned and customer cancelled, notify the driver
-		// Removed notification logic
-
-		return updates;
-	} catch (error) {
-		console.error("❌ Error cancelling ride:", error);
-		throw error;
+	} catch (writeError) {
+		// Release the processing lock even if the full update fails
+		updateDoc(rideRef, { refundProcessing: false }).catch(() => {});
+		throw writeError;
 	}
+
+	return updates;
 };
 
 /**
@@ -315,15 +404,20 @@ export const declineRide = async (rideId, driverId) => {
 		const rideData = rideDoc.data();
 		const declinedBy = rideData.declined_by || [];
 
-		// Add driver to declined_by array if not already there
-		if (!declinedBy.includes(driverId)) {
-			await updateDoc(rideRef, {
-				declined_by: [...declinedBy, driverId],
-			});
-			console.log(`✅ Ride ${rideId} declined by driver ${driverId}`);
-		} else {
+		if (declinedBy.includes(driverId)) {
 			console.log(`ℹ️ Driver ${driverId} already declined ride ${rideId}`);
+			return;
 		}
+
+		if (declinedBy.length >= 100) {
+			console.warn(`⚠️ Ride ${rideId} declined_by array at cap, skipping`);
+			return;
+		}
+
+		await updateDoc(rideRef, {
+			declined_by: [...declinedBy, driverId],
+		});
+		console.log(`✅ Ride ${rideId} declined by driver ${driverId}`);
 	} catch (error) {
 		console.error("❌ Error declining ride:", error);
 		throw error;
@@ -352,9 +446,18 @@ export const checkPendingRefunds = async () => {
 			const ride = docSnapshot.data();
 			if (ride.refundId) {
 				try {
-					const status = await checkRefundStatus(ride.refundId);
+					let status, lastErr;
+					for (let attempt = 0; attempt < 3; attempt++) {
+						try {
+							status = await checkRefundStatus(ride.refundId);
+							break;
+						} catch (e) {
+							lastErr = e;
+							if (attempt < 2) await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+						}
+					}
+					if (!status) throw lastErr;
 
-					// Update Firestore if status changed
 					if (status.status === "completed") {
 						const rideRef = doc(FIREBASE_DB, "rides", docSnapshot.id);
 						await updateDoc(rideRef, {
@@ -371,6 +474,12 @@ export const checkPendingRefunds = async () => {
 					});
 				} catch (error) {
 					console.error(`Error checking refund ${ride.refundId}:`, error);
+					pendingRefunds.push({
+						rideId: docSnapshot.id,
+						refundId: ride.refundId,
+						status: "check_failed",
+						error: error.message,
+					});
 				}
 			}
 		}
@@ -392,8 +501,8 @@ export const checkPendingRefunds = async () => {
 export const listenToPendingRides = (callback, driverId = null) => {
 	try {
 		const ridesRef = collection(FIREBASE_DB, "rides");
-		// Simple query without orderBy to avoid index requirement
-		const q = query(ridesRef, where("status", "==", "pending"));
+		// Cap at 50 — avoids a full-collection scan when many rides accumulate.
+		const q = query(ridesRef, where("status", "==", "pending"), limit(50));
 
 		const unsubscribe = onSnapshot(
 			q,

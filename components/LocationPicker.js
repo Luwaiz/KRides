@@ -73,8 +73,11 @@ const LocationPicker = ({
 			if (error.code === 'permission-denied') {
 				Alert.alert(
 					'Permission Error',
-					'Unable to load locations due to database permissions. Please contact support.',
-					[{ text: 'OK', onPress: onClose }]
+					'Unable to load locations. This may be a temporary issue — please try again.',
+					[
+						{ text: 'Cancel', style: 'cancel', onPress: onClose },
+						{ text: 'Retry', onPress: fetchLocations },
+					]
 				);
 			} else if (error.message?.includes('network') || error.message?.includes('fetch')) {
 				Alert.alert(

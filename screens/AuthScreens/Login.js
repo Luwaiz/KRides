@@ -10,6 +10,7 @@ import Terms from "../../components/Terms";
 import BackButton from "../../components/buttons/BackButton";
 import Firebase from "../../hooks/Firebase";
 import Toast from "react-native-toast-message";
+import { checkRateLimit, recordAttempt, clearAttempts } from "../../helpers/authRateLimiter";
 import { useGoogleAuth } from "../../hooks/useGoogleAuth";
 import useAuthStore from "../../constants/Store";
 const { height, width } = Dimensions.get('window');
@@ -27,10 +28,17 @@ const Login = ({ navigation }) => {
 			return;
 		}
 
+		const identifier = email.toLowerCase().trim();
+		const rateCheck = checkRateLimit(identifier);
+		if (rateCheck.blocked) {
+			alert(`Too many failed attempts. Please wait ${rateCheck.minutesRemaining} minute${rateCheck.minutesRemaining === 1 ? '' : 's'} before trying again.`);
+			return;
+		}
+
 		setLoading(true);
 		try {
 			await Firebase.signInWithEmail(email, password);
-			// Navigation.js will automatically handle routing based on Firebase Auth
+			clearAttempts(identifier);
 			Toast.show({
 				type: "tomatoToast",
 				text1: "Login Successful",
@@ -40,6 +48,7 @@ const Login = ({ navigation }) => {
 			});
 		} catch (error) {
 			setLoading(false);
+			recordAttempt(identifier);
 			console.log("Login Error:", error);
 
 			let errorMessage = "Login failed. Please try again.";

@@ -1,6 +1,13 @@
 // Refund calls go through our server so the Flutterwave secret key
 // never touches the client bundle.
 const PAYMENTS_SERVER_URL = 'https://krides.onrender.com/api/payments';
+const FETCH_TIMEOUT_MS = 10000;
+
+function fetchWithTimeout(url, options = {}) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer));
+}
 
 /**
  * Process refund via server → Flutterwave
@@ -11,7 +18,7 @@ const PAYMENTS_SERVER_URL = 'https://krides.onrender.com/api/payments';
 export const processRefund = async (transactionId, amount = null, comments = 'Ride cancelled by customer') => {
     console.log('💰 Processing refund for transaction:', transactionId);
 
-    const response = await fetch(`${PAYMENTS_SERVER_URL}/refund`, {
+    const response = await fetchWithTimeout(`${PAYMENTS_SERVER_URL}/refund`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ transactionId, amount, comments }),
@@ -40,7 +47,7 @@ export const processRefund = async (transactionId, amount = null, comments = 'Ri
 export const checkRefundStatus = async (refundId) => {
     console.log('🔍 Checking refund status for:', refundId);
 
-    const response = await fetch(`${PAYMENTS_SERVER_URL}/refund/${refundId}`, {
+    const response = await fetchWithTimeout(`${PAYMENTS_SERVER_URL}/refund/${refundId}`, {
         headers: { 'Content-Type': 'application/json' },
     });
 

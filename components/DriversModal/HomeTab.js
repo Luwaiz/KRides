@@ -1,6 +1,7 @@
 import {
 	ActivityIndicator,
 	Alert,
+	Animated,
 	FlatList,
 	StyleSheet,
 	Text,
@@ -31,7 +32,7 @@ import API from "../../hooks/API";
 import { getRideCoordinates } from "../../helpers/getLocationCoordinates";
 import { listenToPendingRides, declineRide } from "../../helpers/firebaseRides";
 import { notifyCustomerRideAccepted } from "../../helpers/notificationHelpers";
-import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { doc, updateDoc, runTransaction, serverTimestamp } from "firebase/firestore";
 import { FIREBASE_DB } from "../../firebaseConfig";
 import { sp, fs, br, ms } from "../../constants/responsive";
 import { useNavigation } from "@react-navigation/native";
@@ -60,6 +61,23 @@ const HomeTab = () => {
 	const [currentRideRequest, setCurrentRideRequest] = useState(null);
 	const [showRideModal, setShowRideModal] = useState(false);
 	const processedRideIds = useRef(new Set());
+	const pulseAnim = useRef(new Animated.Value(1)).current;
+
+	// Pulse animation for the listening indicator — runs while the list is empty
+	useEffect(() => {
+		if (rides.length > 0 || !isOnline) {
+			pulseAnim.setValue(1);
+			return;
+		}
+		const pulse = Animated.loop(
+			Animated.sequence([
+				Animated.timing(pulseAnim, { toValue: 0.3, duration: 900, useNativeDriver: true }),
+				Animated.timing(pulseAnim, { toValue: 1, duration: 900, useNativeDriver: true }),
+			])
+		);
+		pulse.start();
+		return () => pulse.stop();
+	}, [rides.length, isOnline]);
 
 	// ✅ Listen to pending rides from Firestore (real-time)
 	useEffect(() => {
@@ -165,7 +183,7 @@ const HomeTab = () => {
 		await handleModalDecline(rideId);
 	};
 
-	// ✅ Accept ride — UI switches immediately, Firestore write runs in background
+	// ✅ Accept ride — atomic Firestore transaction prevents double-acceptance
 	const AcceptRide = async (rideId) => {
 		if (!uid) {
 			alert("Driver account not loaded. Please log out and log back in.");
@@ -191,9 +209,41 @@ const HomeTab = () => {
 			return;
 		}
 
-		setAccepting(rideId); // triggers loading overlay
+		setAccepting(rideId); // shows spinner on the Accept button
 
-		// 1. Switch to AcceptTab immediately — don't block on the network write
+		// Atomic transaction: read current state, verify still pending, then write.
+		// If another driver accepted first, the transaction throws and we abort.
+		const rideRef = doc(FIREBASE_DB, "rides", rideId);
+		try {
+			await runTransaction(FIREBASE_DB, async (txn) => {
+				const snap = await txn.get(rideRef);
+				if (!snap.exists()) throw new Error("RIDE_NOT_FOUND");
+				const data = snap.data();
+				if (data.status !== "pending" || (data.driverId && data.driverId !== "")) {
+					throw new Error("RIDE_TAKEN");
+				}
+				txn.update(rideRef, {
+					status: "accepted",
+					driverId: uid,
+					driverName: fullName || "Driver",
+					driverPhone: phone || "",
+					vehicleId: VehicleId || "",
+					acceptedAt: serverTimestamp(),
+				});
+			});
+		} catch (err) {
+			setAccepting(null);
+			if (err.message === "RIDE_TAKEN") {
+				Alert.alert("Ride Taken", "Another driver accepted this ride first. Please choose another ride.");
+			} else if (err.message === "RIDE_NOT_FOUND") {
+				Alert.alert("Not Available", "This ride is no longer available.");
+			} else {
+				Alert.alert("Connection Error", "Could not accept the ride. Please check your connection and try again.");
+			}
+			return;
+		}
+
+		// Transaction succeeded — switch UI
 		setAcceptedRide({
 			...rideDetails,
 			rideId,
@@ -205,28 +255,7 @@ const HomeTab = () => {
 		setAcceptRidePage();
 		setAccepting(null);
 
-		// 2. Firestore write in background — retry once on failure
-		const rideRef = doc(FIREBASE_DB, "rides", rideId);
-		const writeUpdate = () => updateDoc(rideRef, {
-			status: "accepted",
-			driverId: uid,
-			driverName: fullName || "Driver",
-			driverPhone: phone || "",
-			vehicleId: VehicleId || "",
-			acceptedAt: serverTimestamp(),
-		});
-		writeUpdate().catch(() => {
-			setTimeout(() => writeUpdate().catch((err) => {
-				console.warn("⚠️ Firestore accept write failed after retry:", err.message);
-				Alert.alert(
-					"Sync Issue",
-					"The ride was accepted on your device but we couldn't confirm it with the server. Please check your connection — the customer may not see you yet.",
-					[{ text: "OK" }]
-				);
-			}), 3000);
-		});
-
-		// 3. Coords + notification in background
+		// Background: fetch coords and notify customer
 		const fetchCoords = () =>
 			getRideCoordinates(rideDetails.pickupLocation, rideDetails.destination)
 				.then(({ pickup, destination }) => {
@@ -241,7 +270,7 @@ const HomeTab = () => {
 		notifyCustomerRideAccepted(rideDetails.customerId, rideId, fullName || "Driver")
 			.catch((err) => console.warn("⚠️ Customer notification failed:", err.message));
 
-		console.log("✅ Ride accepted, switched to AcceptTab");
+		console.log("✅ Ride accepted atomically, switched to AcceptTab");
 	};
 
 	// Track driver location — only while online
@@ -268,7 +297,9 @@ const HomeTab = () => {
 		return () => {
 			try {
 				Geolocation.clearWatch(watchId);
-			} catch (e) {}
+			} catch (e) {
+				console.warn('⚠️ Geolocation.clearWatch failed:', e.message);
+			}
 		};
 	}, [uid, isOnline]);
 
@@ -303,7 +334,23 @@ const HomeTab = () => {
 						</View>
 						{rides?.length === 0 ? (
 							<View style={styles.noRidesContainer}>
-								<Text style={styles.noRides}>No pending rides</Text>
+								{isOnline ? (
+									<>
+										<Animated.View style={[styles.listeningDot, { opacity: pulseAnim }]} />
+										<Text style={styles.listeningText}>Listening for ride requests...</Text>
+										<Text style={styles.listeningSubtext}>
+											You'll be notified as soon as a customer nearby requests a ride.
+										</Text>
+									</>
+								) : (
+									<>
+										<View style={styles.offlineDot} />
+										<Text style={styles.noRides}>You're offline</Text>
+										<Text style={styles.listeningSubtext}>
+											Go online using the toggle above to start receiving ride requests.
+										</Text>
+									</>
+								)}
 								<TouchableOpacity
 									onPress={onRefresh}
 									style={styles.refreshButton}
@@ -411,11 +458,41 @@ const styles = StyleSheet.create({
 		fontSize: fs(16),
 		color: colors.lightGrey3,
 		textAlign: "center",
-		marginTop: sp(20),
+		marginTop: sp(12),
 	},
 	noRidesContainer: {
 		alignItems: "center",
 		marginTop: sp(40),
+		paddingHorizontal: sp(24),
+	},
+	listeningDot: {
+		width: ms(14),
+		height: ms(14),
+		borderRadius: ms(7),
+		backgroundColor: "#4caf50",
+		marginBottom: sp(12),
+	},
+	offlineDot: {
+		width: ms(14),
+		height: ms(14),
+		borderRadius: ms(7),
+		backgroundColor: colors.lightGrey3,
+		marginBottom: sp(12),
+	},
+	listeningText: {
+		fontSize: fs(16),
+		fontFamily: "Albert-SemiBold",
+		color: "#333",
+		textAlign: "center",
+		marginBottom: sp(6),
+	},
+	listeningSubtext: {
+		fontSize: fs(13),
+		fontFamily: "Albert-Regular",
+		color: colors.lightGrey3,
+		textAlign: "center",
+		marginBottom: sp(20),
+		lineHeight: fs(20),
 	},
 	refreshButton: {
 		marginTop: sp(20),

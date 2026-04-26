@@ -19,22 +19,32 @@ import {
 	FIREBASE_MEASUREMENT_ID,
 } from "@env";
 
-// Firebase configuration using environment variables
-// Falls back to hardcoded values if env vars are not available (for backward compatibility)
-const firebaseConfig = {
-	apiKey: FIREBASE_API_KEY || "AIzaSyA2EsyMXZlABPA1ZJ06Y9S6VOsKR62EQkA",
-	authDomain: FIREBASE_AUTH_DOMAIN || "kampusride.firebaseapp.com",
-	projectId: FIREBASE_PROJECT_ID || "kampusride",
-	storageBucket: FIREBASE_STORAGE_BUCKET || "kampusride.firebasestorage.app",
-	messagingSenderId: FIREBASE_MESSAGING_SENDER_ID || "1054058095059",
-	appId: FIREBASE_APP_ID || "1:1054058095059:web:ff2a3c61ad63d32d818f26",
-	measurementId: FIREBASE_MEASUREMENT_ID || "G-GJK6Q51CPP",
+// Fail fast if required Firebase env vars are missing — never fall back to
+// hardcoded credentials, as they would end up in the app bundle.
+const requiredVars = {
+	apiKey: FIREBASE_API_KEY,
+	authDomain: FIREBASE_AUTH_DOMAIN,
+	projectId: FIREBASE_PROJECT_ID,
+	storageBucket: FIREBASE_STORAGE_BUCKET,
+	messagingSenderId: FIREBASE_MESSAGING_SENDER_ID,
+	appId: FIREBASE_APP_ID,
 };
 
-// Log configuration source (only in development)
-if (__DEV__) {
-	console.log("🔥 Firebase Config Source:", FIREBASE_API_KEY ? "Environment Variables" : "Fallback Values");
+const missingVars = Object.entries(requiredVars)
+	.filter(([, v]) => !v)
+	.map(([k]) => k);
+
+if (missingVars.length > 0) {
+	throw new Error(
+		`Missing Firebase environment variables: ${missingVars.join(", ")}. ` +
+		"Check your .env file and EAS build secrets."
+	);
 }
+
+const firebaseConfig = {
+	...requiredVars,
+	measurementId: FIREBASE_MEASUREMENT_ID, // optional — Google Analytics
+};
 
 // Initialize Firebase
 export const FIREBASE_APP = initializeApp(firebaseConfig);
@@ -43,13 +53,10 @@ export const FIREBASE_AUTH = initializeAuth(FIREBASE_APP, {
 	persistence: getReactNativePersistence(ReactNativeAsyncStorage),
 });
 
-// Initialize Firestore with settings for better network handling
 export const FIREBASE_DB = getFirestore(FIREBASE_APP);
 
-// Enable offline persistence (helps with network issues)
-// Note: This is automatically enabled in React Native, but we're being explicit
 if (__DEV__) {
-	console.log("🔥 Firestore initialized with offline persistence");
+	console.log("🔥 Firestore initialized");
 }
 
 export const FIREBASE_FUNCTIONS = getFunctions(FIREBASE_APP);

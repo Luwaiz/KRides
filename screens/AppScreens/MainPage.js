@@ -17,8 +17,10 @@ import { useShallow } from "zustand/react/shallow";
 import { cancelRideWithRefund, listenToRide } from "../../helpers/firebaseRides";
 import { notifyDriverRideCancelled } from "../../helpers/notificationHelpers";
 import Toast from "react-native-toast-message";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { PENDING_RATING_KEY } from "../../components/modals/RatingModal";
 import { registerForPushNotificationsAsync } from "../../helpers/pushNotifications";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, updateDoc, getDoc } from "firebase/firestore";
 import { FIREBASE_DB } from "../../firebaseConfig";
 
 const MainPage = () => {
@@ -65,7 +67,8 @@ const MainPage = () => {
 		const p = pickup.coord || pickup;
 		const lat = parseFloat(p.latitude);
 		const lng = parseFloat(p.longitude);
-		return isNaN(lat) || isNaN(lng) ? null : { latitude: lat, longitude: lng };
+		if (isNaN(lat) || isNaN(lng) || lat < 2 || lat > 14 || lng < 3 || lng > 15) return null;
+		return { latitude: lat, longitude: lng };
 	}, [pickup]);
 
 	const destCoords = useMemo(() => {
@@ -73,7 +76,8 @@ const MainPage = () => {
 		const d = destination.coord || destination;
 		const lat = parseFloat(d.latitude);
 		const lng = parseFloat(d.longitude);
-		return isNaN(lat) || isNaN(lng) ? null : { latitude: lat, longitude: lng };
+		if (isNaN(lat) || isNaN(lng) || lat < 2 || lat > 14 || lng < 3 || lng > 15) return null;
+		return { latitude: lat, longitude: lng };
 	}, [destination]);
 
 	const BABCOCK_COORDINATES = (location && location.coords)
@@ -145,15 +149,26 @@ const MainPage = () => {
 				if (token) {
 					console.log("✅ Customer FCM token obtained:", token.substring(0, 30) + "...");
 
-					// Store token in Firestore
 					const userRef = doc(FIREBASE_DB, "users", UserId);
-					await updateDoc(userRef, {
-						fcmToken: token,
-						lastTokenUpdate: new Date(),
-					});
-					console.log("✅ Customer FCM token saved to Firestore");
+					const snap = await getDoc(userRef);
+					if (snap.exists() && snap.data()?.fcmToken === token) {
+						console.log("✅ Customer FCM token unchanged, skipping write");
+					} else {
+						await updateDoc(userRef, {
+							fcmToken: token,
+							lastTokenUpdate: new Date(),
+						});
+						console.log("✅ Customer FCM token saved to Firestore");
+					}
 				} else {
-					console.log("⚠️ Failed to get FCM token");
+					console.warn("⚠️ Failed to get FCM token");
+					Toast.show({
+						type: 'tomatoToast',
+						text1: 'Notifications unavailable',
+						text2: 'You may not receive ride updates. Restart the app to retry.',
+						position: 'top',
+						visibilityTime: 5000,
+					});
 				}
 			} catch (error) {
 				console.warn("⚠️ Error setting up notifications (non-critical):", error);
@@ -163,12 +178,54 @@ const MainPage = () => {
 		setupNotifications();
 	}, [UserId]);
 
+	// Track whether we've already shown the notification-failure warning for
+	// the current ride (ref so it doesn't trigger re-renders)
+	const notificationWarningShown = useRef(false);
+	const [pendingRatingData, setPendingRatingData] = useState(null);
+
+	// On mount, check if the customer deferred a rating from a previous session
+	useEffect(() => {
+		AsyncStorage.getItem(PENDING_RATING_KEY).then((raw) => {
+			if (!raw) return;
+			try {
+				const data = JSON.parse(raw);
+				if (data?.rideId && data?.driverId) {
+					setPendingRatingData(data);
+					setShowRatingModal(true);
+				}
+			} catch {
+				AsyncStorage.removeItem(PENDING_RATING_KEY).catch(() => {});
+			}
+		}).catch(() => {});
+	}, []);
+
+	// Reset the warning flag whenever the active ride changes
+	useEffect(() => {
+		notificationWarningShown.current = false;
+	}, [activeRide?.rideId]);
+
 	// Listen for ride updates when there's an active ride
 	useEffect(() => {
 		if (!activeRide?.rideId) return;
 
 		const unsubscribe = listenToRide(activeRide.rideId, (rideData) => {
 			if (rideData) {
+				// Surface a warning if the driver notification failed on booking
+				if (
+					rideData.status === 'pending' &&
+					rideData.notificationFailed &&
+					!notificationWarningShown.current
+				) {
+					notificationWarningShown.current = true;
+					Toast.show({
+						type: 'tomatoToast',
+						text1: 'Having trouble reaching drivers',
+						text2: 'We\'re working on it — you\'ll be notified when a driver accepts.',
+						position: 'top',
+						visibilityTime: 5000,
+					});
+				}
+
 				// Update active ride store status
 				useActiveRideStore.getState().updateRideStatus(rideData.status);
 
@@ -384,24 +441,30 @@ const MainPage = () => {
 			{/* Bottom Sheet */}
 			{BottomSheetComponents}
 
-			{/* Rating Modal - shown after ride completion */}
-			{showRatingModal && completedRideData && (
-				<RatingModal
-					visible={showRatingModal}
-					onClose={() => {
-						setShowRatingModal(false);
-						setCompletedRideData(null);
-						setHomePage(); // Navigate back to home after rating
-					}}
-					rideId={completedRideData.rideId}
-					driverId={completedRideData.driverId}
-					driverName={completedRideData.driverName}
-					pickupLocation={completedRideData.pickupLocation}
-					destination={completedRideData.destination}
-					amount={completedRideData.amount}
-					completedAt={completedRideData.completedAt}
-				/>
-			)}
+			{/* Rating Modal — shown after ride completion or on re-open for deferred ratings */}
+			{showRatingModal && (completedRideData || pendingRatingData) && (() => {
+				const data = completedRideData || pendingRatingData;
+				const isReminder = !completedRideData && !!pendingRatingData;
+				return (
+					<RatingModal
+						visible={showRatingModal}
+						isReminder={isReminder}
+						onClose={() => {
+							setShowRatingModal(false);
+							setCompletedRideData(null);
+							setPendingRatingData(null);
+							if (!isReminder) setHomePage();
+						}}
+						rideId={data.rideId}
+						driverId={data.driverId}
+						driverName={data.driverName}
+						pickupLocation={data.pickupLocation}
+						destination={data.destination}
+						amount={data.amount}
+						completedAt={data.completedAt}
+					/>
+				);
+			})()}
 		</View>
 	);
 };

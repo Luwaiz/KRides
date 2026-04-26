@@ -16,7 +16,15 @@ const Payment = ({ email, amount, name, phoneNumber, BookRide, loading = false }
 
 	const handleOnRedirect = (data) => {
 		if (data.status === "completed" || data.status === "successful") {
-			const transactionId = data.transaction_id || data.flw_ref || data.tx_ref || null;
+			const transactionId = data.transaction_id || data.flw_ref || data.tx_ref;
+			if (!transactionId) {
+				Alert.alert(
+					"Payment Reference Missing",
+					"Your payment went through but we couldn't get a reference number. Please contact support and we'll sort it out.",
+					[{ text: "OK" }]
+				);
+				return;
+			}
 			BookRide(transactionId);
 		} else if (data.status === "cancelled") {
 			Alert.alert(
