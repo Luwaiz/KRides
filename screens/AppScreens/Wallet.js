@@ -58,7 +58,7 @@ const Wallet = () => {
         );
         const unsub = onSnapshot(q, (snap) => {
             setTransactions(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-        }, () => {});
+        }, (err) => console.error('❌ walletTransactions listener error:', err));
         return () => unsub();
     }, [user?.uid]);
 

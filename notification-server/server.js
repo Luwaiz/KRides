@@ -1042,45 +1042,6 @@ app.post('/api/wallet/pay-ride', async (req, res) => {
     }
 });
 
-// ── Test helpers (remove before going live) ───────────────────────────────────
-
-app.post('/api/wallet/test-credit', async (req, res) => {
-    const { userId, amount } = req.body;
-    if (!userId || !amount) return res.status(400).json({ error: 'userId and amount required' });
-
-    const parsedAmount = Number(amount);
-    if (!parsedAmount || parsedAmount <= 0) return res.status(400).json({ error: 'Invalid amount' });
-
-    try {
-        const userRef = db.collection('users').doc(userId);
-        const txnRef = userRef.collection('walletTransactions').doc(`test_${Date.now()}`);
-
-        await db.runTransaction(async (txn) => {
-            const userSnap = await txn.get(userRef);
-            if (!userSnap.exists) throw new Error('User not found');
-
-            txn.update(userRef, {
-                walletBalance: admin.firestore.FieldValue.increment(parsedAmount),
-            });
-            txn.set(txnRef, {
-                userId,
-                type: 'topup',
-                amount: parsedAmount,
-                rideId: null,
-                flwTxRef: 'test',
-                flwTxId: `test_${Date.now()}`,
-                status: 'completed',
-                createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            });
-        });
-
-        console.log(`🧪 Test credit: userId=${userId} +₦${parsedAmount}`);
-        return res.json({ success: true });
-    } catch (error) {
-        console.error('❌ Test credit error:', error);
-        return res.status(500).json({ error: error.message });
-    }
-});
 
 // Health check endpoint
 app.get('/health', (req, res) => {
