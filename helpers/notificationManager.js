@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
-import { doc, updateDoc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, updateDoc, setDoc, getDoc, deleteField } from 'firebase/firestore';
 import { FIREBASE_DB } from '../firebaseConfig';
 
 /**
@@ -119,13 +119,21 @@ class NotificationManager {
             const userRef = doc(FIREBASE_DB, collectionName, uid);
             const snap = await getDoc(userRef);
             if (!snap.exists()) return;
-            const existingToken = snap.data()?.fcmToken;
+            const data = snap.data();
+            const existingToken = data?.fcmToken;
+            const updates = {};
             if (existingToken && existingToken !== newToken) {
-                await updateDoc(userRef, { fcmToken: null });
-                console.log('🔄 Cleared stale FCM token before saving new one');
+                updates.fcmToken = null;
+            }
+            // Remove legacy fcmTokens map field if present
+            if (data?.fcmTokens !== undefined) {
+                updates.fcmTokens = deleteField();
+            }
+            if (Object.keys(updates).length > 0) {
+                await updateDoc(userRef, updates);
+                console.log('🔄 Cleared stale token fields');
             }
         } catch (error) {
-            // Non-fatal — the new token write that follows will overwrite it anyway
             console.warn('⚠️ Could not clear stale token:', error.message);
         }
     }

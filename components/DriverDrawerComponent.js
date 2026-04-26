@@ -1,6 +1,6 @@
 // components/DriverDrawerComponent.jsx
 import React, { useEffect, useState } from "react";
-import { StyleSheet, Text, View, Switch, TouchableOpacity } from "react-native";
+import { StyleSheet, Text, View, TouchableOpacity } from "react-native";
 import { DrawerContentScrollView, DrawerItem } from "@react-navigation/drawer";
 import {
 	AntDesign,
@@ -15,7 +15,7 @@ import { colors } from "../constants/styling";
 import Confirmation1 from "./modals/Confirmation1";
 import useAuthStore, { useDriverDetails } from "../constants/Store";
 import { FIREBASE_AUTH, FIREBASE_DB } from "../firebaseConfig";
-import { doc, onSnapshot, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 
 // --- Drawer items list for driver (unique name) ---
@@ -116,13 +116,11 @@ const DriverDrawerComponent = (props) => {
 	console.log("🚗 DriverDrawerComponent RENDERED - This is the DRIVER drawer!");
 
 	const navigation = useNavigation();
-	const { fullName, vehicle_id, rating, isOnline, setIsOnline } =
+	const { fullName, vehicle_id, rating } =
 		useDriverDetails((s) => ({
 			fullName: s.fullName,
 			vehicle_id: s.vehicle_id,
 			rating: s.rating,
-			isOnline: s.isOnline,
-			setIsOnline: s.setIsOnline,
 		}));
 	const { profile } = useAuthStore();
 
@@ -161,32 +159,6 @@ const DriverDrawerComponent = (props) => {
 		return () => unsub && unsub();
 	}, []);
 
-	const toggleOnlineStatus = async () => {
-		try {
-			const newStatus = !isOnline;
-			setIsOnline(newStatus);
-
-			const driverLocationRef = doc(
-				FIREBASE_DB,
-				"driver_locations",
-				FIREBASE_AUTH.currentUser.uid
-			);
-			await setDoc(
-				driverLocationRef,
-				{
-					isOnline: newStatus,
-					lastUpdated: serverTimestamp(),
-				},
-				{ merge: true }
-			);
-		} catch (error) {
-			console.error("Error toggling online status:", error);
-			// revert locally
-			setIsOnline((prev) => !prev);
-			alert("Failed to update online status");
-		}
-	};
-
 	console.log("ssss", profile);
 	return (
 		<View style={{ flex: 1 }}>
@@ -211,18 +183,6 @@ const DriverDrawerComponent = (props) => {
 						</View>
 					</View>
 				</TouchableOpacity>
-
-				<View style={styles.onlineStatusContainer}>
-					<Text style={styles.onlineStatusText}>
-						{isOnline ? "Online" : "Offline"}
-					</Text>
-					<Switch
-						value={isOnline}
-						onValueChange={toggleOnlineStatus}
-						trackColor={{ false: "#767577", true: colors.primaryBlue }}
-						thumbColor={isOnline ? "#fff" : "#f4f3f4"}
-					/>
-				</View>
 
 				<View style={styles.bottomCont}>
 					{driverDetails.map((d, i) => (
@@ -279,15 +239,5 @@ const styles = StyleSheet.create({
 		borderBottomColor: colors.lightGrey,
 		marginHorizontal: 15,
 	},
-	onlineStatusContainer: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		paddingHorizontal: 20,
-		paddingVertical: 15,
-		borderBottomWidth: 1,
-		borderBottomColor: colors.lightGrey,
-	},
-	onlineStatusText: { fontFamily: "Albert-Regular", fontSize: 16 },
 	infoContainer: { flex: 1 },
 });

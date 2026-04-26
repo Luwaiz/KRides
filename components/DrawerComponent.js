@@ -3,7 +3,7 @@ import { DrawerContentScrollView, DrawerItem } from "@react-navigation/drawer";
 import React, { useEffect, useState, useRef } from "react";
 import { AntDesign } from "@expo/vector-icons";
 import { Foundation } from "@expo/vector-icons";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { colors } from "../constants/styling";
 import { useNavigation } from "@react-navigation/native";
 import { TouchableOpacity } from "react-native-gesture-handler";
@@ -20,6 +20,11 @@ const details = [
 	// 	title: "Ride history",
 	// 	navigateTo: "History",
 	// },
+	{
+		icon: <MaterialCommunityIcons name="wallet-outline" size={24} color={colors.IconGrey} />,
+		title: "Wallet",
+		navigateTo: "Wallet",
+	},
 	{
 		icon: <AntDesign name="questioncircle" size={24} color={colors.IconGrey} />,
 		title: "Support",

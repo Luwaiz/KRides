@@ -53,6 +53,7 @@ const HomeTab = () => {
 		(state) => state.setAcceptRidePage
 	);
 	const isOnline = useDriverAvailability((state) => state.isOnline);
+	const setOnline = useDriverAvailability((state) => state.setOnline);
 	const [loading, setLoading] = useState(false);
 	const [refreshing, setRefreshing] = useState(false);
 	const [accepting, setAccepting] = useState(null);
@@ -198,6 +199,26 @@ const HomeTab = () => {
 				[
 					{ text: "Later", style: "cancel" },
 					{ text: "Set Up Now", onPress: () => navigation.navigate("BankAccountDetails") },
+				]
+			);
+			return;
+		}
+
+		if (!useDriverAvailability.getState().isOnline) {
+			Alert.alert(
+				"You're Offline",
+				"You need to be online to accept rides. Switch online now?",
+				[
+					{ text: "Cancel", style: "cancel" },
+					{
+						text: "Go Online & Accept",
+						onPress: async () => {
+							setOnline();
+							const driverRef = doc(FIREBASE_DB, "drivers", uid);
+							await updateDoc(driverRef, { isOnline: true, lastStatusChange: serverTimestamp() }).catch(() => {});
+							AcceptRide(rideId);
+						},
+					},
 				]
 			);
 			return;
