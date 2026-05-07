@@ -1104,7 +1104,7 @@ app.post('/api/payments/complete-ride', async (req, res) => {
         // Calculate driver earnings (platform takes ₦50 for <3 passengers, ₦100 for 3+)
         const totalAmount = Number(ride.amount) || 0;
         const passengers = Number(ride.numberOfPassengers) || 1;
-        const platformFee = passengers >= 3 ? 100 : 50;
+        const platformFee = passengers >= 3 ? 150 : 100;
         const driverEarnings = Math.max(totalAmount - platformFee, 0);
 
         // Only transfer if ride was paid digitally and driver has bank details
@@ -1171,6 +1171,181 @@ app.post('/api/payments/complete-ride', async (req, res) => {
     } catch (error) {
         console.error('❌ complete-ride error:', error);
         return res.status(500).json({ error: 'Could not complete ride. Please try again.' });
+    }
+});
+
+/**
+ * POST /api/payments/wallet-refund
+ * Credits a cancelled wallet-paid ride back to the customer's wallet.
+ * Body: { idToken, rideId }
+ */
+app.post('/api/payments/wallet-refund', async (req, res) => {
+    const { idToken, rideId } = req.body;
+
+    if (!idToken || !rideId) {
+        return res.status(400).json({ error: 'idToken and rideId are required' });
+    }
+
+    let customerId;
+    try {
+        const decoded = await admin.auth().verifyIdToken(idToken);
+        customerId = decoded.uid;
+    } catch (err) {
+        return res.status(401).json({ error: 'Invalid or expired session. Please log in again.' });
+    }
+
+    try {
+        const rideRef = db.collection('rides').doc(rideId);
+        const rideSnap = await rideRef.get();
+
+        if (!rideSnap.exists) {
+            return res.status(404).json({ error: 'Ride not found' });
+        }
+
+        const ride = rideSnap.data();
+
+        if (ride.customerId !== customerId) {
+            return res.status(403).json({ error: 'This ride does not belong to you' });
+        }
+
+        if (ride.paymentMethod !== 'wallet') {
+            return res.status(400).json({ error: 'This ride was not paid via wallet' });
+        }
+
+        // Eligible if cancellation is in progress (refundProcessing=true) or ride is already cancelled
+        if (ride.refundProcessing !== true && ride.status !== 'cancelled') {
+            return res.status(400).json({ error: `Cannot refund ride with status: ${ride.status}` });
+        }
+
+        // Idempotency — return success immediately if already refunded
+        if (ride.walletRefunded === true) {
+            return res.json({ success: true, alreadyRefunded: true });
+        }
+
+        const amount = Number(ride.amount) || 0;
+        if (amount <= 0) {
+            return res.json({ success: true, refunded: false, reason: 'no_amount' });
+        }
+
+        const userRef = db.collection('users').doc(customerId);
+        await db.runTransaction(async (txn) => {
+            const userSnap = await txn.get(userRef);
+            if (!userSnap.exists) throw new Error('Customer not found');
+
+            const currentBalance = Number(userSnap.data().walletBalance) || 0;
+            txn.update(userRef, { walletBalance: currentBalance + amount });
+
+            const txRef = db.collection('walletTransactions').doc();
+            txn.set(txRef, {
+                userId: customerId,
+                type: 'refund',
+                amount,
+                description: 'Ride cancellation refund',
+                rideId,
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+            // Idempotency guard — prevent a second refund if this endpoint is called twice
+            txn.update(rideRef, { walletRefunded: true });
+        });
+
+        console.log(`✅ Wallet refund of ₦${amount} credited to customer ${customerId} (ride ${rideId})`);
+        return res.json({ success: true, refundedAmount: amount });
+
+    } catch (error) {
+        console.error('❌ wallet-refund error:', error);
+        return res.status(500).json({ error: 'Could not process wallet refund. Please try again.' });
+    }
+});
+
+/**
+ * POST /api/reports/driver
+ * Customer reports a driver. Saves to Firestore and emails admin.
+ * Body: { idToken, rideId, reason, description }
+ */
+app.post('/api/reports/driver', async (req, res) => {
+    const { idToken, rideId, reason, description } = req.body;
+
+    if (!idToken || !rideId || !reason) {
+        return res.status(400).json({ error: 'idToken, rideId, and reason are required' });
+    }
+
+    let customerId;
+    try {
+        const decoded = await admin.auth().verifyIdToken(idToken);
+        customerId = decoded.uid;
+    } catch {
+        return res.status(401).json({ error: 'Invalid or expired session' });
+    }
+
+    try {
+        // Read ride
+        const rideSnap = await db.collection('rides').doc(rideId).get();
+        if (!rideSnap.exists) return res.status(404).json({ error: 'Ride not found' });
+        const ride = rideSnap.data();
+
+        if (ride.customerId !== customerId) {
+            return res.status(403).json({ error: 'This ride does not belong to you' });
+        }
+        if (!ride.driverId) {
+            return res.status(400).json({ error: 'No driver on this ride' });
+        }
+
+        // Idempotency — one report per customer per ride
+        const existing = await db.collection('driverReports')
+            .where('customerId', '==', customerId)
+            .where('rideId', '==', rideId)
+            .limit(1)
+            .get();
+        if (!existing.empty) {
+            return res.json({ success: true, alreadyReported: true });
+        }
+
+        // Read driver and customer info for the email
+        const [driverSnap, customerSnap] = await Promise.all([
+            db.collection('drivers').doc(ride.driverId).get(),
+            db.collection('users').doc(customerId).get(),
+        ]);
+        const driver = driverSnap.exists ? driverSnap.data() : {};
+        const customer = customerSnap.exists ? customerSnap.data() : {};
+
+        const reportedAt = new Date().toLocaleString('en-NG', { timeZone: 'Africa/Lagos' });
+        const pickupStr = typeof ride.pickupLocation === 'object'
+            ? ride.pickupLocation?.name || ride.pickupLocation?.address || 'Unknown'
+            : ride.pickupLocation || 'Unknown';
+        const destStr = typeof ride.destination === 'object'
+            ? ride.destination?.name || ride.destination?.address || 'Unknown'
+            : ride.destination || 'Unknown';
+
+        // Save report to Firestore
+        await db.collection('driverReports').add({
+            customerId,
+            customerName: customer.firstName ? `${customer.firstName} ${customer.lastName || ''}`.trim() : 'Unknown',
+            customerPhone: customer.phone || ride.customerPhone || 'N/A',
+            driverId: ride.driverId,
+            driverName: driver.fullName || driver.name || ride.driverName || 'Unknown',
+            driverPhone: driver.phone || ride.driverPhone || 'N/A',
+            driverEmail: driver.email || 'N/A',
+            driverVehicleId: driver.vehicle_id || 'N/A',
+            rideId,
+            pickupLocation: pickupStr,
+            destination: destStr,
+            rideAmount: ride.amount || 0,
+            rideStatus: ride.status,
+            reason,
+            description: description || '',
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        // TODO: enable email notifications when ready
+        // Set GMAIL_USER, GMAIL_APP_PASSWORD, and ADMIN_EMAIL (kampusrides24@gmail.com) on Render
+        console.log(`📋 Report saved for ride ${rideId} — email notifications disabled`);
+
+        return res.json({ success: true });
+
+    } catch (error) {
+        console.error('❌ driver report error:', error);
+        return res.status(500).json({ error: 'Could not submit report. Please try again.' });
     }
 });
 

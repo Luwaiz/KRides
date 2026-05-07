@@ -136,11 +136,6 @@ const RideStatusBar = ({
                         </TouchableOpacity>
                     ) : (
                         <View style={styles.driverActions}>
-                            {driverPhone && (
-                                <TouchableOpacity onPress={callDriver} style={styles.callButton}>
-                                    <Ionicons name="call" size={18} color="#fff" />
-                                </TouchableOpacity>
-                            )}
                             <TouchableOpacity onPress={toggleExpanded} style={styles.viewButton}>
                                 <Text style={styles.viewText}>View</Text>
                                 <Ionicons
@@ -252,13 +247,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: sp(8),
-    },
-    callButton: {
-        backgroundColor: '#4caf50',
-        borderRadius: br(8),
-        padding: sp(8),
-        justifyContent: 'center',
-        alignItems: 'center',
     },
     viewButton: {
         flexDirection: 'row',

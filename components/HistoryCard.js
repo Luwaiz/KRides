@@ -9,11 +9,15 @@ import React, { useState } from "react";
 import { colors } from "../constants/styling";
 import Direction from "../assets/svg/Frame 34direction.svg";
 import AntDesign from "@expo/vector-icons/AntDesign";
+import { Ionicons } from "@expo/vector-icons";
 import { format } from "date-fns";
 import { useUserDetails, useDriverDetails } from "../constants/Store";
+import { calculateDriverEarnings } from "../constants/commission";
+import ReportDriverModal from "./modals/ReportDriverModal";
 
 const HistoryCard = ({ history }) => {
 	const [selected, setSelected] = useState(null);
+	const [showReport, setShowReport] = useState(false);
 	const UserId = useUserDetails((state) => state?.UserId);
 	const driverUid = useDriverDetails((state) => state?.uid);
 
@@ -122,15 +126,35 @@ const HistoryCard = ({ history }) => {
 					</View>
 
 					<View style={styles.status}>
-						<Text style={styles.statusText}>₦ {history?.amount || 0}</Text>
-						{isCompleted ? (
-							<Text style={styles.complete}>Completed</Text>
-						) : (
-							<Text style={styles.cancelled}>Cancelled</Text>
-						)}
+						<Text style={styles.statusText}>
+							₦ {isDriver
+								? calculateDriverEarnings(history?.amount || 0, history?.numberOfPassengers || 1)
+								: history?.amount || 0}
+						</Text>
+						<View style={styles.statusRight}>
+							{isCompleted ? (
+								<Text style={styles.complete}>Completed</Text>
+							) : (
+								<Text style={styles.cancelled}>Cancelled</Text>
+							)}
+							{!isDriver && history?.driverId && (
+								<TouchableOpacity
+									onPress={() => setShowReport(true)}
+									hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+									style={styles.reportButton}
+								>
+									<Ionicons name="flag-outline" size={16} color="#d32f2f" />
+								</TouchableOpacity>
+							)}
+						</View>
 					</View>
 				</Pressable>
 			)}
+			<ReportDriverModal
+				visible={showReport}
+				onClose={() => setShowReport(false)}
+				history={history}
+			/>
 		</View>
 	);
 };
@@ -200,6 +224,14 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 		justifyContent: "space-between",
 		paddingHorizontal: 8,
+	},
+	statusRight: {
+		flexDirection: "row",
+		alignItems: "center",
+		gap: 8,
+	},
+	reportButton: {
+		padding: 2,
 	},
 	statusText: {
 		fontSize: 16,

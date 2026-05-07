@@ -6,6 +6,8 @@ export const useBottomTabStore = create((set) => ({
 	AcceptRidePage: false,
 	PassengerPage: () => set({ passengerPage: true }),
 	setConfirmPage: () => set({ confirmPage: true }),
+	backFromConfirm: () => set({ confirmPage: false }),
+	backFromPassenger: () => set({ passengerPage: false }),
 	setAcceptRidePage: () =>
 		set((state) => ({ AcceptRidePage: !state.AcceptRidePage })),
 	setDriverHome: () => set({ AcceptRidePage: false }),

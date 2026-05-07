@@ -31,6 +31,7 @@ import axios from "axios";
 import API from "../../hooks/API";
 import { getRideCoordinates } from "../../helpers/getLocationCoordinates";
 import { listenToPendingRides, declineRide } from "../../helpers/firebaseRides";
+import { calculateDriverEarnings } from "../../constants/commission";
 import { notifyCustomerRideAccepted } from "../../helpers/notificationHelpers";
 import { doc, updateDoc, runTransaction, serverTimestamp } from "firebase/firestore";
 import { FIREBASE_DB } from "../../firebaseConfig";
@@ -403,7 +404,7 @@ const HomeTab = () => {
 														item?.number_of_passengers ||
 														1}
 												</Text>
-												<Text style={styles.time}>₦{item?.amount || 0}</Text>
+												<Text style={styles.time}>₦{calculateDriverEarnings(item?.amount || 0, item?.numberOfPassengers || item?.number_of_passengers || 1)}</Text>
 											</View>
 										</View>
 										<Destination

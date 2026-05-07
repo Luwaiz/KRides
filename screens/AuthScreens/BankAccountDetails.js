@@ -18,6 +18,7 @@ import { Picker } from "@react-native-picker/picker";
 import { FIREBASE_DB, FIREBASE_AUTH } from "../../firebaseConfig";
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
 const PAYMENTS_SERVER_URL = 'https://krides.onrender.com/api/payments';
+import { NOTIFICATION_API_KEY } from "@env";
 import { useDriverDetails } from "../../constants/Store";
 const { width, height } = Dimensions.get("window");
 const NIGERIAN_BANKS = [
@@ -85,7 +86,7 @@ const BankAccountDetails = ({ navigation, route }) => {
             // Call our backend — secret key stays server-side
             const response = await fetch(`${PAYMENTS_SERVER_URL}/create-subaccount`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { "Content-Type": "application/json", "x-api-key": NOTIFICATION_API_KEY || "" },
                 body: JSON.stringify({
                     bankCode,
                     accountNumber,

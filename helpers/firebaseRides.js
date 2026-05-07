@@ -1,4 +1,5 @@
 import { FIREBASE_DB } from "../firebaseConfig";
+import { NOTIFICATION_API_KEY } from "@env";
 
 // ── Validation ────────────────────────────────────────────────────────────────
 
@@ -368,6 +369,35 @@ export const cancelRideWithRefund = async (rideId, cancelledBy = 'customer', rea
 			console.error("❌ Refund failed:", refundError.message);
 			updates.refundStatus = "failed";
 			updates.refundError = refundError.message;
+		}
+	} else if (rideData.paymentMethod === 'wallet' && rideData.customerId) {
+		try {
+			console.log("💰 Processing wallet refund for cancelled ride...");
+			const { FIREBASE_AUTH } = require("../firebaseConfig");
+			const idToken = await FIREBASE_AUTH.currentUser?.getIdToken();
+			if (!idToken) throw new Error("No authenticated user for wallet refund");
+
+			const response = await fetch('https://krides.onrender.com/api/payments/wallet-refund', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json', 'x-api-key': NOTIFICATION_API_KEY || '' },
+				body: JSON.stringify({ idToken, rideId }),
+			});
+			const result = await response.json();
+
+			if (result.success) {
+				updates.walletRefundStatus = 'completed';
+				updates.walletRefunded = true;
+				updates.refundAmount = rideData.amount;
+				console.log(`✅ Wallet refund of ₦${rideData.amount} processed`);
+			} else {
+				updates.walletRefundStatus = 'failed';
+				updates.walletRefundError = result.error;
+				console.error("❌ Wallet refund failed:", result.error);
+			}
+		} catch (walletRefundErr) {
+			console.error("❌ Wallet refund error:", walletRefundErr.message);
+			updates.walletRefundStatus = 'failed';
+			updates.walletRefundError = walletRefundErr.message;
 		}
 	} else {
 		console.log("ℹ️ No payment to refund (cash or no transaction ID)");

@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, TouchableOpacity, Image, Linking, Alert } from "react-native";
+import { StyleSheet, Text, View, TouchableOpacity, Image, Linking, Alert, ActivityIndicator } from "react-native";
 import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import { MaterialIcons, Octicons } from "@expo/vector-icons";
 import React, { useState, useEffect } from "react";
@@ -26,6 +26,7 @@ const AcceptTab = () => {
 	const [showPendingRides, setShowPendingRides] = useState(false);
 	const [pendingRides, setPendingRides] = useState([]);
 	const [hasArrived, setHasArrived] = useState(false);
+	const [arriving, setArriving] = useState(false);
 
 	const acceptedRide = useAcceptedRideStore((state) => state.acceptedRide);
 	const nextRide = useAcceptedRideStore((state) => state.nextRide);
@@ -81,7 +82,7 @@ const AcceptTab = () => {
 		if (queued) {
 			Alert.alert(
 				"Next Ride Ready",
-				`You have a queued ride from ${queued.customerName || "a customer"}.\n\n${queued.pickupLocation || "Pickup"} → ${queued.destination || "Destination"}\n₦${queued.amount || 0}\n\nStart this ride now?`,
+				`You have a queued ride from ${queued.customerName || "a customer"}.\n\n${queued.pickupLocation || "Pickup"} → ${queued.destination || "Destination"}\n₦${calculateDriverEarnings(queued.amount || 0, queued.numberOfPassengers || 1)}\n\nStart this ride now?`,
 				[
 					{
 						text: "Decline",
@@ -197,13 +198,11 @@ const AcceptTab = () => {
 	};
 
 	const doNotifyArrival = async () => {
+		setArriving(true);
 		try {
-			// Use acceptedRide.driverName which was set when accepting the ride
-			// Fallback to fullName from store, then to 'Your driver'
 			const driverName = acceptedRide.driverName || fullName || 'Your driver';
 			console.log('📤 Notifying customer with driver name:', driverName);
 
-			// Update ride status — mark arrived and transition to in_progress
 			const rideRef = doc(FIREBASE_DB, 'rides', acceptedRide.rideId);
 			await updateDoc(rideRef, {
 				hasArrived: true,
@@ -222,6 +221,8 @@ const AcceptTab = () => {
 		} catch (error) {
 			console.error('Error notifying arrival:', error);
 			Alert.alert('Error', 'Could not update arrival status. Please try again.');
+		} finally {
+			setArriving(false);
 		}
 	};
 
@@ -454,15 +455,18 @@ const AcceptTab = () => {
 						<TouchableOpacity
 							style={[
 								styles.arrivalButton,
-								hasArrived && styles.arrivalButtonDisabled
+								(hasArrived || arriving) && styles.arrivalButtonDisabled
 							]}
 							onPress={notifyArrival}
 							activeOpacity={0.7}
-							disabled={hasArrived}
+							disabled={hasArrived || arriving}
 						>
-							<MaterialIcons name="location-on" size={20} color="#fff" />
+							{arriving
+								? <ActivityIndicator size="small" color="#fff" />
+								: <MaterialIcons name="location-on" size={20} color="#fff" />
+							}
 							<Text style={styles.arrivalButtonText}>
-								{hasArrived ? "Arrived ✓" : "I've Arrived"}
+								{hasArrived ? "Arrived ✓" : arriving ? "Updating..." : "I've Arrived"}
 							</Text>
 						</TouchableOpacity>
 

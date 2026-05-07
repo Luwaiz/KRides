@@ -14,6 +14,7 @@ import BackButton from "../../components/buttons/BackButton";
 import { colors } from "../../constants/styling";
 import { sp, fs, br, ms } from "../../constants/responsive";
 import { getDriverEarnings, formatCurrency } from "../../helpers/driverEarnings";
+import { calculateDriverEarnings } from "../../constants/commission";
 import { useDriverDetails } from "../../constants/Store";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -31,8 +32,6 @@ const DriverEarnings = () => {
     const [earningsData, setEarningsData] = useState({
         rides: [],
         totalRides: 0,
-        grossEarnings: 0,
-        platformFees: 0,
         netEarnings: 0,
         averagePerRide: 0,
     });
@@ -60,17 +59,14 @@ const DriverEarnings = () => {
             const d = raw.toDate ? raw.toDate() : new Date(raw);
             return d.getDate() === selectedDay;
         });
-        const platformFeePerRide = 50;
-        const grossEarnings = dayRides.reduce((s, r) => s + (r.amount || 0), 0);
-        const platformFees = dayRides.length * platformFeePerRide;
-        const netEarnings = grossEarnings - platformFees;
+        const netEarnings = dayRides.reduce(
+            (s, r) => s + calculateDriverEarnings(r.amount || 0, r.numberOfPassengers || 1), 0
+        );
         return {
             rides: dayRides,
             totalRides: dayRides.length,
-            grossEarnings,
-            platformFees,
             netEarnings,
-            averagePerRide: dayRides.length > 0 ? grossEarnings / dayRides.length : 0,
+            averagePerRide: dayRides.length > 0 ? netEarnings / dayRides.length : 0,
         };
     }, [earningsData, selectedDay]);
 
@@ -245,25 +241,16 @@ const DriverEarnings = () => {
                 {!fetching && (
                 <>
                 <View style={styles.breakdownCard}>
-                    <Text style={styles.sectionTitle}>Earnings Breakdown</Text>
+                    <Text style={styles.sectionTitle}>Earnings Summary</Text>
                     <View style={styles.breakdownRow}>
-                        <Text style={styles.breakdownLabel}>Gross Earnings</Text>
-                        <Text style={styles.breakdownValue}>
-                            {formatCurrency(displayData.grossEarnings)}
-                        </Text>
-                    </View>
-                    <View style={styles.breakdownRow}>
-                        <Text style={styles.breakdownLabel}>Platform Fees</Text>
-                        <Text style={[styles.breakdownValue, styles.feeValue]}>
-                            -{formatCurrency(displayData.platformFees)}
-                        </Text>
-                    </View>
-                    <View style={styles.breakdownDivider} />
-                    <View style={styles.breakdownRow}>
-                        <Text style={styles.breakdownLabelBold}>Net Earnings</Text>
+                        <Text style={styles.breakdownLabelBold}>Total Earned</Text>
                         <Text style={styles.breakdownValueBold}>
                             {formatCurrency(displayData.netEarnings)}
                         </Text>
+                    </View>
+                    <View style={styles.breakdownRow}>
+                        <Text style={styles.breakdownLabel}>Completed Rides</Text>
+                        <Text style={styles.breakdownValue}>{displayData.totalRides}</Text>
                     </View>
                 </View>
 
@@ -302,7 +289,7 @@ const DriverEarnings = () => {
                                         </Text>
                                     </View>
                                     <Text style={styles.transactionAmount}>
-                                        {formatCurrency(ride.amount)}
+                                        {formatCurrency(calculateDriverEarnings(ride.amount || 0, ride.numberOfPassengers || 1))}
                                     </Text>
                                 </View>
                                 {ride.pickupAddress && ride.destinationAddress && (

@@ -97,9 +97,9 @@ export const calculateFare = (distanceKm, passengers) => {
 	const baseFare = 200;
 	let fare;
 	if (passengers >= 3) {
-		fare = baseFare * passengers + 100;
+		fare = baseFare * passengers + 150;
 	} else {
-		fare = baseFare * passengers + 50;
+		fare = baseFare * passengers + 100;
 	}
 	return fare;
 };
