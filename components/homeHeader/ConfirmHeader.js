@@ -6,7 +6,7 @@ import { AntDesign } from "@expo/vector-icons";
 import { useBottomTabStore } from "../../constants/Store";
 
 const HomeHeader = () => {
-	const Back = useBottomTabStore((state)=>state.setConfirmPage)
+	const Back = useBottomTabStore((state) => state.backFromConfirm)
 	return (
 		<TouchableOpacity
 			style={styles.drawerNav}

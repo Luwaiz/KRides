@@ -25,7 +25,7 @@ import {
 import InActiveButton from "./buttons/InActiveButton";
 import DangerButton from "./buttons/DangerButton";
 import Payment from "../screens/AppScreens/Payment";
-import { createRide, listenToRide, cancelRide, getRide } from "../helpers/firebaseRides";
+import { createRide, listenToRide, cancelRideWithRefund, getRide } from "../helpers/firebaseRides";
 import { calculateDistance, calculateFare } from "../helpers/rideCalculations";
 import { FIREBASE_DB, FIREBASE_AUTH } from "../firebaseConfig";
 import { doc, onSnapshot, updateDoc } from "firebase/firestore";
@@ -344,7 +344,7 @@ const ConfirmRide = () => {
 						setCancelling(true);
 						try {
 							const rideSnapshot = await getRide(cancelRideId);
-							await cancelRide(cancelRideId);
+							await cancelRideWithRefund(cancelRideId, 'customer', 'Customer cancelled ride');
 							console.log("✅ Ride cancelled successfully");
 
 							// Notify driver if one had already accepted

@@ -1,5 +1,7 @@
 // Refund calls go through our server so the Flutterwave secret key
 // never touches the client bundle.
+import { NOTIFICATION_API_KEY } from "@env";
+
 const PAYMENTS_SERVER_URL = 'https://krides.onrender.com/api/payments';
 const FETCH_TIMEOUT_MS = 10000;
 
@@ -20,7 +22,7 @@ export const processRefund = async (transactionId, amount = null, comments = 'Ri
 
     const response = await fetchWithTimeout(`${PAYMENTS_SERVER_URL}/refund`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-api-key': NOTIFICATION_API_KEY || '' },
         body: JSON.stringify({ transactionId, amount, comments }),
     });
 
@@ -48,7 +50,7 @@ export const checkRefundStatus = async (refundId) => {
     console.log('🔍 Checking refund status for:', refundId);
 
     const response = await fetchWithTimeout(`${PAYMENTS_SERVER_URL}/refund/${refundId}`, {
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-api-key': NOTIFICATION_API_KEY || '' },
     });
 
     const result = await response.json();

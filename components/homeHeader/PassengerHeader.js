@@ -5,7 +5,7 @@ import { colors } from "../../constants/styling";
 import { useBottomTabStore } from "../../constants/Store";
 
 const PassengerHeader = () => {
-	const Back = useBottomTabStore((state)=>state.PassengerPage)
+	const Back = useBottomTabStore((state) => state.backFromPassenger)
 	
 	return (
 		<View style={styles.drawerNav} activeOpacity={0.7}>

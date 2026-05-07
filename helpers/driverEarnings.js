@@ -1,5 +1,6 @@
 import { FIREBASE_DB } from "../firebaseConfig";
 import { collection, query, where, getDocs } from "firebase/firestore";
+import { calculateDriverEarnings, calculatePlatformFee } from "../constants/commission";
 
 /**
  * Get driver earnings for a specific time period
@@ -41,29 +42,22 @@ export const getDriverEarnings = async (driverId, period = 'month', year = null,
             return bTime - aTime;
         });
 
-        // Calculate earnings
+        // Calculate earnings — driver sees net only, platform fee is internal
         const totalRides = rides.length;
-        const platformFeePerRide = 50; // ₦50 platform fee per ride
 
-        let grossEarnings = 0;
-        let platformFees = 0;
+        let netEarnings = 0;
 
         rides.forEach(ride => {
-            const amount = ride.amount || 0;
-            grossEarnings += amount;
-            platformFees += platformFeePerRide;
+            netEarnings += calculateDriverEarnings(ride.amount || 0, ride.numberOfPassengers || 1);
         });
 
-        const netEarnings = grossEarnings - platformFees;
-        const averagePerRide = totalRides > 0 ? grossEarnings / totalRides : 0;
+        const averagePerRide = totalRides > 0 ? netEarnings / totalRides : 0;
 
         console.log(`✅ Calculated earnings: ₦${netEarnings} from ${totalRides} rides`);
 
         return {
             rides,
             totalRides,
-            grossEarnings,
-            platformFees,
             netEarnings,
             averagePerRide,
             period,
@@ -75,8 +69,6 @@ export const getDriverEarnings = async (driverId, period = 'month', year = null,
         return {
             rides: [],
             totalRides: 0,
-            grossEarnings: 0,
-            platformFees: 0,
             netEarnings: 0,
             averagePerRide: 0,
             period,
@@ -92,5 +84,5 @@ export const getDriverEarnings = async (driverId, period = 'month', year = null,
  * @returns {string} Formatted currency string
  */
 export const formatCurrency = (amount) => {
-    return `₦${amount.toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+    return `₦${(Number(amount) || 0).toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 };
