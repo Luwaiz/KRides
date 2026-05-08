@@ -5,7 +5,8 @@
     "start": "expo start --dev-client",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@expo-google-fonts/albert-sans": "^0.2.3",
@@ -19,7 +20,6 @@
     "@react-navigation/native": "^6.1.18",
     "@react-navigation/native-stack": "^6.11.0",
     "@react-navigation/stack": "^6.4.1",
-    "@rnmapbox/maps": "^10.2.10",
     "axios": "^1.7.9",
     "date-fns": "^4.1.0",
     "dotenv": "^16.4.7",
@@ -57,6 +57,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
+    "patch-package": "^8.0.1",
     "react-native-svg-transformer": "^1.4.0"
   },
   "expo": {
