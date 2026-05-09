@@ -1,0 +1,26 @@
+diff --git a/node_modules/react-native/React/Fabric/Mounting/ComponentViews/Modal/RCTModalHostViewComponentView.mm b/node_modules/react-native/React/Fabric/Mounting/ComponentViews/Modal/RCTModalHostViewComponentView.mm
+index 9205fa3..42ce2d9 100644
+--- a/node_modules/react-native/React/Fabric/Mounting/ComponentViews/Modal/RCTModalHostViewComponentView.mm
++++ b/node_modules/react-native/React/Fabric/Mounting/ComponentViews/Modal/RCTModalHostViewComponentView.mm
+@@ -149,6 +149,21 @@ static ModalHostViewEventEmitter::OnOrientationChange onOrientationChangeStruct(
+ {
+   BOOL shouldBePresented = !_isPresented && _shouldPresent && self.window;
+   if (shouldBePresented) {
++    // iOS 26 fix: presentViewController:animated:NO while a UIKit transition coordinator is
++    // active causes the presenter to register an alongside completion block whose body is the
++    // deferred _presentViewController:animated:completion: invocation. When that block fires
++    // inside _runAlongsideCompletions, UIKit 26.1 throws "_presentViewController inside
++    // _runAlongsideCompletions" → SIGABRT. Defer to the next run-loop cycle so the coordinator
++    // is gone before we attempt the presentation.
++    UIViewController *controller = [self reactViewController];
++    if (controller.transitionCoordinator != nil) {
++      __weak RCTModalHostViewComponentView *weakSelf = self;
++      dispatch_async(dispatch_get_main_queue(), ^{
++        [weakSelf ensurePresentedOnlyIfNeeded];
++      });
++      return;
++    }
++
+     self.viewController.presentationController.delegate = self;
+ 
+     _isPresented = YES;
