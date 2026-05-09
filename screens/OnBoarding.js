@@ -61,12 +61,7 @@ const OnBoarding = ({ navigation }) => {
 				})}
 				style={{ flex: 0.65 }}
 				renderItem={({ item }) => (
-					<View style={{ width }}>
-						{/* <Image
-							source={item?.image}
-							style={styles.image}
-							resizeMode="cover"
-						/> */}
+					<View style={{ width, flex: 1 }}>
 						<View style={styles.indicator}>{item?.image}</View>
 						<BottomSheet
 							style={styles.Sheet}
@@ -98,6 +93,11 @@ export default OnBoarding;
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
+	},
+	indicator: {
+		width,
+		height: height * 0.65,
+		overflow: "hidden",
 	},
 	image: {
 		width: "100%",

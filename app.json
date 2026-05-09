@@ -2,7 +2,7 @@
   "expo": {
     "name": "KRides",
     "slug": "KRides",
-    "owner": "luwaiz",
+    "owner": "eluwaiz",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -19,12 +19,11 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-font",
-      "@rnmapbox/maps"
+      "expo-font"
     ],
     "extra": {
       "eas": {
-        "projectId": "4f4f3190-f45f-4415-97a9-b3dfb44bba45"
+        "projectId": "8bd3366e-c67f-4c79-a093-e409ebb147f4"
       }
     },
     "android": {
@@ -41,7 +40,7 @@
       ],
       "config": {
         "googleMaps": {
-          "apiKey": ""
+          "apiKey": "AIzaSyB7fe6OfWqZs2BP0AoZS-2jLi5mIVbiYTM"
         }
       }
     },
@@ -49,6 +48,10 @@
       "bundleIdentifier": "com.eluwaiz.KRides",
       "buildNumber": "1.0.0",
       "supportsTablet": true,
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "config": {
+        "googleMapsApiKey": "AIzaSyB59DSubzPcNuQkfYrNv_pfhBtJX_rqPI4"
+      },
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "KRides needs your location to find nearby drivers and calculate routes.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "KRides needs your location to track rides and show driver arrival.",

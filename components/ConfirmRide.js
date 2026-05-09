@@ -1,4 +1,4 @@
-import { StyleSheet, Text, TouchableOpacity, View, Alert, Linking, ActivityIndicator, Modal } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View, Alert, Linking, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import BottomSheet from "@gorhom/bottom-sheet";
 import React, { useEffect, useState, useMemo, useRef } from "react";
@@ -522,16 +522,16 @@ const ConfirmRide = () => {
 				</View>
 			</BottomSheet>
 
-			{/* Booking-in-progress overlay — shown while Firestore write is pending
-			    after Flutterwave payment completes. Prevents a blank 1-3 second gap. */}
-			<Modal visible={loading} transparent animationType="fade">
-				<View style={styles.loadingOverlay}>
+			{/* Booking-in-progress overlay — plain View instead of Modal to avoid
+			    _presentViewController crash on iOS when Flutterwave modal is mid-dismiss */}
+			{loading && (
+				<View style={[StyleSheet.absoluteFillObject, styles.loadingOverlay]}>
 					<View style={styles.loadingCard}>
 						<ActivityIndicator size="large" color={colors.primaryBlue} />
 						<Text style={styles.loadingText}>Booking your ride...</Text>
 					</View>
 				</View>
-			</Modal>
+			)}
 
 			{showRatingModal && (
 				<RatingModal

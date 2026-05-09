@@ -1,6 +1,5 @@
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Pressable, View } from "react-native";
 import React from "react";
-import { TouchableOpacity } from "react-native-gesture-handler";
 import { colors } from "../../constants/styling";
 import { AntDesign } from "@expo/vector-icons";
 import { useBottomTabStore } from "../../constants/Store";
@@ -8,15 +7,12 @@ import { useBottomTabStore } from "../../constants/Store";
 const HomeHeader = () => {
 	const Back = useBottomTabStore((state) => state.backFromConfirm)
 	return (
-		<TouchableOpacity
+		<Pressable
 			style={styles.drawerNav}
-			activeOpacity={0.7}
 			onPress={Back}
 		>
-			<View>
-				<AntDesign name="arrowleft" size={24} color="black" />
-			</View>
-		</TouchableOpacity>
+			<AntDesign name="arrowleft" size={24} color="black" />
+		</Pressable>
 	);
 };
 

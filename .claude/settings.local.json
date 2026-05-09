@@ -1,7 +1,27 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git merge *)"
+      "Bash(git merge *)",
+      "Bash(npx @sentry/wizard@latest -i reactNative --saas --org kampus-rides --project react-native)",
+      "Bash(cat .sentryclirc)",
+      "Bash(ls sentry.properties)",
+      "Bash(node -e \"const p = require\\('./package.json'\\); console.log\\('@sentry/react-native:', p.dependencies['@sentry/react-native']\\); console.log\\('expo:', p.dependencies['expo']\\); console.log\\('react-native:', p.dependencies['react-native']\\);\")",
+      "Bash(node -e \"const p = require\\('./node_modules/@sentry/react-native/package.json'\\); console.log\\('installed version:', p.version\\);\")",
+      "Bash(npm uninstall *)",
+      "Bash(eas init *)",
+      "Bash(eas whoami *)",
+      "Bash(xargs grep *)",
+      "Bash(npm install *)",
+      "Bash(npx patch-package *)",
+      "Bash(grep -E \"\\\\.\\(mm|m|h\\)$\")",
+      "Read(//c/Users/Administrator/.claude/projects/c--Users-Administrator-Documents-REACTNATIVE-KRides/**)",
+      "Bash(python3)",
+      "Bash(awk -F: '{print $1}')",
+      "Bash(awk 'NR>20{print}')",
+      "Bash(python3 -c ' *)",
+      "Bash(find \"c:\\\\Users\\\\Administrator\\\\Documents\\\\REACTNATIVE\\\\KRides\\\\node_modules\\\\flutterwave-react-native\\\\\" -type f \\\\\\( -name \"*.js\" -o -name \"*.ts\" -o -name \"*.jsx\" -o -name \"*.tsx\" \\\\\\) | head -20)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }

@@ -14,7 +14,7 @@ import useAuthStore, {
 // Screens and Navigators
 import OnBoarding from "../screens/OnBoarding";
 import AuthStack from "./AuthStack";
-import DrawerNavigator from "./DrawerNavigator"; // for customers (with drawer)
+import AppStackNavigator from "./AppStack"; // for customers
 import DriverDrawer from "./DriverDrawer"; // for drivers (with drawer)
 
 const Stack = createNativeStackNavigator();
@@ -208,9 +208,9 @@ const Navigation = () => {
 				) : (
 					// Customer logged in - use key to force remount when role changes
 					<Stack.Screen
-						key="customer-drawer"
+						key="customer-stack"
 						name="AppStack"
-						component={DrawerNavigator}
+						component={AppStackNavigator}
 					/>
 				)}
 			</Stack.Navigator>

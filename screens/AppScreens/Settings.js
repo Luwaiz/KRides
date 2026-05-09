@@ -109,6 +109,13 @@ const Settings = ({ navigation }) => {
 			<View style={styles.bottomContainer}>
 				<Pressable
 					style={styles.options}
+					onPress={() => navigation.navigate("Home")}
+				>
+					<Entypo name="home" size={20} color="black" />
+					<Text style={styles.optionText}>Home</Text>
+				</Pressable>
+				<Pressable
+					style={styles.options}
 					onPress={() => navigation.navigate("Profile")}
 				>
 					<Ionicons name="settings" size={20} color="black" />

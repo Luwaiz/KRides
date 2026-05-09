@@ -49,10 +49,8 @@ configureReanimatedLogger({
 	level: ReanimatedLogLevel.warn,
 	strict: false, // Reanimated runs in strict mode by default
 });
-export default function App() {
+function App() {
 	const fontLoaded = FontResources();
-
-	// Removed Firebase notification setup - not supported in React Native with Web SDK
 
 	if (!fontLoaded) {
 		return null;
@@ -72,6 +70,8 @@ export default function App() {
 		);
 	}
 }
+
+export default App;
 
 const styles = StyleSheet.create({
 	container: {
