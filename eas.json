@@ -50,6 +50,9 @@
     "production": {
       "distribution": "store",
       "autoIncrement": true,
+      "cache": {
+        "disabled": true
+      },
       "ios": {
         "simulator": false,
         "image": "latest"
