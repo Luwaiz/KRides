@@ -2,6 +2,7 @@ import { StyleSheet, Text, View, TouchableOpacity, Alert } from "react-native";
 import { PayWithFlutterwave } from "flutterwave-react-native";
 import React, { useState } from "react";
 import { FLUTTERWAVE_PUBLIC_KEY } from "@env";
+import Toast from "react-native-toast-message";
 
 const generateTransactionRef = (length) => {
 	var result = "";
@@ -39,36 +40,42 @@ const Payment = ({ email, amount, name, phoneNumber, BookRide, loading = false }
 		// point and takes ~350ms.  Any Alert.alert() or BookRide() call that reaches
 		// the native layer during that window triggers the iOS 26 SIGABRT
 		// "_presentViewController inside _runAlongsideCompletions" crash.
-		// Delaying by 750ms guarantees we are past the 400ms + 350ms window.
+		// Increased to 1500ms to be absolutely safe on newer/slower devices.
 		setTimeout(() => {
 			if (data.status === "completed" || data.status === "successful") {
 				const transactionId = data.transaction_id || data.flw_ref || data.tx_ref;
 				if (!transactionId) {
 					setTxRef(generateTransactionRef(10)); // allow retry
-					Alert.alert(
-						"Payment Reference Missing",
-						"Your payment went through but we couldn't get a reference number. Please contact support and we'll sort it out.",
-						[{ text: "OK" }]
-					);
+					Toast.show({
+						type: 'tomatoToast',
+						text1: 'Payment Reference Missing',
+						text2: "Your payment went through but we couldn't get a reference number. Please contact support.",
+						position: 'top',
+						visibilityTime: 6000,
+					});
 					return;
 				}
 				BookRide(transactionId);
 			} else if (data.status === "cancelled") {
 				setTxRef(generateTransactionRef(10)); // allow retry
-				Alert.alert(
-					"Payment Cancelled",
-					"You cancelled the payment. Tap 'Pay' below to try again.",
-					[{ text: "OK" }]
-				);
+				Toast.show({
+					type: 'tomatoToast',
+					text1: 'Payment Cancelled',
+					text2: "You cancelled the payment. Tap 'Pay' below to try again.",
+					position: 'top',
+					visibilityTime: 4000,
+				});
 			} else {
 				setTxRef(generateTransactionRef(10)); // allow retry
-				Alert.alert(
-					"Payment Failed",
-					"Your payment could not be completed. Please try again or use a different payment method.",
-					[{ text: "Try Again" }]
-				);
+				Toast.show({
+					type: 'tomatoToast',
+					text1: 'Payment Failed',
+					text2: "Your payment could not be completed. Please try again or use a different method.",
+					position: 'top',
+					visibilityTime: 5000,
+				});
 			}
-		}, 750);
+		}, 1500);
 	};
 
 	const handleOnAbort = () => {
@@ -76,12 +83,14 @@ const Payment = ({ email, amount, name, phoneNumber, BookRide, loading = false }
 		// UIKit dismiss is still in progress when this fires.
 		setTimeout(() => {
 			setTxRef(generateTransactionRef(10)); // allow retry
-			Alert.alert(
-				"Payment Cancelled",
-				"You cancelled the payment. Tap 'Pay' below to try again.",
-				[{ text: "OK" }]
-			);
-		}, 500);
+			Toast.show({
+				type: 'tomatoToast',
+				text1: 'Payment Cancelled',
+				text2: "You cancelled the payment. Tap 'Pay' below to try again.",
+				position: 'top',
+				visibilityTime: 4000,
+			});
+		}, 1500);
 	};
 
 	// Custom button component that receives onPress from Flutterwave

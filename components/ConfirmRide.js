@@ -157,81 +157,80 @@ const ConfirmRide = () => {
 		// Validation: Check if user is logged in
 		if (!UserId) {
 			setLoading(false);
-			Alert.alert(
-				"Session Expired",
-				"Please log in to book a ride.",
-				[
-					{
-						text: "OK",
-						onPress: async () => {
-							try {
-								await signOut(FIREBASE_AUTH);
-								clearAuth();
-								clearUser();
-							} catch (error) {
-								console.error("❌ Logout error:", error);
-							}
-						},
-					},
-				],
-				{ cancelable: false }
-			);
+			Toast.show({
+				type: 'tomatoToast',
+				text1: 'Session Expired',
+				text2: 'Please log in again to book a ride.',
+				position: 'top',
+			});
+			setTimeout(async () => {
+				try {
+					await signOut(FIREBASE_AUTH);
+					clearAuth();
+					clearUser();
+				} catch (error) {
+					console.error("❌ Logout error:", error);
+				}
+			}, 1000);
 			return;
 		}
 
 		// Validation: Check if Firebase Auth user matches store user
 		if (!currentUser || currentUser.uid !== UserId) {
 			setLoading(false);
-			Alert.alert(
-				"Authentication Error",
-				"Your session is out of sync. Please log in again.",
-				[
-					{
-						text: "OK",
-						onPress: async () => {
-							try {
-								await signOut(FIREBASE_AUTH);
-								clearAuth();
-								clearUser();
-							} catch (error) {
-								console.error("❌ Logout error:", error);
-							}
-						},
-					},
-				],
-				{ cancelable: false }
-			);
+			Toast.show({
+				type: 'tomatoToast',
+				text1: 'Authentication Error',
+				text2: 'Your session is out of sync. Please log in again.',
+				position: 'top',
+			});
+			setTimeout(async () => {
+				try {
+					await signOut(FIREBASE_AUTH);
+					clearAuth();
+					clearUser();
+				} catch (error) {
+					console.error("❌ Logout error:", error);
+				}
+			}, 1000);
 			return;
 		}
 
 		// Validation before booking
 		if (!pickupLocation || !destinationCoords) {
 			setLoading(false);
-			alert("Missing location information. Please go back and select pickup and destination again.");
+			Toast.show({
+				type: 'tomatoToast',
+				text1: 'Missing Info',
+				text2: "Pickup or destination not found. Please try again.",
+				position: 'top',
+			});
 			return;
 		}
 
 		if (!numberOfPassenger) {
 			setLoading(false);
-			alert("Please select number of passengers.");
+			Toast.show({
+				type: 'tomatoToast',
+				text1: 'Missing Info',
+				text2: "Please select number of passengers.",
+				position: 'top',
+			});
 			return;
 		}
 
 		// Validation: Check if user profile data is loaded
 		if (!email || !firstName) {
 			console.log("⚠️ Warning: User profile data incomplete");
-			console.log("   - Email:", email || "MISSING");
-			console.log("   - First Name:", firstName || "MISSING");
-			console.log("   - Last Name:", lastName || "MISSING");
 			setLoading(false);
-			Alert.alert(
-				"Profile Incomplete",
-				"Some of your profile information couldn't be loaded. This is usually temporary.\n\nDo you want to continue booking anyway?",
-				[
-					{ text: "Cancel", style: "cancel" },
-					{ text: "Continue Anyway", onPress: () => continueBooking(transactionId) },
-				]
-			);
+			// Use Toast for warning too
+			Toast.show({
+				type: 'tomatoToast',
+				text1: 'Profile Incomplete',
+				text2: "Some profile data is missing, but we will try to continue.",
+				position: 'top',
+			});
+			await continueBooking(transactionId);
 			return;
 		}
 
@@ -288,28 +287,39 @@ const ConfirmRide = () => {
 
 			// Navigate to home immediately after booking
 			console.log("🏠 Navigating to home page...");
-			setHomePage();
+			// Small delay before major UI change to ensure previous transitions/modals are clean
+			setTimeout(() => {
+				setHomePage();
+			}, 500);
 		} catch (error) {
 			console.error("❌ Error creating ride:", error);
 			if (error.code === "permission-denied") {
-				Alert.alert(
-					"Firebase Permission Error",
-					"The Firestore security rules are blocking ride creation. This is a Firebase Console configuration issue, not an app issue.\n\nPlease:\n1. Open Firebase Console\n2. Go to Firestore → Rules\n3. Update and publish the security rules.",
-					[{ text: "OK" }]
-				);
+				Toast.show({
+					type: 'tomatoToast',
+					text1: 'Database Error',
+					text2: "Permission denied. Please contact support.",
+					position: 'top',
+					visibilityTime: 5000,
+				});
 			} else if (
 				error.name === "AbortError" ||
 				error.message?.toLowerCase().includes("network") ||
 				error.message?.toLowerCase().includes("internet") ||
 				error.code === "unavailable"
 			) {
-				Alert.alert(
-					"No Internet Connection",
-					"Please check your connection and try again.",
-					[{ text: "OK" }]
-				);
+				Toast.show({
+					type: 'tomatoToast',
+					text1: 'Connection Error',
+					text2: "Please check your internet connection.",
+					position: 'top',
+				});
 			} else {
-				alert("Failed to create ride. Please try again.");
+				Toast.show({
+					type: 'tomatoToast',
+					text1: 'Booking Failed',
+					text2: "Failed to create ride. Please try again.",
+					position: 'top',
+				});
 			}
 		} finally {
 			bookingInFlight.current = false;

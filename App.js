@@ -34,11 +34,13 @@ if (!__DEV__) {
 		if (errorMessage.includes('FATAL') &&
 			!errorMessage.includes('Firebase: Error (auth/user-not-found)') &&
 			!errorMessage.includes('Firestore: Error (permission-denied)')) {
-			Alert.alert(
-				'System Error',
-				'A critical error occurred. Please restart the app or contact support.',
-				[{ text: 'OK' }]
-			);
+			Toast.show({
+				type: 'tomatoToast',
+				text1: 'System Error',
+				text2: 'A critical error occurred. Please restart the app or contact support.',
+				position: 'top',
+				visibilityTime: 5000,
+			});
 		}
 	};
 }
