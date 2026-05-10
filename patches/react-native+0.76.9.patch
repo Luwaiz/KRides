@@ -1,26 +1,30 @@
 diff --git a/node_modules/react-native/React/Fabric/Mounting/ComponentViews/Modal/RCTModalHostViewComponentView.mm b/node_modules/react-native/React/Fabric/Mounting/ComponentViews/Modal/RCTModalHostViewComponentView.mm
-index 9205fa3..42ce2d9 100644
+index 9205fa3..0ef58d1 100644
 --- a/node_modules/react-native/React/Fabric/Mounting/ComponentViews/Modal/RCTModalHostViewComponentView.mm
 +++ b/node_modules/react-native/React/Fabric/Mounting/ComponentViews/Modal/RCTModalHostViewComponentView.mm
-@@ -149,6 +149,21 @@ static ModalHostViewEventEmitter::OnOrientationChange onOrientationChangeStruct(
+@@ -133,8 +133,24 @@ static ModalHostViewEventEmitter::OnOrientationChange onOrientationChangeStruct(
+                      animated:(BOOL)animated
+                    completion:(void (^)(void))completion
  {
-   BOOL shouldBePresented = !_isPresented && _shouldPresent && self.window;
-   if (shouldBePresented) {
-+    // iOS 26 fix: presentViewController:animated:NO while a UIKit transition coordinator is
-+    // active causes the presenter to register an alongside completion block whose body is the
-+    // deferred _presentViewController:animated:completion: invocation. When that block fires
-+    // inside _runAlongsideCompletions, UIKit 26.1 throws "_presentViewController inside
-+    // _runAlongsideCompletions" → SIGABRT. Defer to the next run-loop cycle so the coordinator
-+    // is gone before we attempt the presentation.
-+    UIViewController *controller = [self reactViewController];
-+    if (controller.transitionCoordinator != nil) {
-+      __weak RCTModalHostViewComponentView *weakSelf = self;
-+      dispatch_async(dispatch_get_main_queue(), ^{
-+        [weakSelf ensurePresentedOnlyIfNeeded];
-+      });
++  // iOS 26 fix: calling presentViewController: while the UIKit main thread is inside
++  // _runAlongsideCompletions (e.g. during a navigation-push or modal-fade alongside block)
++  // throws "_presentViewController inside _runAlongsideCompletions" → SIGABRT. The
++  // transitionCoordinator guard in ensurePresentedOnlyIfNeeded is insufficient because iOS
++  // clears the coordinator before firing alongside completions, so the guard sees nil and
++  // proceeds. Deferring to the next main-queue cycle guarantees we are past _runAlongsideCompletions
++  // regardless of what transition triggered the update.
+   UIViewController *controller = [self reactViewController];
+-  [controller presentViewController:modalViewController animated:animated completion:completion];
++  __weak RCTModalHostViewComponentView *weakSelf = self;
++  __weak UIViewController *weakController = controller;
++  dispatch_async(dispatch_get_main_queue(), ^{
++    RCTModalHostViewComponentView *strongSelf = weakSelf;
++    UIViewController *strongController = weakController;
++    if (!strongSelf || !strongController || !strongSelf->_isPresented) {
 +      return;
 +    }
-+
-     self.viewController.presentationController.delegate = self;
++    [strongController presentViewController:modalViewController animated:animated completion:completion];
++  });
+ }
  
-     _isPresented = YES;
+ - (void)dismissViewController:(UIViewController *)modalViewController
