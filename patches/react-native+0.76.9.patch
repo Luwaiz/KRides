@@ -77,3 +77,96 @@ index 9205fa3..25ff090 100644
  }
  
  - (void)dismissViewController:(UIViewController *)modalViewController
+diff --git a/node_modules/react-native/React/Views/RCTModalHostViewManager.m b/node_modules/react-native/React/Views/RCTModalHostViewManager.m
+index 8407662..6b0df1a 100644
+--- a/node_modules/react-native/React/Views/RCTModalHostViewManager.m
++++ b/node_modules/react-native/React/Views/RCTModalHostViewManager.m
+@@ -60,13 +60,83 @@ RCT_EXPORT_MODULE()
+       modalHostView.onShow(nil);
+     }
+   };
++  // iOS 26 fix: calling presentViewController: while ANY VC in the presenter's hierarchy
++  // has an active transitionCoordinator causes iOS 26 to defer the call as an alongside
++  // completion block. When that block fires inside _runAlongsideCompletions, UIKit 26.1
++  // throws "_presentViewController inside _runAlongsideCompletions" -> SIGABRT.
++  //
++  // The original single dispatch_async only delays one run-loop cycle (~16ms), but UIKit
++  // transitions run for ~350ms. Recursively re-defer until the coordinator chain is clear,
++  // then present. Walks both the parent chain (nav controller push/pop) and the presented
++  // chain (foreign modal mid-dismiss).
++  [self _RCTKR_attemptPresentRetry:0
++                          hostView:modalHostView
++                    viewController:viewController
++                          animated:animated
++                   completionBlock:completionBlock];
++}
++
++- (void)_RCTKR_attemptPresentRetry:(NSInteger)attempts
++                          hostView:(RCTModalHostView *)modalHostView
++                    viewController:(RCTModalHostViewController *)viewController
++                          animated:(BOOL)animated
++                   completionBlock:(dispatch_block_t)completionBlock
++{
++  __weak RCTModalHostViewManager *weakSelf = self;
++  __weak RCTModalHostView *weakHostView = modalHostView;
+   dispatch_async(dispatch_get_main_queue(), ^{
+-    if (self->_presentationBlock) {
+-      self->_presentationBlock([modalHostView reactViewController], viewController, animated, completionBlock);
++    RCTModalHostViewManager *strongSelf = weakSelf;
++    RCTModalHostView *strongHostView = weakHostView;
++    if (!strongSelf || !strongHostView || !viewController) {
++      return;
++    }
++    UIViewController *reactVC = [strongHostView reactViewController];
++    if (!reactVC) {
++      return;
++    }
++    // Bail out if already presented (re-entrant call protection).
++    if (viewController.presentingViewController != nil) {
++      return;
++    }
++
++    UIViewController *presenter = [strongSelf _topMostViewControllerFrom:reactVC];
++
++    // Walk parent chain (catches UINavigationController push/pop coordinator).
++    BOOL hasActiveCoordinator = NO;
++    UIViewController *vc = presenter;
++    while (vc != nil) {
++      if (vc.transitionCoordinator != nil) {
++        hasActiveCoordinator = YES;
++        break;
++      }
++      vc = vc.parentViewController;
++    }
++    // Walk down through presented chain (catches foreign modal mid-dismiss).
++    if (!hasActiveCoordinator) {
++      UIViewController *p = reactVC.presentedViewController;
++      while (p != nil) {
++        if (p.transitionCoordinator != nil) {
++          hasActiveCoordinator = YES;
++          break;
++        }
++        p = p.presentedViewController;
++      }
++    }
++
++    if (hasActiveCoordinator && attempts < 60) {
++      // ~16ms per retry, max ~960ms total — covers the longest UIKit modal/nav transition.
++      [strongSelf _RCTKR_attemptPresentRetry:attempts + 1
++                                    hostView:strongHostView
++                              viewController:viewController
++                                    animated:animated
++                             completionBlock:completionBlock];
++      return;
++    }
++
++    if (strongSelf->_presentationBlock) {
++      strongSelf->_presentationBlock(reactVC, viewController, animated, completionBlock);
+     } else {
+-      [[self _topMostViewControllerFrom:[modalHostView reactViewController]] presentViewController:viewController
+-                                                                                          animated:animated
+-                                                                                        completion:completionBlock];
++      [presenter presentViewController:viewController animated:animated completion:completionBlock];
+     }
+   });
+ }
