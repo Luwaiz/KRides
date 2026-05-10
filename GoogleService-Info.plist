@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>1054058095059-sdh3vi72m9r3jpqnue9dpauepn64e7mu.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.1054058095059-sdh3vi72m9r3jpqnue9dpauepn64e7mu</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>1054058095059-6r2gsmqjokkb7rl59rlqejoscflebld4.apps.googleusercontent.com</string>
+	<key>API_KEY</key>
+	<string>AIzaSyB59DSubzPcNuQkfYrNv_pfhBtJX_rqPI4</string>
+	<key>GCM_SENDER_ID</key>
+	<string>1054058095059</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.eluwaiz.KRides</string>
+	<key>PROJECT_ID</key>
+	<string>kampusride</string>
+	<key>STORAGE_BUCKET</key>
+	<string>kampusride.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:1054058095059:ios:ea652b8014b9c324818f26</string>
+</dict>
+</plist>

@@ -34,11 +34,13 @@ if (!__DEV__) {
 		if (errorMessage.includes('FATAL') &&
 			!errorMessage.includes('Firebase: Error (auth/user-not-found)') &&
 			!errorMessage.includes('Firestore: Error (permission-denied)')) {
-			Alert.alert(
-				'System Error',
-				'A critical error occurred. Please restart the app or contact support.',
-				[{ text: 'OK' }]
-			);
+			Toast.show({
+				type: 'tomatoToast',
+				text1: 'System Error',
+				text2: 'A critical error occurred. Please restart the app or contact support.',
+				position: 'top',
+				visibilityTime: 5000,
+			});
 		}
 	};
 }
@@ -49,10 +51,8 @@ configureReanimatedLogger({
 	level: ReanimatedLogLevel.warn,
 	strict: false, // Reanimated runs in strict mode by default
 });
-export default function App() {
+function App() {
 	const fontLoaded = FontResources();
-
-	// Removed Firebase notification setup - not supported in React Native with Web SDK
 
 	if (!fontLoaded) {
 		return null;
@@ -72,6 +72,8 @@ export default function App() {
 		);
 	}
 }
+
+export default App;
 
 const styles = StyleSheet.create({
 	container: {

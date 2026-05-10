@@ -1,9 +1,29 @@
 import { StyleSheet, Text, View, TouchableOpacity, Alert } from "react-native";
 import { PayWithFlutterwave } from "flutterwave-react-native";
-import React from "react";
+import React, { useState } from "react";
 import { FLUTTERWAVE_PUBLIC_KEY } from "@env";
+import Toast from "react-native-toast-message";
+
+const generateTransactionRef = (length) => {
+	var result = "";
+	var characters =
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+	for (var i = 0; i < length; i++) {
+		result += characters.charAt(
+			Math.floor(Math.random() * characters.length)
+		);
+	}
+	return `flw_tx_ref_${result}`;
+};
 
 const Payment = ({ email, amount, name, phoneNumber, BookRide, loading = false }) => {
+	// txRef as state so it can be refreshed on cancel/failure, letting the user
+	// retry payment.  PayWithFlutterwaveBase checks reference===options.tx_ref to
+	// detect a duplicate attempt — a new value clears that check for the next tap.
+	// We only ever call setTxRef inside the 750ms setTimeout (below), so the
+	// resulting re-render is well past the Flutterwave dismiss animation window.
+	const [txRef, setTxRef] = useState(() => generateTransactionRef(10));
+
 	// Safety check for required data
 	if (!amount || amount <= 0) {
 		console.error("❌ Invalid amount for payment:", amount);
@@ -15,50 +35,62 @@ const Payment = ({ email, amount, name, phoneNumber, BookRide, loading = false }
 	}
 
 	const handleOnRedirect = (data) => {
-		if (data.status === "completed" || data.status === "successful") {
-			const transactionId = data.transaction_id || data.flw_ref || data.tx_ref;
-			if (!transactionId) {
-				Alert.alert(
-					"Payment Reference Missing",
-					"Your payment went through but we couldn't get a reference number. Please contact support and we'll sort it out.",
-					[{ text: "OK" }]
-				);
-				return;
+		// Flutterwave calls onRedirect AFTER its own 400ms animateOut() completes,
+		// then sets Modal visible=false — the UIKit dismiss transition starts at that
+		// point and takes ~350ms.  Any Alert.alert() or BookRide() call that reaches
+		// the native layer during that window triggers the iOS 26 SIGABRT
+		// "_presentViewController inside _runAlongsideCompletions" crash.
+		// Increased to 1500ms to be absolutely safe on newer/slower devices.
+		setTimeout(() => {
+			if (data.status === "completed" || data.status === "successful") {
+				const transactionId = data.transaction_id || data.flw_ref || data.tx_ref;
+				if (!transactionId) {
+					setTxRef(generateTransactionRef(10)); // allow retry
+					Toast.show({
+						type: 'tomatoToast',
+						text1: 'Payment Reference Missing',
+						text2: "Your payment went through but we couldn't get a reference number. Please contact support.",
+						position: 'top',
+						visibilityTime: 6000,
+					});
+					return;
+				}
+				BookRide(transactionId);
+			} else if (data.status === "cancelled") {
+				setTxRef(generateTransactionRef(10)); // allow retry
+				Toast.show({
+					type: 'tomatoToast',
+					text1: 'Payment Cancelled',
+					text2: "You cancelled the payment. Tap 'Pay' below to try again.",
+					position: 'top',
+					visibilityTime: 4000,
+				});
+			} else {
+				setTxRef(generateTransactionRef(10)); // allow retry
+				Toast.show({
+					type: 'tomatoToast',
+					text1: 'Payment Failed',
+					text2: "Your payment could not be completed. Please try again or use a different method.",
+					position: 'top',
+					visibilityTime: 5000,
+				});
 			}
-			BookRide(transactionId);
-		} else if (data.status === "cancelled") {
-			Alert.alert(
-				"Payment Cancelled",
-				"You cancelled the payment. Tap 'Pay' below to try again.",
-				[{ text: "OK" }]
-			);
-		} else {
-			Alert.alert(
-				"Payment Failed",
-				"Your payment could not be completed. Please try again or use a different payment method.",
-				[{ text: "Try Again" }]
-			);
-		}
+		}, 1500);
 	};
 
 	const handleOnAbort = () => {
-		Alert.alert(
-			"Payment Cancelled",
-			"You cancelled the payment. Tap 'Pay' below to try again.",
-			[{ text: "OK" }]
-		);
-	};
-
-	const generateTransactionRef = (length) => {
-		var result = "";
-		var characters =
-			"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-		for (var i = 0; i < length; i++) {
-			result += characters.charAt(
-				Math.floor(Math.random() * characters.length)
-			);
-		}
-		return `flw_tx_ref_${result}`;
+		// Same timing fix — Flutterwave calls onAbort after animateOut(), so the
+		// UIKit dismiss is still in progress when this fires.
+		setTimeout(() => {
+			setTxRef(generateTransactionRef(10)); // allow retry
+			Toast.show({
+				type: 'tomatoToast',
+				text1: 'Payment Cancelled',
+				text2: "You cancelled the payment. Tap 'Pay' below to try again.",
+				position: 'top',
+				visibilityTime: 4000,
+			});
+		}, 1500);
 	};
 
 	// Custom button component that receives onPress from Flutterwave
@@ -91,7 +123,7 @@ const Payment = ({ email, amount, name, phoneNumber, BookRide, loading = false }
 				onWillInitialize={() => {}}
 				onDidInitialize={() => {}}
 				options={{
-					tx_ref: generateTransactionRef(10),
+					tx_ref: txRef,
 					authorization: FLUTTERWAVE_PUBLIC_KEY,
 					customer: {
 						email: email || "customer@kampusride.com",

@@ -1,0 +1,38 @@
+diff --git a/node_modules/react-native-screens/ios/RNSScreenStack.mm b/node_modules/react-native-screens/ios/RNSScreenStack.mm
+index bfeeb00..40d526b 100644
+--- a/node_modules/react-native-screens/ios/RNSScreenStack.mm
++++ b/node_modules/react-native-screens/ios/RNSScreenStack.mm
+@@ -548,6 +548,17 @@ RNS_IGNORE_SUPER_CALL_END
+       // See: https://github.com/software-mansion/react-native-screens/issues/2048
+       // For now, to mitigate the issue, we also decide to trigger its dismissal before
+       // starting the presentation chain down below in finish() callback.
++      //
++      // iOS 26 fix: if the modal is already being dismissed by another caller (e.g., by
++      // RCTModalHostViewComponentView in Fabric), calling dismissViewControllerAnimated: a
++      // second time while the transition coordinator is active registers an alongside block
++      // that fires presentViewController inside _runAlongsideCompletions → SIGABRT.
++      // Skip the redundant dismiss and run finish() directly so any new controllers can still
++      // be presented after the in-progress dismissal completes.
++      if (firstModalToBeDismissed.beingDismissed) {
++        finish();
++        return;
++      }
+       [changeRootController dismissViewControllerAnimated:shouldAnimate completion:finish];
+       return;
+     }
+@@ -605,7 +616,14 @@ RNS_IGNORE_SUPER_CALL_END
+           }
+           completion:^(id<UIViewControllerTransitionCoordinatorContext> _Nonnull context) {
+             self->_updateScheduled = NO;
+-            [weakSelf updateContainer];
++            // On iOS 26, _runAlongsideCompletions runs this completion block during
++            // the modal dismiss transition. If updateContainer calls presentViewController
++            // here (e.g. for a pending navigation update), iOS 26 SIGABRTs with
++            // "_presentViewController inside _runAlongsideCompletions". Deferring to the
++            // next main-queue cycle lets the transition context unwind first.
++            dispatch_async(dispatch_get_main_queue(), ^{
++              [weakSelf updateContainer];
++            });
+           }];
+     }
+     return;

@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { ActivityIndicator, View, Alert } from "react-native";
+import { ActivityIndicator, View, Alert, StyleSheet } from "react-native";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { FIREBASE_AUTH, FIREBASE_DB } from "../firebaseConfig";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Toast from "react-native-toast-message";
 import useAuthStore, {
 	useUserDetails,
 	useDriverDetails,
@@ -14,7 +15,7 @@ import useAuthStore, {
 // Screens and Navigators
 import OnBoarding from "../screens/OnBoarding";
 import AuthStack from "./AuthStack";
-import DrawerNavigator from "./DrawerNavigator"; // for customers (with drawer)
+import AppStackNavigator from "./AppStack"; // for customers
 import DriverDrawer from "./DriverDrawer"; // for drivers (with drawer)
 
 const Stack = createNativeStackNavigator();
@@ -132,11 +133,14 @@ const Navigation = () => {
 						console.error("❌ Error fetching user role:", error.message);
 
 						if (error.code === "permission-denied") {
-							Alert.alert(
-								"Setup Required",
-								"Your account was created successfully, but the app cannot load your profile due to database security settings.\n\nPlease contact support.",
-								[{ text: "OK" }]
-							);
+							// Use Toast instead of Alert to avoid native presentation crashes during navigation transitions
+							Toast.show({
+								type: 'tomatoToast',
+								text1: 'Setup Required',
+								text2: 'Account created, but profile loading is blocked by security settings. Please contact support.',
+								position: 'top',
+								visibilityTime: 6000,
+							});
 						}
 
 						if (!mounted) return;
@@ -181,40 +185,44 @@ const Navigation = () => {
 		};
 	}, []); // No deps — onAuthStateChanged is persistent; role is read via getState() not closure
 
-	if (initializing || (user && !storeRole) || hasSeenOnboarding === null) {
-		return (
-			<View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-				<ActivityIndicator size="large" color="#007bff" />
-			</View>
-		);
-	}
+	// Determine if we should show the global loading overlay
+	const showLoading = initializing || (user && !storeRole) || hasSeenOnboarding === null;
 
 	return (
-		<NavigationContainer>
-			<Stack.Navigator screenOptions={{ headerShown: false }}>
-				{/* If user not logged in */}
-				{!user ? (
-					<>
-						{!hasSeenOnboarding && <Stack.Screen name="OnBoarding" component={OnBoarding} />}
-						<Stack.Screen name="AuthStack" component={AuthStack} />
-					</>
-				) : storeRole === "driver" ? (
-					// Driver logged in - use key to force remount when role changes
-					<Stack.Screen
-						key="driver-drawer"
-						name="DriverDrawer"
-						component={DriverDrawer}
-					/>
-				) : (
-					// Customer logged in - use key to force remount when role changes
-					<Stack.Screen
-						key="customer-drawer"
-						name="AppStack"
-						component={DrawerNavigator}
-					/>
-				)}
-			</Stack.Navigator>
-		</NavigationContainer>
+		<View style={{ flex: 1 }}>
+			<NavigationContainer>
+				<Stack.Navigator screenOptions={{ headerShown: false }}>
+					{/* If user not logged in */}
+					{!user ? (
+						<>
+							{hasSeenOnboarding === false && <Stack.Screen name="OnBoarding" component={OnBoarding} />}
+							<Stack.Screen name="AuthStack" component={AuthStack} />
+						</>
+					) : storeRole === "driver" ? (
+						// Driver logged in - use key to force remount when role changes
+						<Stack.Screen
+							key="driver-drawer"
+							name="DriverDrawer"
+							component={DriverDrawer}
+						/>
+					) : (
+						// Customer logged in - use key to force remount when role changes
+						<Stack.Screen
+							key="customer-stack"
+							name="AppStack"
+							component={AppStackNavigator}
+						/>
+					)}
+				</Stack.Navigator>
+			</NavigationContainer>
+
+			{/* Global Loading Overlay — avoids unmounting NavigationContainer */}
+			{showLoading && (
+				<View style={[StyleSheet.absoluteFill, { justifyContent: "center", alignItems: "center", backgroundColor: 'white' }]}>
+					<ActivityIndicator size="large" color="#007bff" />
+				</View>
+			)}
+		</View>
 	);
 };
 

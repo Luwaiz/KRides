@@ -20,8 +20,9 @@
         "FIREBASE_APP_ID": "1:1054058095059:web:ff2a3c61ad63d32d818f26",
         "FIREBASE_MEASUREMENT_ID": "G-GJK6Q51CPP",
         "GOOGLE_MAPS_API_KEY": "AIzaSyB7fe6OfWqZs2BP0AoZS-2jLi5mIVbiYTM",
-        "GOOGLE_WEB_CLIENT_ID": "$GOOGLE_WEB_CLIENT_ID",
-        "NOTIFICATION_API_KEY": "$NOTIFICATION_API_KEY"
+        "GOOGLE_WEB_CLIENT_ID": "1054058095059-6j788gaiqicduqgt1jo322hsvb7ums7b.apps.googleusercontent.com",
+        "NOTIFICATION_API_KEY": "a282ae645ab255aa580ceea91dedd3c6bd92b9bafc8189bbb77b62e408c1c177",
+        "FLUTTERWAVE_PUBLIC_KEY": "FLWPUBK_TEST-1c7224ec1e2677cd1261b0fa3bbc0453-X"
       }
     },
     "preview": {
@@ -41,13 +42,17 @@
         "FIREBASE_APP_ID": "1:1054058095059:web:ff2a3c61ad63d32d818f26",
         "FIREBASE_MEASUREMENT_ID": "G-GJK6Q51CPP",
         "GOOGLE_MAPS_API_KEY": "AIzaSyB7fe6OfWqZs2BP0AoZS-2jLi5mIVbiYTM",
-        "GOOGLE_WEB_CLIENT_ID": "$GOOGLE_WEB_CLIENT_ID",
-        "NOTIFICATION_API_KEY": "$NOTIFICATION_API_KEY"
+        "GOOGLE_WEB_CLIENT_ID": "1054058095059-6j788gaiqicduqgt1jo322hsvb7ums7b.apps.googleusercontent.com",
+        "NOTIFICATION_API_KEY": "a282ae645ab255aa580ceea91dedd3c6bd92b9bafc8189bbb77b62e408c1c177",
+        "FLUTTERWAVE_PUBLIC_KEY": "FLWPUBK_TEST-1c7224ec1e2677cd1261b0fa3bbc0453-X"
       }
     },
     "production": {
       "distribution": "store",
       "autoIncrement": true,
+      "cache": {
+        "disabled": true
+      },
       "ios": {
         "simulator": false,
         "image": "latest"
@@ -64,8 +69,9 @@
         "FIREBASE_APP_ID": "1:1054058095059:web:ff2a3c61ad63d32d818f26",
         "FIREBASE_MEASUREMENT_ID": "G-GJK6Q51CPP",
         "GOOGLE_MAPS_API_KEY": "AIzaSyB7fe6OfWqZs2BP0AoZS-2jLi5mIVbiYTM",
-        "GOOGLE_WEB_CLIENT_ID": "$GOOGLE_WEB_CLIENT_ID",
-        "NOTIFICATION_API_KEY": "$NOTIFICATION_API_KEY"
+        "GOOGLE_WEB_CLIENT_ID": "1054058095059-6j788gaiqicduqgt1jo322hsvb7ums7b.apps.googleusercontent.com",
+        "NOTIFICATION_API_KEY": "a282ae645ab255aa580ceea91dedd3c6bd92b9bafc8189bbb77b62e408c1c177",
+        "FLUTTERWAVE_PUBLIC_KEY": "FLWPUBK_TEST-1c7224ec1e2677cd1261b0fa3bbc0453-X"
       }
     }
   },

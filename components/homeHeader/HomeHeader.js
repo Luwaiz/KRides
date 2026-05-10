@@ -1,8 +1,7 @@
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Pressable } from "react-native";
 import React from "react";
 import { Octicons } from "@expo/vector-icons";
-import { DrawerActions, useNavigation } from "@react-navigation/native";
-import { TouchableOpacity } from "react-native-gesture-handler";
+import { useNavigation } from "@react-navigation/native";
 import { colors } from "../../constants/styling";
 
 const HomeHeader = () => {
@@ -11,15 +10,12 @@ const HomeHeader = () => {
 		navigation.navigate("Settings");
 	};
 	return (
-		<TouchableOpacity
+		<Pressable
 			style={styles.drawerNav}
-			activeOpacity={0.7}
 			onPress={OpenSettings}
 		>
-			<View>
-				<Octicons name="three-bars" size={24} color="black" />
-			</View>
-		</TouchableOpacity>
+			<Octicons name="three-bars" size={24} color="black" />
+		</Pressable>
 	);
 };
 

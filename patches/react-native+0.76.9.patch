@@ -1,0 +1,30 @@
+diff --git a/node_modules/react-native/React/Fabric/Mounting/ComponentViews/Modal/RCTModalHostViewComponentView.mm b/node_modules/react-native/React/Fabric/Mounting/ComponentViews/Modal/RCTModalHostViewComponentView.mm
+index 9205fa3..0ef58d1 100644
+--- a/node_modules/react-native/React/Fabric/Mounting/ComponentViews/Modal/RCTModalHostViewComponentView.mm
++++ b/node_modules/react-native/React/Fabric/Mounting/ComponentViews/Modal/RCTModalHostViewComponentView.mm
+@@ -133,8 +133,24 @@ static ModalHostViewEventEmitter::OnOrientationChange onOrientationChangeStruct(
+                      animated:(BOOL)animated
+                    completion:(void (^)(void))completion
+ {
++  // iOS 26 fix: calling presentViewController: while the UIKit main thread is inside
++  // _runAlongsideCompletions (e.g. during a navigation-push or modal-fade alongside block)
++  // throws "_presentViewController inside _runAlongsideCompletions" → SIGABRT. The
++  // transitionCoordinator guard in ensurePresentedOnlyIfNeeded is insufficient because iOS
++  // clears the coordinator before firing alongside completions, so the guard sees nil and
++  // proceeds. Deferring to the next main-queue cycle guarantees we are past _runAlongsideCompletions
++  // regardless of what transition triggered the update.
+   UIViewController *controller = [self reactViewController];
+-  [controller presentViewController:modalViewController animated:animated completion:completion];
++  __weak RCTModalHostViewComponentView *weakSelf = self;
++  __weak UIViewController *weakController = controller;
++  dispatch_async(dispatch_get_main_queue(), ^{
++    RCTModalHostViewComponentView *strongSelf = weakSelf;
++    UIViewController *strongController = weakController;
++    if (!strongSelf || !strongController || !strongSelf->_isPresented) {
++      return;
++    }
++    [strongController presentViewController:modalViewController animated:animated completion:completion];
++  });
+ }
+ 
+ - (void)dismissViewController:(UIViewController *)modalViewController
