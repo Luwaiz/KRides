@@ -361,6 +361,10 @@ app.post('/api/notifications/notify-drivers', async (req, res) => {
                     }
                 );
                 results.push({ driverId: doc.id, ...result });
+                if (result.permanent) {
+                    await db.collection('drivers').doc(doc.id).update({ fcmToken: null });
+                    console.log(`🧹 Cleared stale FCM token for driver ${doc.id}`);
+                }
             } else {
                 console.log(`⚠️ Driver ${doc.id} has no push token`);
             }
@@ -429,6 +433,10 @@ app.post('/api/notifications/ride-accepted', async (req, res) => {
                 rideId: String(rideId),
             }
         );
+        if (result.permanent) {
+            await db.collection('users').doc(customerId).update({ fcmToken: null });
+            console.log(`🧹 Cleared stale FCM token for customer ${customerId}`);
+        }
 
         res.json(result);
     } catch (error) {
@@ -485,6 +493,10 @@ app.post('/api/notifications/ride-completed', async (req, res) => {
                 rideId: String(rideId),
             }
         );
+        if (result.permanent) {
+            await db.collection('users').doc(customerId).update({ fcmToken: null });
+            console.log(`🧹 Cleared stale FCM token for customer ${customerId}`);
+        }
 
         res.json(result);
     } catch (error) {
@@ -542,6 +554,10 @@ app.post('/api/notifications/notify-driver-arrived', async (req, res) => {
                 driverName: String(driverName),
             }
         );
+        if (result.permanent) {
+            await db.collection('users').doc(customerId).update({ fcmToken: null });
+            console.log(`🧹 Cleared stale FCM token for customer ${customerId}`);
+        }
 
         console.log('✅ Driver arrival notification sent');
         res.json(result);
