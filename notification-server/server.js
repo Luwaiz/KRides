@@ -8,7 +8,7 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
-app.use(cors());
+app.use(cors({ origin: false }));
 app.use(express.json());
 
 // API key authentication — all /api/* routes require a valid key.
@@ -570,8 +570,83 @@ app.post('/api/notifications/notify-driver-arrived', async (req, res) => {
     }
 });
 
+// Submit a driver rating (customer → driver)
+app.post('/api/rides/rate', async (req, res) => {
+    const decoded = await verifyFirebaseToken(req);
+    if (!decoded) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { rideId, driverId, rating, feedback } = req.body;
+
+    if (!rideId || !driverId) {
+        return res.status(400).json({ error: 'rideId and driverId are required' });
+    }
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+        return res.status(400).json({ error: 'rating must be an integer 1–5' });
+    }
+
+    try {
+        const rideRef = db.collection('rides').doc(rideId);
+        const rideSnap = await rideRef.get();
+
+        if (!rideSnap.exists) {
+            return res.status(404).json({ error: 'Ride not found' });
+        }
+
+        const ride = rideSnap.data();
+
+        if (ride.customerId !== decoded.uid) {
+            return res.status(403).json({ error: 'Forbidden — not your ride' });
+        }
+
+        if (ride.customerRating) {
+            return res.status(409).json({ error: 'Already rated' });
+        }
+
+        const now = new Date();
+        const batch = db.batch();
+
+        batch.update(db.collection('drivers').doc(driverId), {
+            ratings: admin.firestore.FieldValue.arrayUnion({
+                rideId,
+                rating,
+                feedback: (feedback || '').trim(),
+                createdAt: now,
+            }),
+            totalRatings: admin.firestore.FieldValue.increment(1),
+            ratingSum: admin.firestore.FieldValue.increment(rating),
+        });
+
+        batch.set(rideRef, {
+            customerRating: rating,
+            customerFeedback: (feedback || '').trim(),
+            ratedAt: now,
+        }, { merge: true });
+
+        await batch.commit();
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('❌ Error submitting rating:', error);
+        res.status(500).json({ error: 'Failed to submit rating. Please try again.' });
+    }
+});
+
+// Verify Firebase ID token — returns decoded token or null
+async function verifyFirebaseToken(req) {
+    const auth = req.headers.authorization;
+    if (!auth || !auth.startsWith('Bearer ')) return null;
+    try {
+        return await admin.auth().verifyIdToken(auth.slice(7));
+    } catch {
+        return null;
+    }
+}
+
 // Process a refund via Flutterwave
 app.post('/api/payments/refund', async (req, res) => {
+    const decoded = await verifyFirebaseToken(req);
+    if (!decoded) return res.status(401).json({ error: 'Unauthorized' });
+
     const { transactionId, amount, comments } = req.body;
 
     if (!transactionId) {
@@ -620,6 +695,9 @@ app.post('/api/payments/refund', async (req, res) => {
 
 // Check refund status
 app.get('/api/payments/refund/:refundId', async (req, res) => {
+    const decoded = await verifyFirebaseToken(req);
+    if (!decoded) return res.status(401).json({ error: 'Unauthorized' });
+
     const { refundId } = req.params;
     const secretKey = process.env.FLUTTERWAVE_SECRET_KEY;
 
@@ -650,6 +728,9 @@ app.get('/api/payments/refund/:refundId', async (req, res) => {
 
 // Create Flutterwave subaccount for driver payouts
 app.post('/api/payments/create-subaccount', async (req, res) => {
+    const decoded = await verifyFirebaseToken(req);
+    if (!decoded) return res.status(401).json({ error: 'Unauthorized' });
+
     const { bankCode, accountNumber, accountName, businessName, phone } = req.body;
 
     if (!bankCode || !accountNumber || !accountName) {
@@ -693,6 +774,39 @@ app.post('/api/payments/create-subaccount', async (req, res) => {
     }
 });
 
+// In-memory rate limiter for /api/auth/driver-email
+// Tracks { attempts, resetAt } per normalized phone number.
+// Simple Map is sufficient for a single-instance Render deployment.
+const driverEmailRateLimit = new Map();
+const DRIVER_EMAIL_MAX_ATTEMPTS = 5;
+const DRIVER_EMAIL_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+
+function checkDriverEmailRateLimit(phone) {
+    const now = Date.now();
+    const entry = driverEmailRateLimit.get(phone);
+
+    if (entry && now < entry.resetAt) {
+        if (entry.attempts >= DRIVER_EMAIL_MAX_ATTEMPTS) {
+            const retryAfterSec = Math.ceil((entry.resetAt - now) / 1000);
+            return { blocked: true, retryAfterSec };
+        }
+        entry.attempts++;
+        return { blocked: false };
+    }
+
+    // New window
+    driverEmailRateLimit.set(phone, { attempts: 1, resetAt: now + DRIVER_EMAIL_WINDOW_MS });
+    return { blocked: false };
+}
+
+// Sweep stale entries every 30 minutes so the Map doesn't grow forever
+setInterval(() => {
+    const now = Date.now();
+    for (const [key, val] of driverEmailRateLimit) {
+        if (now >= val.resetAt) driverEmailRateLimit.delete(key);
+    }
+}, 30 * 60 * 1000);
+
 /**
  * POST /api/auth/driver-email
  * Look up a driver's email by phone number.
@@ -719,6 +833,15 @@ app.post('/api/auth/driver-email', async (req, res) => {
 
     if (!normalized) {
         return res.status(400).json({ error: 'Invalid Nigerian phone number format' });
+    }
+
+    const rateCheck = checkDriverEmailRateLimit(normalized);
+    if (rateCheck.blocked) {
+        console.warn(`🚫 Rate limit hit for driver-email lookup: ${normalized}`);
+        return res.status(429).json({
+            error: 'Too many attempts. Please wait before trying again.',
+            retryAfterSeconds: rateCheck.retryAfterSec,
+        });
     }
 
     try {
@@ -1000,11 +1123,11 @@ app.post('/api/wallet/pay-ride', async (req, res) => {
             // Create ride
             txn.set(rideRef, {
                 customerId: userId,
-                customerName: rideData.customerName || 'Customer',
-                customerPhone: rideData.customerPhone || '',
-                pickupLocation: rideData.pickupLocation,
+                customerName: (rideData.customerName || 'Customer').trim(),
+                customerPhone: (rideData.customerPhone || '').trim(),
+                pickupLocation: (rideData.pickupLocation || '').trim(),
                 pickupCoords: rideData.pickupCoords || null,
-                destination: rideData.destination,
+                destination: (rideData.destination || '').trim(),
                 destinationCoords: rideData.destinationCoords || null,
                 numberOfPassengers: rideData.numberOfPassengers || 1,
                 amount,
