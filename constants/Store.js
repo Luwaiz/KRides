@@ -56,6 +56,7 @@ export const useDriverDetails = create((set) => ({
 	accountNumber: "",
 	accountName: "",
 	bankDetailsVerified: false,
+	bankDetailsSkipped: false,
 	// Actions
 	setDriverProfile: (profile) =>
 		set({
@@ -73,6 +74,7 @@ export const useDriverDetails = create((set) => ({
 			accountNumber: profile.accountNumber || "",
 			accountName: profile.accountName || "",
 			bankDetailsVerified: profile.bankDetailsVerified || false,
+			bankDetailsSkipped: profile.bankDetailsSkipped || false,
 		}),
 	setFullName: (fullName) => set({ fullName }),
 	setPhone: (phone) => set({ phone }),
@@ -98,6 +100,7 @@ export const useDriverDetails = create((set) => ({
 			accountNumber: "",
 			accountName: "",
 			bankDetailsVerified: false,
+			bankDetailsSkipped: false,
 		}),
 	clearDriver: () =>
 		set({
@@ -115,6 +118,7 @@ export const useDriverDetails = create((set) => ({
 			accountNumber: "",
 			accountName: "",
 			bankDetailsVerified: false,
+			bankDetailsSkipped: false,
 		}),
 }));
 
@@ -254,7 +258,7 @@ export const useActiveRideStore = create((set) => ({
 
 // Store for driver availability (online/offline status)
 export const useDriverAvailability = create((set) => ({
-	isOnline: true,
+	isOnline: false,
 	setOnline: () => set({ isOnline: true }),
 	setOffline: () => set({ isOnline: false }),
 	toggleAvailability: () => set((state) => ({ isOnline: !state.isOnline })),

@@ -73,7 +73,10 @@ const DriverSettings = ({ navigation }) => {
 					/>
 					<Text style={styles.iconText}>Ride history</Text>
 				</Pressable>
-				<Pressable style={styles.iconContainer}>
+				<Pressable
+					style={styles.iconContainer}
+					onPress={() => navigation.navigate("DriverEarnings")}
+				>
 					<Entypo name="wallet" size={35} color={colors.primaryBlue} />
 					<Text style={styles.iconText}>Wallet</Text>
 				</Pressable>
@@ -93,7 +96,10 @@ const DriverSettings = ({ navigation }) => {
 					<Ionicons name="settings" size={20} color="black" />
 					<Text style={styles.optionText}>Edit Profile</Text>
 				</Pressable>
-				<Pressable style={styles.options}>
+				<Pressable
+					style={styles.options}
+					onPress={() => navigation.navigate("Support")}
+				>
 					<MaterialIcons name="support-agent" size={20} color="black" />
 					<Text style={styles.optionText}>Support</Text>
 				</Pressable>

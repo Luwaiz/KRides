@@ -71,7 +71,6 @@ const Settings = ({ navigation }) => {
 		fetchUserProfile();
 	}, []);
 
-	console.log("User details in Settings:", user.email);
 	return (
 		<SafeAreaView style={styles.container}>
 			<View style={styles.topContainer}>

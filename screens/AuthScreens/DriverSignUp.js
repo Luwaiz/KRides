@@ -42,7 +42,12 @@ const DriverSignup = ({ navigation }) => {
 	};
 
 	const isPasswordValid = (password) => {
-		return password.length >= 8;
+		return (
+			password.length >= 8 &&
+			/[A-Z]/.test(password) &&
+			/[0-9]/.test(password) &&
+			/[^A-Za-z0-9]/.test(password)
+		);
 	};
 
 	const isEmailValid = (email) => {
@@ -99,7 +104,7 @@ const DriverSignup = ({ navigation }) => {
 		if (!isPasswordValid(password)) {
 			Alert.alert(
 				"Weak Password",
-				"Please choose a stronger password (at least 8 characters) 🔒"
+				"Password must be at least 8 characters and include an uppercase letter, a number, and a special character (e.g. @, #, !)."
 			);
 			return false;
 		}
@@ -118,20 +123,24 @@ const DriverSignup = ({ navigation }) => {
 	const handleSignUp = async (password, confirmPassword) => {
 		setLoading(true);
 
-		// Simple validation
-		if (!validateForm()) {
-			setLoading(false);
-			return;
-		}
-
-		// Normalize phone to local 11-digit format before storing
-		const normalizedPhone = Firebase.normalizeNigerianPhone(phone);
-		if (!normalizedPhone) {
-			Alert.alert("Invalid Phone Number", "Please enter a valid Nigerian phone number (e.g. 08012345678).");
-			return;
-		}
-
 		try {
+			if (!validateForm()) {
+				setLoading(false);
+				return;
+			}
+
+			const normalizedPhone = Firebase.normalizeNigerianPhone(phone);
+			if (!normalizedPhone) {
+				setLoading(false);
+				Alert.alert("Invalid Phone Number", "Please enter a valid Nigerian phone number (e.g. 08012345678).");
+				return;
+			}
+
+			// Set pending_role BEFORE auth fires so Navigation.js routes as driver
+			// even if the Firestore driver doc hasn't been written yet.
+			// Include expiry so a crash mid-signup doesn't permanently misroute logins.
+			await AsyncStorage.setItem('pending_role', JSON.stringify({ role: 'driver', expiresAt: Date.now() + 5 * 60 * 1000 }));
+
 			const user = await Firebase.signUpDriver({
 				email,
 				phone: normalizedPhone,
@@ -140,30 +149,27 @@ const DriverSignup = ({ navigation }) => {
 				vehicle_id,
 			});
 
-			// Update local state with the user info
+			console.log("✅ Driver account created:", user.uid);
+
 			setFullName(fullName);
 			setVehicleId(vehicle_id);
 			setPhone(normalizedPhone);
 
-			// Register FCM token for notifications
 			await Firebase.registerFcmToken(user.uid);
 
-			// Set flag for new driver to redirect to bank details
-			await AsyncStorage.setItem("isNewDriver", "true");
-
 			setLoading(false);
-
-			// Navigate to bank account details
 			navigation.replace("BankAccountDetails");
 		} catch (error) {
-			console.error("Error registering driver:", error);
+			console.error("❌ Driver signup error:", error.code, error.message);
 			setLoading(false);
+			// Clear pending_role so a failed signup doesn't misroute the next login attempt
+			await AsyncStorage.removeItem('pending_role').catch(() => {});
 			if (error.code === "auth/email-already-in-use") {
-				alert("A driver with this phone number is already registered.");
+				Alert.alert("Already Registered", "An account with this email already exists. Please login instead.");
 			} else if (error.code === "auth/weak-password") {
-				alert("Please choose a stronger password.");
+				Alert.alert("Weak Password", "Please choose a stronger password.");
 			} else {
-				alert(error.message || "Registration failed. Please try again.");
+				Alert.alert("Sign Up Failed", error.message || "Registration failed. Please try again.");
 			}
 		}
 	};

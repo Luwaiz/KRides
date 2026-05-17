@@ -61,12 +61,12 @@ const BankAccountDetails = ({ navigation, route }) => {
     }));
 
     const handleSubmit = async () => {
-        if (!accountNumber || accountNumber.length < 10) {
-            Alert.alert("Invalid Input", "Please enter a valid account number.");
+        if (!accountNumber || !/^\d{10}$/.test(accountNumber)) {
+            Alert.alert("Invalid Account Number", "Nigerian bank account numbers must be exactly 10 digits.");
             return;
         }
-        if (!accountName) {
-            Alert.alert("Invalid Input", "Please enter the account name.");
+        if (!accountName || accountName.trim().length < 2) {
+            Alert.alert("Invalid Account Name", "Please enter the account name as it appears on your bank account.");
             return;
         }
 
@@ -75,18 +75,23 @@ const BankAccountDetails = ({ navigation, route }) => {
         try {
             const selectedBank = NIGERIAN_BANKS.find((b) => b.value === bankCode);
             const bankName = selectedBank ? selectedBank.label : "Unknown Bank";
-            const driverId = uid || FIREBASE_AUTH.currentUser?.uid;
+            const currentUser = FIREBASE_AUTH.currentUser;
+            const driverId = uid || currentUser?.uid;
 
-            if (!driverId) {
+            if (!driverId || !currentUser) {
                 throw new Error("Driver ID not found. Please login again.");
             }
 
-            console.log("Creating subaccount for driver:", driverId);
+            const idToken = await currentUser.getIdToken();
 
             // Call our backend — secret key stays server-side
             const response = await fetch(`${PAYMENTS_SERVER_URL}/create-subaccount`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json", "x-api-key": NOTIFICATION_API_KEY || "" },
+                headers: {
+                    "Content-Type": "application/json",
+                    "x-api-key": NOTIFICATION_API_KEY || "",
+                    "Authorization": `Bearer ${idToken}`,
+                },
                 body: JSON.stringify({
                     bankCode,
                     accountNumber,
@@ -132,7 +137,7 @@ const BankAccountDetails = ({ navigation, route }) => {
                         {
                             text: "Continue",
                             onPress: () => {
-                                navigation.navigate("DriverHome");
+                                navigation.replace("DriverHome");
                             },
                         },
                     ]
@@ -163,14 +168,14 @@ const BankAccountDetails = ({ navigation, route }) => {
                             if (!driverId) return;
 
                             const driverRef = doc(FIREBASE_DB, "drivers", driverId);
-                            await updateDoc(driverRef, { bankDetailsVerified: true });
+                            await updateDoc(driverRef, { bankDetailsSkipped: true });
 
                             useDriverDetails.getState().setDriverProfile({
                                 ...useDriverDetails.getState(),
-                                bankDetailsVerified: true,
+                                bankDetailsSkipped: true,
                             });
 
-                            navigation.navigate("DriverHome");
+                            navigation.replace("DriverHome");
                         } catch (error) {
                             console.error("Error skipping:", error);
                             Alert.alert("Error", "Could not skip. Please try again.");
@@ -224,7 +229,7 @@ const BankAccountDetails = ({ navigation, route }) => {
                             placeholder={"0123456789"}
                             keyboardType="numeric"
                             maxLength={10}
-                            onChangeText={setAccountNumber}
+                            onChangeText={(text) => setAccountNumber(text.replace(/\D/g, ""))}
                             value={accountNumber}
                         />
 

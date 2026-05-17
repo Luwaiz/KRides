@@ -17,6 +17,15 @@ service cloud.firestore {
                .hasOnly(['ratings', 'totalRatings', 'ratingSum']);
     }
 
+    // Guard against oversized string fields written to ride documents.
+    function rideFieldLengthsOk() {
+      let d = request.resource.data;
+      return (!('customerName'   in d) || (d.customerName   is string && d.customerName.size()   <= 100)) &&
+             (!('customerPhone'  in d) || (d.customerPhone  is string && d.customerPhone.size()  <=  20)) &&
+             (!('pickupLocation' in d) || (d.pickupLocation is string && d.pickupLocation.size() <= 200)) &&
+             (!('destination'    in d) || (d.destination    is string && d.destination.size()    <= 200));
+    }
+
     // ── Users (customers) ─────────────────────────────────────────────────────
     match /users/{userId} {
       // Users read and write only their own document.
@@ -53,19 +62,23 @@ service cloud.firestore {
 
     // ── Rides ─────────────────────────────────────────────────────────────────
     match /rides/{rideId} {
-      // Create: only the customer who will own the ride.
+      // Create: only the customer who will own the ride, with sane field lengths.
       allow create: if isAuth()
-                    && request.resource.data.customerId == request.auth.uid;
+                    && request.resource.data.customerId == request.auth.uid
+                    && rideFieldLengthsOk();
 
       // Read:
       //   • The customer who booked the ride.
       //   • The assigned driver.
-      //   • Any authenticated driver may read a pending ride to decide whether
-      //     to accept it (only status == 'pending' exposed at this stage).
+      //   • Any registered driver may read a pending ride to decide whether
+      //     to accept it — existence check prevents non-drivers from polling.
       allow read: if isAuth() && (
         resource.data.customerId == request.auth.uid ||
         resource.data.driverId   == request.auth.uid ||
-        resource.data.status     == 'pending'
+        (
+          resource.data.status == 'pending' &&
+          exists(/databases/$(database)/documents/drivers/$(request.auth.uid))
+        )
       );
 
       // Update:
@@ -86,7 +99,11 @@ service cloud.firestore {
         (
           request.resource.data.diff(resource.data)
             .affectedKeys().hasOnly(['declined_by']) &&
-          request.resource.data.declined_by is list
+          request.resource.data.declined_by is list &&
+          request.resource.data.declined_by.hasAll(resource.data.declined_by) &&
+          request.resource.data.declined_by.size() == resource.data.declined_by.size() + 1 &&
+          request.resource.data.declined_by.hasAll([request.auth.uid]) &&
+          !resource.data.declined_by.hasAll([request.auth.uid])
         )
       );
 
@@ -96,8 +113,10 @@ service cloud.firestore {
     }
 
     // ── Driver locations ──────────────────────────────────────────────────────
+    // Read restricted to the driver themselves — live tracking is not a
+    // client-facing feature, so no customer needs to read this collection.
     match /driver_locations/{driverId} {
-      allow read:  if isAuth();
+      allow read:  if isOwner(driverId);
       allow write: if isOwner(driverId);
     }
 

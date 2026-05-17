@@ -145,7 +145,7 @@ const Confirmation1 = ({ modal, setModal, title }) => {
 		} catch (error) {
 			setLoading(false);
 			console.error("Logout Error:", error);
-			alert("Logout failed. Please try again.");
+			Alert.alert("Logout Failed", "Logout failed. Please try again.");
 		}
 	};
 

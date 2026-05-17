@@ -1,6 +1,7 @@
 // Refund calls go through our server so the Flutterwave secret key
 // never touches the client bundle.
 import { NOTIFICATION_API_KEY } from "@env";
+import { FIREBASE_AUTH } from "../firebaseConfig";
 
 const PAYMENTS_SERVER_URL = 'https://krides.onrender.com/api/payments';
 const FETCH_TIMEOUT_MS = 10000;
@@ -20,9 +21,17 @@ function fetchWithTimeout(url, options = {}) {
 export const processRefund = async (transactionId, amount = null, comments = 'Ride cancelled by customer') => {
     console.log('💰 Processing refund for transaction:', transactionId);
 
+    const user = FIREBASE_AUTH.currentUser;
+    if (!user) throw new Error('Not authenticated — cannot process refund');
+    const idToken = await user.getIdToken();
+
     const response = await fetchWithTimeout(`${PAYMENTS_SERVER_URL}/refund`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': NOTIFICATION_API_KEY || '' },
+        headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': NOTIFICATION_API_KEY || '',
+            'Authorization': `Bearer ${idToken}`,
+        },
         body: JSON.stringify({ transactionId, amount, comments }),
     });
 
@@ -49,8 +58,16 @@ export const processRefund = async (transactionId, amount = null, comments = 'Ri
 export const checkRefundStatus = async (refundId) => {
     console.log('🔍 Checking refund status for:', refundId);
 
+    const user = FIREBASE_AUTH.currentUser;
+    if (!user) throw new Error('Not authenticated — cannot check refund status');
+    const idToken = await user.getIdToken();
+
     const response = await fetchWithTimeout(`${PAYMENTS_SERVER_URL}/refund/${refundId}`, {
-        headers: { 'Content-Type': 'application/json', 'x-api-key': NOTIFICATION_API_KEY || '' },
+        headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': NOTIFICATION_API_KEY || '',
+            'Authorization': `Bearer ${idToken}`,
+        },
     });
 
     const result = await response.json();

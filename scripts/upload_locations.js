@@ -1,20 +1,27 @@
 /**
  * Script to upload locations to Firestore
  * Run with: node scripts/upload_locations.js
+ * Requires .env in the project root with FIREBASE_API_KEY and FIREBASE_APP_ID set.
  */
+
+require("dotenv").config({ path: require("path").resolve(__dirname, "../.env") });
 
 const { initializeApp } = require("firebase/app");
 const { getFirestore, collection, doc, setDoc } = require("firebase/firestore");
 
-// Your Firebase config
+if (!process.env.FIREBASE_API_KEY || !process.env.FIREBASE_APP_ID) {
+	console.error("❌ FIREBASE_API_KEY and FIREBASE_APP_ID must be set in your .env file");
+	process.exit(1);
+}
+
 const firebaseConfig = {
-	apiKey: "AIzaSyA2EsyMXZlABPA1ZJ06Y9S6VOsKR62EQkA",
-	authDomain: "kampusride.firebaseapp.com",
-	projectId: "kampusride",
-	storageBucket: "kampusride.firebasestorage.app",
-	messagingSenderId: "1054058095059",
-	appId: "1:1054058095059:web:ff2a3c61ad63d32d818f26",
-	measurementId: "G-GJK6Q51CPP",
+	apiKey: process.env.FIREBASE_API_KEY,
+	authDomain: process.env.FIREBASE_AUTH_DOMAIN || "kampusride.firebaseapp.com",
+	projectId: process.env.FIREBASE_PROJECT_ID || "kampusride",
+	storageBucket: process.env.FIREBASE_STORAGE_BUCKET || "kampusride.firebasestorage.app",
+	messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || "1054058095059",
+	appId: process.env.FIREBASE_APP_ID,
+	measurementId: process.env.FIREBASE_MEASUREMENT_ID || "G-GJK6Q51CPP",
 };
 
 // Initialize Firebase

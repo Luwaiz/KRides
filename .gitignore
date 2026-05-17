@@ -80,3 +80,10 @@ yarn-error.*
 
 # @end expo-cli
 .env.local
+
+# Firebase service account keys — never commit these
+*-firebase-adminsdk-*.json
+kampusride-f546b40d90a1.json
+fcm-v1-key.json
+*.serviceaccount.json
+google-services-admin*.json

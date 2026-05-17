@@ -9,6 +9,20 @@ const api = axios.create({
     timeout: 15000,
 });
 
+// Attach a fresh Firebase ID token to every outgoing request.
+api.interceptors.request.use(async (config) => {
+    const user = FIREBASE_AUTH.currentUser;
+    if (user) {
+        try {
+            const token = await user.getIdToken();
+            config.headers['Authorization'] = `Bearer ${token}`;
+        } catch {
+            // Non-fatal
+        }
+    }
+    return config;
+});
+
 /**
  * Creates a one-time virtual account for a specific top-up amount.
  * No BVN/NIN required (non-permanent Flutterwave accounts are exempt).

@@ -50,13 +50,6 @@ export async function signUpWithEmail({
 	role = "customer",
 	vehicle_id = null,
 }) {
-	console.log("🔐 signUpWithEmail called with:", {
-		email,
-		name,
-		phone,
-		role,
-		vehicle_id,
-	});
 
 	const credential = await createUserWithEmailAndPassword(
 		FIREBASE_AUTH,
@@ -111,8 +104,7 @@ export async function signUpWithEmail({
 }
 
 // Sign up driver specifically
-export async function signUpDriver({ phone, password, fullname, vehicle_id }) {
-	const email = `${phone}@rideapp.com`;
+export async function signUpDriver({ email, phone, password, fullname, vehicle_id }) {
 	return signUpWithEmail({
 		email,
 		password,
@@ -232,11 +224,16 @@ export async function getDriverEmailByPhone(phone) {
 
 	let response;
 	try {
+		// Include Firebase ID token so the server can rate-limit by authenticated identity.
+		const currentUser = FIREBASE_AUTH.currentUser;
+		const idToken = currentUser ? await currentUser.getIdToken().catch(() => null) : null;
+
 		response = await fetch(`${NOTIFICATION_SERVER}/api/auth/driver-email`, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
 				'x-api-key': NOTIFICATION_API_KEY || '',
+				...(idToken ? { 'Authorization': `Bearer ${idToken}` } : {}),
 			},
 			body: JSON.stringify({ phone }),
 		});
@@ -248,11 +245,15 @@ export async function getDriverEmailByPhone(phone) {
 	const data = await response.json();
 
 	if (!response.ok) {
+		if (response.status === 429) {
+			const waitMin = Math.ceil((data.retryAfterSeconds || 900) / 60);
+			throw new Error(`Too many attempts. Please wait ${waitMin} minute${waitMin === 1 ? '' : 's'} before trying again.`);
+		}
 		if (response.status === 404) throw new Error("No driver found with this phone number");
 		throw new Error(data.error || "Driver lookup failed. Please try again.");
 	}
 
-	console.log(`✅ Driver email resolved for phone ${phone}`);
+	console.log('✅ Driver email resolved');
 	return data.email;
 }
 
@@ -350,6 +351,7 @@ export default {
 	signOut,
 	onAuthStateChanged,
 	resetPassword,
+	normalizeNigerianPhone,
 	getDriverEmailByPhone,
 	getUserDoc,
 	handleGoogleSignIn,

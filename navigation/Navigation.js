@@ -93,8 +93,23 @@ const Navigation = () => {
 							}
 						} else {
 							// Check pending_role set before auth state fired
-							const pendingRole = await AsyncStorage.getItem('pending_role');
+							const pendingRoleRaw = await AsyncStorage.getItem('pending_role');
 							await AsyncStorage.removeItem('pending_role');
+
+							// Parse — support both legacy string format and new { role, expiresAt } format
+							let pendingRole = null;
+							if (pendingRoleRaw) {
+								try {
+									const parsed = JSON.parse(pendingRoleRaw);
+									if (parsed?.expiresAt && Date.now() < parsed.expiresAt) {
+										pendingRole = parsed.role;
+									}
+									// Expired — discard silently
+								} catch {
+									// Legacy plain-string value — honour it once, then it's gone
+									pendingRole = pendingRoleRaw;
+								}
+							}
 
 							if (pendingRole === 'customer') {
 								// Google sign-in explicitly requested customer — honour it
@@ -170,7 +185,14 @@ const Navigation = () => {
 					if (mounted) {
 						setAuthData(null, null, null);
 					}
-					// No need to clear cached role — it remains valid for next login
+					// Clear all cached role keys on logout so a shared device
+					// starts fresh for the next user.
+					AsyncStorage.getAllKeys()
+						.then(keys => {
+							const roleKeys = keys.filter(k => k.startsWith('role_'));
+							if (roleKeys.length) AsyncStorage.multiRemove(roleKeys);
+						})
+						.catch(() => {});
 				}
 
 				if (mounted) {

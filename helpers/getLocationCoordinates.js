@@ -66,7 +66,8 @@ export const getLocationCoordinates = async (locationName) => {
 			if (
 				data.name.toLowerCase().includes(locationName.toLowerCase()) ||
 				data.searchKeywords?.some((keyword) =>
-					locationName.toLowerCase().includes(keyword)
+					locationName.toLowerCase().includes(keyword.toLowerCase()) ||
+					keyword.toLowerCase().includes(locationName.toLowerCase())
 				)
 			) {
 				return {

@@ -1,4 +1,4 @@
-import { StatusBar, StyleSheet, Text, ToastAndroid, View, Image, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
+import { StatusBar, StyleSheet, Text, View, Image, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
 import { AntDesign } from "@expo/vector-icons";
 import React, { useState, useEffect } from "react";
 import { colors } from "../../constants/styling";
@@ -7,6 +7,7 @@ import Avatar from "../../assets/svg/Frame 91profile.svg";
 import useAuthStore, { useDriverDetails } from "../../constants/Store";
 import EditableInput from "../../components/EditableInput";
 import { FIREBASE_DB, FIREBASE_AUTH } from "../../firebaseConfig";
+import { CLOUDINARY_CLOUD_NAME, CLOUDINARY_UPLOAD_PRESET } from "@env";
 import { doc, updateDoc, getDoc } from "firebase/firestore";
 import ActiveButton from "../../components/buttons/ActiveButton";
 import { useNavigation } from "@react-navigation/native";
@@ -69,13 +70,19 @@ const DriverProfilePage = () => {
 	}, [profile]);
 
 	const successToast = () => {
-		ToastAndroid.show("Updated successfully!", ToastAndroid.SHORT);
+		Toast.show({
+			type: "tomatoToast",
+			text1: "Profile Updated",
+			text2: "Your changes have been saved.",
+			position: "top",
+			visibilityTime: 2000,
+		});
 	};
 
 	const pickImage = async () => {
 		const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
 		if (status !== "granted") {
-			alert("Sorry, we need camera roll permissions to make this work!");
+			Alert.alert("Permission Required", "Camera roll permission is needed to update your profile picture.");
 			return;
 		}
 
@@ -94,43 +101,47 @@ const DriverProfilePage = () => {
 	};
 
 	const uploadToCloudinary = async (imageAsset) => {
+		if (!imageAsset.base64) {
+			Alert.alert("Error", "Could not read image data. Please try a different photo.");
+			return;
+		}
+
 		setUploadingImage(true);
 		const controller = new AbortController();
 		const timeoutId = setTimeout(() => controller.abort(), 30000);
 		try {
-			const cloudName = "dmutxmoj3";
-			const uploadPreset = "image_upload";
+			const cloudName = CLOUDINARY_CLOUD_NAME;
+			const uploadPreset = CLOUDINARY_UPLOAD_PRESET;
 
-			let base64Img = `data:image/jpg;base64,${imageAsset.base64}`;
-			let data = {
-				file: base64Img,
-				upload_preset: uploadPreset,
-			};
+			const base64Img = `data:image/jpg;base64,${imageAsset.base64}`;
+			const data = { file: base64Img, upload_preset: uploadPreset };
 
 			const response = await fetch(
 				`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
 				{
 					body: JSON.stringify(data),
-					headers: {
-						"content-type": "application/json",
-					},
+					headers: { "content-type": "application/json" },
 					method: "POST",
 					signal: controller.signal,
 				}
 			);
 
+			if (!response.ok) {
+				throw new Error(`Upload failed (${response.status})`);
+			}
+
 			const result = await response.json();
 			if (result.secure_url) {
 				await saveProfileUrl(result.secure_url);
 			} else {
-				alert("Upload failed");
+				Alert.alert("Upload Failed", "Image upload did not return a URL. Please try again.");
 			}
 		} catch (error) {
 			if (error.name === "AbortError") {
-				alert("Upload timed out. Please check your connection and try again.");
+				Alert.alert("Timeout", "Upload timed out. Please check your connection and try again.");
 			} else {
 				console.error("Error uploading image:", error);
-				alert("Error uploading image");
+				Alert.alert("Error", "Could not upload image. Please try again.");
 			}
 		} finally {
 			clearTimeout(timeoutId);
@@ -167,7 +178,7 @@ const DriverProfilePage = () => {
 			});
 		} catch (error) {
 			console.error("Error saving profile URL:", error);
-			alert("Failed to save profile picture");
+			Alert.alert("Error", "Failed to save profile picture. Please try again.");
 		}
 	};
 
@@ -271,7 +282,7 @@ const DriverProfilePage = () => {
 		} catch (error) {
 			console.error("Profile update error:", error);
 			setLoading(false);
-			alert("Failed to update profile. Please try again.");
+			Alert.alert("Error", "Failed to update profile. Please try again.");
 		}
 	};
 

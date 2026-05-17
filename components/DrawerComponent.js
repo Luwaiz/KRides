@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, Image } from "react-native";
+import { StyleSheet, Text, View, Image, Alert } from "react-native";
 import { DrawerContentScrollView, DrawerItem } from "@react-navigation/drawer";
 import React, { useEffect, useState, useRef } from "react";
 import { AntDesign } from "@expo/vector-icons";
@@ -73,7 +73,7 @@ const DrawerLayout = ({ icon, title, navigateTo }) => {
 							navigation.replace("AuthStack");
 						} catch (err) {
 							console.error("Logout error:", err);
-							alert("Failed to logout");
+							Alert.alert("Logout Failed", "Failed to logout. Please try again.");
 						}
 					}
 				}}
@@ -96,7 +96,7 @@ const DrawerContent = (props) => {
 };
 
 const DrawerComponent = (props) => {
-	console.log("👤 DrawerComponent RENDERED - This is the CUSTOMER drawer!");
+	// DrawerComponent (customer)
 
 	const navigation = useNavigation();
 	const [name, setName] = useState("Loading...");
@@ -115,27 +115,20 @@ const DrawerComponent = (props) => {
 		const db = FIREBASE_DB;
 		const user = auth.currentUser;
 
-		console.log("🔍 DrawerComponent useEffect - Current user:", user?.uid);
-
 		if (user) {
-			console.log("📱 Setting up listener for customer profile:", user.uid);
 			listenerSetup.current = true;
 
 			// Set up real-time listener for customer profile
 			const unsub = onSnapshot(
 				doc(db, "users", user.uid),
 				(docSnap) => {
-					console.log("📄 Snapshot received. Exists?", docSnap.exists());
-
 					if (docSnap.exists()) {
 						const userData = docSnap.data();
 						const displayName =
 							userData?.name || userData?.fullname || "Customer";
 						setName(displayName);
 						setProfileUrl(userData?.profileUrl || null);
-						console.log("✅ Customer profile loaded. Name:", displayName);
 					} else {
-						console.log("❌ No customer profile document found");
 						setName("Customer");
 						setProfileUrl(null);
 					}
@@ -156,18 +149,15 @@ const DrawerComponent = (props) => {
 
 			// Cleanup listener on unmount
 			return () => {
-				console.log("🧹 Cleaning up DrawerComponent listener");
 				listenerSetup.current = false;
 				unsub();
 			};
 		} else {
-			console.log("⚠️ No authenticated user in DrawerComponent");
 			setName("No User");
 			setLoading(false);
 		}
 	}, []); // Empty dependency array - only run once
 
-	console.log("👤 DrawerComponent rendering with name:", name);
 	return (
 		<View style={{ flex: 1 }}>
 			<DrawerContentScrollView {...props}>

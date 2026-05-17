@@ -8,7 +8,7 @@ const PassengerHeader = () => {
 	const Back = useBottomTabStore((state) => state.backFromPassenger)
 	
 	return (
-		<View style={styles.drawerNav} activeOpacity={0.7}>
+		<View style={styles.drawerNav}>
 			<Pressable onPress={Back} style={styles.backButton}>
 				<AntDesign name="arrowleft" size={24} color="black" />
 			</Pressable>

@@ -1,4 +1,4 @@
-import { Dimensions, StyleSheet, Text, View } from "react-native";
+import { Alert, Dimensions, StyleSheet, Text, View } from "react-native";
 import React, { useState } from "react";
 import BottomSheet from "@gorhom/bottom-sheet";
 import { colors } from "../../constants/styling";
@@ -24,14 +24,14 @@ const Login = ({ navigation }) => {
 
 	const handleLogin = async () => {
 		if (!email || !password) {
-			alert("Please enter both email and password");
+			Alert.alert("Missing Details", "Please enter both email and password.");
 			return;
 		}
 
 		const identifier = email.toLowerCase().trim();
-		const rateCheck = checkRateLimit(identifier);
+		const rateCheck = await checkRateLimit(identifier);
 		if (rateCheck.blocked) {
-			alert(`Too many failed attempts. Please wait ${rateCheck.minutesRemaining} minute${rateCheck.minutesRemaining === 1 ? '' : 's'} before trying again.`);
+			Alert.alert("Too Many Attempts", `Please wait ${rateCheck.minutesRemaining} minute${rateCheck.minutesRemaining === 1 ? '' : 's'} before trying again.`);
 			return;
 		}
 
@@ -49,23 +49,15 @@ const Login = ({ navigation }) => {
 		} catch (error) {
 			setLoading(false);
 			recordAttempt(identifier);
-			console.log("Login Error:", error);
 
-			let errorMessage = "Login failed. Please try again.";
-			if (
-				error.code === "auth/invalid-credential" ||
-				error.code === "auth/wrong-password"
-			) {
-				errorMessage = "Invalid email or password";
-			} else if (error.code === "auth/user-not-found") {
-				errorMessage = "No account found with this email";
-			} else if (error.code === "auth/invalid-email") {
+			let errorMessage = "Invalid email or password";
+			if (error.code === "auth/invalid-email") {
 				errorMessage = "Invalid email address";
 			} else if (error.code === "auth/too-many-requests") {
 				errorMessage = "Too many failed attempts. Please try again later.";
 			}
 
-			alert(errorMessage);
+			Alert.alert("Login Failed", errorMessage);
 		}
 	}
 
@@ -94,7 +86,7 @@ const Login = ({ navigation }) => {
 			}
 		} catch (error) {
 			console.error('❌ Google Sign-In Error:', error);
-			alert(error.message || 'Google Sign-In failed. Please try again.');
+			Alert.alert("Sign-In Failed", error.message || 'Google Sign-In failed. Please try again.');
 		}
 	};
 

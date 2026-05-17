@@ -1,6 +1,6 @@
 // components/DriverDrawerComponent.jsx
 import React, { useEffect, useState } from "react";
-import { StyleSheet, Text, View, TouchableOpacity } from "react-native";
+import { StyleSheet, Text, View, TouchableOpacity, Alert } from "react-native";
 import { DrawerContentScrollView, DrawerItem } from "@react-navigation/drawer";
 import {
 	AntDesign,
@@ -65,7 +65,7 @@ const DriverDrawerItem = ({ icon, title, navigateTo }) => {
 			navigation.replace("Login");
 		} catch (err) {
 			console.error("Logout error", err);
-			alert("Failed to logout");
+			Alert.alert("Logout Failed", "Failed to logout. Please try again.");
 		}
 	};
 
@@ -102,7 +102,7 @@ const DriverDrawerItem = ({ icon, title, navigateTo }) => {
 							navigation.replace("AuthStack");
 						} catch (err) {
 							console.error("Logout error:", err);
-							alert("Failed to logout");
+							Alert.alert("Logout Failed", "Failed to logout. Please try again.");
 						}
 					}
 					// Delete Account is now handled directly in Confirmation1.js
@@ -113,7 +113,7 @@ const DriverDrawerItem = ({ icon, title, navigateTo }) => {
 };
 
 const DriverDrawerComponent = (props) => {
-	console.log("🚗 DriverDrawerComponent RENDERED - This is the DRIVER drawer!");
+	// DriverDrawerComponent
 
 	const navigation = useNavigation();
 	const { fullName, vehicle_id, rating } =
@@ -159,7 +159,6 @@ const DriverDrawerComponent = (props) => {
 		return () => unsub && unsub();
 	}, []);
 
-	console.log("ssss", profile);
 	return (
 		<View style={{ flex: 1 }}>
 			<DrawerContentScrollView {...props}>

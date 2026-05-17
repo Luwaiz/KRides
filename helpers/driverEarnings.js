@@ -62,7 +62,7 @@ export const getDriverEarnings = async (driverId, period = 'month', year = null,
             averagePerRide,
             period,
             startDate,
-            endDate: now,
+            endDate: endDate,
         };
     } catch (error) {
         console.error("❌ Error getting driver earnings:", error);

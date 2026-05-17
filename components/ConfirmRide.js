@@ -11,7 +11,7 @@ import Star from "../assets/svg/Rating.svg";
 import Direction from "../assets/svg/Frame 34direction.svg";
 import Naira from "../assets/svg/Naira.svg";
 import RideConfirm from "./modals/RideConfirm";
-import RatingModal from "./modals/RatingModal";
+import RatingModal, { PENDING_RATING_KEY } from "./modals/RatingModal";
 import { sp, fs, br, ms } from "../constants/responsive";
 import Toast from "react-native-toast-message";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -105,7 +105,7 @@ const ConfirmRide = () => {
 		if (!UserId || bookingInFlight.current) return;
 		bookingInFlight.current = true;
 		setLoading(true);
-		AsyncStorage.removeItem('pending_customer_rating').catch(() => {});
+		AsyncStorage.removeItem(PENDING_RATING_KEY).catch(() => {});
 		try {
 			const result = await payWithWallet({
 				customerName: `${firstName || ''} ${lastName || ''}`.trim() || 'Customer',
@@ -242,7 +242,7 @@ const ConfirmRide = () => {
 		bookingInFlight.current = true;
 		setLoading(true);
 		// Clear any deferred rating reminder so it doesn't pop up mid-new-ride
-		AsyncStorage.removeItem('pending_customer_rating').catch(() => {});
+		AsyncStorage.removeItem(PENDING_RATING_KEY).catch(() => {});
 		try {
 			const rideData = {
 				customerId: UserId,
@@ -332,7 +332,7 @@ const ConfirmRide = () => {
 	const handleCancelRide = () => {
 		const cancelRideId = activeRide?.rideId || rideId;
 		if (!cancelRideId) {
-			alert("No active ride to cancel");
+			Alert.alert("Error", "No active ride to cancel");
 			return;
 		}
 
@@ -354,7 +354,7 @@ const ConfirmRide = () => {
 						setCancelling(true);
 						try {
 							const rideSnapshot = await getRide(cancelRideId);
-							await cancelRideWithRefund(cancelRideId, 'customer', 'Customer cancelled ride');
+							const result = await cancelRideWithRefund(cancelRideId, 'customer', 'Customer cancelled ride');
 							console.log("✅ Ride cancelled successfully");
 
 							// Notify driver if one had already accepted
@@ -374,13 +374,43 @@ const ConfirmRide = () => {
 							// Navigate back to home
 							setHomePage();
 
-							Toast.show({
-								type: "tomatoToast",
-								text1: "Ride Cancelled",
-								text2: "Your ride has been cancelled successfully",
-								position: "top",
-								visibilityTime: 3000,
-							});
+							if (result.refundStatus === "completed") {
+								Toast.show({
+									type: "tomatoToast",
+									text1: "Ride Cancelled & Refunded",
+									text2: `₦${result.refundAmount} refund initiated — allow 3–5 business days`,
+									position: "top",
+									visibilityTime: 5000,
+								});
+							} else if (result.walletRefundStatus === "completed") {
+								Toast.show({
+									type: "tomatoToast",
+									text1: "Ride Cancelled & Refunded",
+									text2: `₦${result.refundAmount} returned to your wallet`,
+									position: "top",
+									visibilityTime: 5000,
+								});
+							} else if (
+								result.refundStatus === "failed" ||
+								result.refundStatus === "needs_review" ||
+								result.walletRefundStatus === "failed"
+							) {
+								Toast.show({
+									type: "tomatoToast",
+									text1: "Ride Cancelled — Refund Issue",
+									text2: "We could not process your refund automatically. Contact support for assistance.",
+									position: "top",
+									visibilityTime: 7000,
+								});
+							} else {
+								Toast.show({
+									type: "tomatoToast",
+									text1: "Ride Cancelled",
+									text2: "Your ride has been cancelled successfully",
+									position: "top",
+									visibilityTime: 3000,
+								});
+							}
 						} catch (error) {
 							console.error("❌ Error cancelling ride:", error);
 							Toast.show({

@@ -14,7 +14,7 @@ import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import MapViewDirections from "react-native-maps-directions";
 import Geolocation from "@react-native-community/geolocation";
 import { useShallow } from "zustand/react/shallow";
-import { cancelRideWithRefund, listenToRide } from "../../helpers/firebaseRides";
+import { cancelRideWithRefund, listenToRide, checkPendingRefunds } from "../../helpers/firebaseRides";
 import { notifyDriverRideCancelled } from "../../helpers/notificationHelpers";
 import Toast from "react-native-toast-message";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -181,6 +181,7 @@ const MainPage = () => {
 	// Track whether we've already shown the notification-failure warning for
 	// the current ride (ref so it doesn't trigger re-renders)
 	const notificationWarningShown = useRef(false);
+	const arrivalToastShown = useRef(false);
 	const [pendingRatingData, setPendingRatingData] = useState(null);
 
 	// On mount, check if the customer deferred a rating from a previous session
@@ -199,9 +200,16 @@ const MainPage = () => {
 		}).catch(() => {});
 	}, []);
 
-	// Reset the warning flag whenever the active ride changes
+	// On mount, retry any refunds that previously failed or are still pending
+	useEffect(() => {
+		if (!UserId) return;
+		checkPendingRefunds().catch(() => {});
+	}, [UserId]);
+
+	// Reset per-ride flags whenever the active ride changes
 	useEffect(() => {
 		notificationWarningShown.current = false;
+		arrivalToastShown.current = false;
 	}, [activeRide?.rideId]);
 
 	// Listen for ride updates when there's an active ride
@@ -242,6 +250,16 @@ const MainPage = () => {
 				// Check if driver has arrived
 				if (rideData.hasArrived !== undefined) {
 					useActiveRideStore.getState().updateArrivalStatus(rideData.hasArrived);
+					if (rideData.hasArrived && !arrivalToastShown.current) {
+						arrivalToastShown.current = true;
+						Toast.show({
+							type: 'tomatoToast',
+							text1: '🚗 Your driver has arrived!',
+							text2: `${rideData.driverName || 'Your driver'} is waiting at the pickup point.`,
+							position: 'top',
+							visibilityTime: 6000,
+						});
+					}
 				}
 
 				// If ride is completed - show rating modal
@@ -330,27 +348,45 @@ const MainPage = () => {
 							clearActiveRide();
 
 							if (result.refundStatus === "completed") {
-								const wasAccepted = rideStatus === "accepted";
 								Toast.show({
 									type: 'tomatoToast',
 									text1: 'Ride Cancelled & Refunded',
-									text2: wasAccepted
-										? `₦${result.refundAmount} refund initiated — allow 3–5 business days`
-										: `Full refund of ₦${result.refundAmount} initiated — allow 3–5 business days`,
+									text2: `₦${result.refundAmount} refund initiated — allow 3–5 business days`,
 									position: 'top',
 									visibilityTime: 5000,
+								});
+							} else if (result.walletRefundStatus === "completed") {
+								Toast.show({
+									type: 'tomatoToast',
+									text1: 'Ride Cancelled & Refunded',
+									text2: `₦${result.refundAmount} returned to your wallet`,
+									position: 'top',
+									visibilityTime: 5000,
+								});
+							} else if (
+								result.refundStatus === "failed" ||
+								result.refundStatus === "needs_review" ||
+								result.walletRefundStatus === "failed"
+							) {
+								Toast.show({
+									type: 'tomatoToast',
+									text1: 'Ride Cancelled — Refund Issue',
+									text2: 'We could not process your refund automatically. Contact support for assistance.',
+									position: 'top',
+									visibilityTime: 7000,
 								});
 							} else {
 								Toast.show({
 									type: 'tomatoToast',
 									text1: 'Ride Cancelled',
-									text2: 'Your ride has been cancelled. Any payment will be reviewed for refund.',
+									text2: 'Your ride has been cancelled.',
 									position: 'top',
 									visibilityTime: 4000,
 								});
 							}
 						} catch (error) {
 							console.error('Error cancelling ride:', error);
+							Alert.alert('Error', 'Could not cancel the ride. Please check your connection and try again.');
 						} finally {
 							setCancelling(false);
 						}

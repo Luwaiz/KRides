@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { NOTIFICATION_API_KEY } from '@env';
+import { FIREBASE_AUTH } from '../firebaseConfig';
 
 // Production server (Render.com)
 const NOTIFICATION_SERVER_URL = 'https://krides.onrender.com/api/notifications';
@@ -10,9 +11,21 @@ const api = axios.create({
     timeout: 10000,
 });
 
-// For local testing: Use your computer's IP address (not localhost)
-// To find your IP: Run 'ipconfig' on Windows or 'ifconfig' on Mac/Linux
-// const NOTIFICATION_SERVER_URL = 'http://172.20.10.3:3001/api/notifications';
+// Attach a fresh Firebase ID token to every outgoing request so the server
+// can verify the caller is a real authenticated user. Once the server fully
+// migrates to token-only auth, the x-api-key header above can be removed.
+api.interceptors.request.use(async (config) => {
+    const user = FIREBASE_AUTH.currentUser;
+    if (user) {
+        try {
+            const token = await user.getIdToken();
+            config.headers['Authorization'] = `Bearer ${token}`;
+        } catch {
+            // Non-fatal — request still goes out with the API key
+        }
+    }
+    return config;
+});
 
 
 /**
