@@ -1,4 +1,4 @@
-import { Dimensions, StyleSheet, Text, View } from "react-native";
+import { Alert, Dimensions, StyleSheet, Text, View } from "react-native";
 import React, { useState } from "react";
 import { colors } from "../../constants/styling";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -28,14 +28,14 @@ const DriverLogin = ({ navigation }) => {
 
 	const handleLogin = async () => {
 		if (!phone || !password) {
-			alert("Please enter both phone number and password");
+			Alert.alert("Missing Details", "Please enter both phone number and password.");
 			return;
 		}
 
 		const identifier = phone.trim();
-		const rateCheck = checkRateLimit(identifier);
+		const rateCheck = await checkRateLimit(identifier);
 		if (rateCheck.blocked) {
-			alert(`Too many failed attempts. Please wait ${rateCheck.minutesRemaining} minute${rateCheck.minutesRemaining === 1 ? '' : 's'} before trying again.`);
+			Alert.alert("Too Many Attempts", `Please wait ${rateCheck.minutesRemaining} minute${rateCheck.minutesRemaining === 1 ? '' : 's'} before trying again.`);
 			return;
 		}
 
@@ -47,7 +47,8 @@ const DriverLogin = ({ navigation }) => {
 			// Tell Navigation.js to treat this auth event as a driver login,
 			// guarding against the stale-closure race where a previous customer
 			// role is still in memory when onAuthStateChanged fires.
-			await AsyncStorage.setItem('pending_role', 'driver');
+			// Include expiry so a network failure mid-login doesn't permanently misroute future logins.
+			await AsyncStorage.setItem('pending_role', JSON.stringify({ role: 'driver', expiresAt: Date.now() + 5 * 60 * 1000 }));
 
 			// Sign in with the real email
 			await Firebase.signInWithEmail(email, password);
@@ -57,25 +58,19 @@ const DriverLogin = ({ navigation }) => {
 		} catch (error) {
 			setLoading(false);
 			recordAttempt(identifier);
-			console.log("Login Error:", error);
+			// Clear pending_role so a failed login doesn't misroute the next successful one
+			await AsyncStorage.removeItem('pending_role').catch(() => {});
 
-			let errorMessage = "Login failed. Please try again.";
-			if (error.message === "No driver found with this phone number") {
-				errorMessage = "No driver account found with that phone number. Check the number or sign up.";
-			} else if (
-				error.code === "auth/wrong-password" ||
-				error.code === "auth/invalid-credential"
-			) {
-				errorMessage = "Incorrect password. Please try again or use 'Forgot password'.";
-			} else if (error.code === "auth/user-not-found") {
-				errorMessage = "No account found with these details. Please sign up.";
+			let errorMessage = "Invalid phone number or password. Please try again.";
+			if (error.code === "auth/too-many-requests") {
+				errorMessage = "Too many failed attempts. Please wait a few minutes and try again.";
 			} else if (error.code === "auth/invalid-email") {
 				errorMessage = "The phone number format is not recognised. Try 08123456789 or +2348123456789.";
-			} else if (error.code === "auth/too-many-requests") {
-				errorMessage = "Too many failed attempts. Please wait a few minutes and try again.";
+			} else if (error.message?.includes("internet") || error.message?.includes("network")) {
+				errorMessage = "Connection error. Please check your internet and try again.";
 			}
 
-			alert(errorMessage);
+			Alert.alert("Login Failed", errorMessage);
 		}
 	};
 

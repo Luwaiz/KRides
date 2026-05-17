@@ -2,7 +2,7 @@
   "expo": {
     "name": "KRides",
     "slug": "KRides",
-    "owner": "eluwaiz",
+    "owner": "uwaiz",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -23,7 +23,7 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "8bd3366e-c67f-4c79-a093-e409ebb147f4"
+        "projectId": "61bd7aca-e58d-4cf2-840c-28773922c9d1"
       }
     },
     "android": {
@@ -40,7 +40,7 @@
       ],
       "config": {
         "googleMaps": {
-          "apiKey": "AIzaSyB7fe6OfWqZs2BP0AoZS-2jLi5mIVbiYTM"
+          "apiKey": ""
         }
       }
     },
@@ -50,7 +50,7 @@
       "supportsTablet": true,
       "googleServicesFile": "./GoogleService-Info.plist",
       "config": {
-        "googleMapsApiKey": "AIzaSyB59DSubzPcNuQkfYrNv_pfhBtJX_rqPI4"
+        "googleMapsApiKey": ""
       },
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "KRides needs your location to find nearby drivers and calculate routes.",

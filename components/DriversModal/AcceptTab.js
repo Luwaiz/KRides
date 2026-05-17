@@ -12,7 +12,7 @@ import Avatar from "../../assets/svg/Frame 77avatar.svg";
 import Arrival from "../modals/Arrival";
 import { updateRideStatus, listenToPendingRides, declineRide, getRide } from "../../helpers/firebaseRides";
 import { getRideCoordinates } from "../../helpers/getLocationCoordinates";
-import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { doc, updateDoc, runTransaction, serverTimestamp } from "firebase/firestore";
 import { FIREBASE_DB, FIREBASE_AUTH } from "../../firebaseConfig";
 import { NOTIFICATION_API_KEY } from "@env";
 import { DrawerActions, useNavigation } from "@react-navigation/native";
@@ -134,6 +134,8 @@ const AcceptTab = () => {
 
 	const doCompleteRide = async () => {
 		setLoading(true);
+		const controller = new AbortController();
+		const timeoutId = setTimeout(() => controller.abort(), 20000);
 		try {
 			const idToken = await FIREBASE_AUTH.currentUser.getIdToken();
 			const response = await fetch('https://krides.onrender.com/api/payments/complete-ride', {
@@ -143,15 +145,20 @@ const AcceptTab = () => {
 					'x-api-key': NOTIFICATION_API_KEY || '',
 				},
 				body: JSON.stringify({ idToken, rideId: acceptedRide.rideId }),
+				signal: controller.signal,
 			});
 			const result = await response.json();
 			if (!result.success) throw new Error(result.error || 'Could not complete ride');
-			console.log("✅ Ride completed. Payout:", result.payout ?? 'none');
 			setEndRide(true);
 		} catch (error) {
-			console.error("❌ Error completing ride:", error);
-			alert("Unable to complete ride. Please check your connection and try again.");
+			if (error.name === 'AbortError') {
+				Alert.alert("Timeout", "Request timed out. Please check your connection and try again.");
+			} else {
+				console.error("❌ Error completing ride:", error);
+				Alert.alert("Error", "Unable to complete ride. Please check your connection and try again.");
+			}
 		} finally {
+			clearTimeout(timeoutId);
 			setLoading(false);
 		}
 	};
@@ -228,17 +235,21 @@ const AcceptTab = () => {
 
 	const AcceptNextRide = async (rideId) => {
 		if (!uid) {
-			alert("Driver account not loaded. Please log out and log back in.");
+			Alert.alert("Error", "Driver account not loaded. Please log out and log back in.");
 			return;
 		}
 
 		// Check if bank details are verified
 		const driverDetails = useDriverDetails.getState();
 		if (!driverDetails.bankDetailsVerified) {
-			alert(
-				"Please complete your bank account details before accepting rides. Go to Settings > Bank Details to add your account information."
+			Alert.alert(
+				"Bank Details Required",
+				"Please complete your bank account details before accepting rides.",
+				[
+					{ text: "Later", style: "cancel" },
+					{ text: "Set Up Now", onPress: () => navigation.navigate("BankAccountDetails") },
+				]
 			);
-			navigation.navigate("BankAccountDetails");
 			return;
 		}
 
@@ -256,7 +267,7 @@ const AcceptTab = () => {
 		try {
 			const rideDetails = pendingRides.find((r) => (r.rideId || r.id) === rideId);
 			if (!rideDetails) {
-				throw new Error("Ride not found");
+				throw new Error("RIDE_NOT_FOUND");
 			}
 
 			const { pickup, destination } = await getRideCoordinates(
@@ -264,14 +275,23 @@ const AcceptTab = () => {
 				rideDetails.destination
 			);
 
+			// Atomic transaction prevents two drivers accepting the same ride simultaneously
 			const rideRef = doc(FIREBASE_DB, "rides", rideId);
-			await updateDoc(rideRef, {
-				status: "accepted",
-				driverId: uid,
-				driverName: fullName || "Driver",
-				driverPhone: phone || "",
-				vehicleId: VehicleId || "",
-				acceptedAt: serverTimestamp(),
+			await runTransaction(FIREBASE_DB, async (txn) => {
+				const snap = await txn.get(rideRef);
+				if (!snap.exists()) throw new Error("RIDE_NOT_FOUND");
+				const data = snap.data();
+				if (data.status !== "pending" || (data.driverId && data.driverId !== "")) {
+					throw new Error("RIDE_TAKEN");
+				}
+				txn.update(rideRef, {
+					status: "accepted",
+					driverId: uid,
+					driverName: fullName || "Driver",
+					driverPhone: phone || "",
+					vehicleId: VehicleId || "",
+					acceptedAt: serverTimestamp(),
+				});
 			});
 
 			setNextRide({
@@ -284,10 +304,16 @@ const AcceptTab = () => {
 			});
 
 			console.log("✅ Next ride queued successfully");
-			alert("Next ride accepted! It will start after you complete the current ride.");
+			Alert.alert("Ride Queued", "Next ride accepted! It will start after you complete the current ride.");
 		} catch (error) {
 			console.error("❌ Error accepting next ride:", error);
-			alert("Unable to accept ride. Please try again.");
+			if (error.message === "RIDE_TAKEN") {
+				Alert.alert("Ride Taken", "Another driver accepted this ride first.");
+			} else if (error.message === "RIDE_NOT_FOUND") {
+				Alert.alert("Not Available", "This ride is no longer available.");
+			} else {
+				Alert.alert("Error", "Unable to accept ride. Please check your connection and try again.");
+			}
 		} finally {
 			setAccepting(null);
 		}
@@ -324,7 +350,9 @@ const AcceptTab = () => {
 									<Text style={styles.name}>
 										{acceptedRide?.customerName || acceptedRide?.name || "Customer"}
 									</Text>
-									<Text style={styles.time}>Card Payment</Text>
+									<Text style={styles.time}>
+							{acceptedRide?.paymentMethod === 'wallet' ? 'Wallet' : acceptedRide?.paymentMethod === 'flutterwave' ? 'Card' : 'Cash'}
+						</Text>
 									<Text style={styles.time}>₦{calculateDriverEarnings(acceptedRide?.amount, acceptedRide?.numberOfPassengers) || "0"}</Text>
 								</View>
 							</View>

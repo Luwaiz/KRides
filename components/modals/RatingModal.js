@@ -16,8 +16,10 @@ import { AntDesign } from "@expo/vector-icons";
 import ActiveButton from "../buttons/ActiveButton";
 import { colors } from "../../constants/styling";
 import { sp, fs, br, wp, ms } from "../../constants/responsive";
-import { FIREBASE_DB } from "../../firebaseConfig";
-import { doc, getDoc, updateDoc, setDoc, arrayUnion, increment } from "firebase/firestore";
+import { FIREBASE_AUTH } from "../../firebaseConfig";
+import { NOTIFICATION_API_KEY } from "@env";
+
+const RATINGS_URL = 'https://krides.onrender.com/api/rides/rate';
 
 const { width } = Dimensions.get("screen");
 
@@ -28,53 +30,47 @@ const RatingModal = ({ visible, onClose, rideId, driverId, driverName, pickupLoc
 
 	const handleSubmitRating = async () => {
 		if (rating === 0) {
-			alert("Please select a rating");
+			Alert.alert("Rating Required", "Please select a star rating before submitting.");
 			return;
 		}
 
 		setLoading(true);
 		try {
-			// Guard against duplicate submissions
-			const rideSnap = await getDoc(doc(FIREBASE_DB, "rides", rideId));
-			if (rideSnap.exists() && rideSnap.data()?.customerRating) {
-				alert("You've already rated this ride.");
+			const user = FIREBASE_AUTH.currentUser;
+			if (!user) throw new Error('Not authenticated');
+			const idToken = await user.getIdToken();
+
+			const response = await fetch(RATINGS_URL, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'x-api-key': NOTIFICATION_API_KEY || '',
+					'Authorization': `Bearer ${idToken}`,
+				},
+				body: JSON.stringify({ rideId, driverId, rating, feedback: feedback.trim() }),
+			});
+
+			const result = await response.json();
+
+			if (response.status === 409) {
+				Alert.alert("Already Rated", "You've already rated this ride.");
 				onClose();
 				return;
 			}
-			// Update driver's rating
-			const driverRef = doc(FIREBASE_DB, "drivers", driverId);
-			await updateDoc(driverRef, {
-				ratings: arrayUnion({
-					rideId,
-					rating,
-					feedback: feedback.trim(),
-					createdAt: new Date(),
-				}),
-				totalRatings: increment(1),
-				ratingSum: increment(rating),
-			});
 
-			// Update ride with rating — use setDoc/merge so the write succeeds
-			// even if the ride document was archived after completion.
-			const rideRef = doc(FIREBASE_DB, "rides", rideId);
-			await setDoc(rideRef, {
-				customerRating: rating,
-				customerFeedback: feedback.trim(),
-				ratedAt: new Date(),
-			}, { merge: true });
+			if (!response.ok || !result.success) {
+				throw new Error(result.error || 'Rating submission failed');
+			}
 
-			console.log("✅ Rating submitted successfully");
-			// Clear any pending reminder now that rating is submitted
 			await AsyncStorage.removeItem(PENDING_RATING_KEY).catch(() => {});
-			alert("Thank you for your feedback!");
+			Alert.alert("Thank you!", "Your feedback has been submitted.");
 
-			// Reset and close
 			setRating(0);
 			setFeedback("");
 			onClose();
 		} catch (error) {
 			console.error("❌ Error submitting rating:", error);
-			alert("Unable to submit rating. Please try again.");
+			Alert.alert("Error", "Unable to submit rating. Please try again.");
 		} finally {
 			setLoading(false);
 		}

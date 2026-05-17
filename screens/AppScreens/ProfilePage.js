@@ -2,7 +2,6 @@ import {
 	StatusBar,
 	StyleSheet,
 	Text,
-	ToastAndroid,
 	View,
 	ActivityIndicator,
 	Image,
@@ -15,6 +14,7 @@ import BackButton from "../../components/buttons/BackButton";
 import Avatar from "../../assets/svg/Frame 91profile.svg";
 import EditableInput from "../../components/EditableInput";
 import { FIREBASE_AUTH, FIREBASE_DB } from "../../firebaseConfig";
+import { CLOUDINARY_CLOUD_NAME, CLOUDINARY_UPLOAD_PRESET } from "@env";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import Toast from "react-native-toast-message";
 import * as ImagePicker from "expo-image-picker";
@@ -50,7 +50,7 @@ const ProfilePage = () => {
 		try {
 			const user = FIREBASE_AUTH.currentUser;
 			if (!user) {
-				alert("No user logged in");
+				Alert.alert("Error", "No user logged in");
 				return;
 			}
 
@@ -77,7 +77,7 @@ const ProfilePage = () => {
 			}
 		} catch (error) {
 			console.error("❌ Error fetching profile:", error);
-			alert("Failed to load profile");
+			Alert.alert("Error", "Failed to load profile");
 		} finally {
 			setLoading(false);
 		}
@@ -103,7 +103,7 @@ const ProfilePage = () => {
 	const pickImage = async () => {
 		const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
 		if (status !== "granted") {
-			alert("Sorry, we need camera roll permissions to make this work!");
+			Alert.alert("Permission Required", "Camera roll permission is needed to update your profile picture.");
 			return;
 		}
 
@@ -126,8 +126,8 @@ const ProfilePage = () => {
 		const controller = new AbortController();
 		const timeoutId = setTimeout(() => controller.abort(), 30000);
 		try {
-			const cloudName = "dmutxmoj3";
-			const uploadPreset = "image_upload";
+			const cloudName = CLOUDINARY_CLOUD_NAME;
+			const uploadPreset = CLOUDINARY_UPLOAD_PRESET;
 
 			let base64Img = `data:image/jpg;base64,${imageAsset.base64}`;
 			let data = {
@@ -151,14 +151,14 @@ const ProfilePage = () => {
 			if (result.secure_url) {
 				await saveProfileUrl(result.secure_url);
 			} else {
-				alert("Upload failed");
+				Alert.alert("Upload Failed", "Image upload did not return a URL. Please try again.");
 			}
 		} catch (error) {
 			if (error.name === "AbortError") {
-				alert("Upload timed out. Please check your connection and try again.");
+				Alert.alert("Timeout", "Upload timed out. Please check your connection and try again.");
 			} else {
 				console.error("Error uploading image:", error);
-				alert("Error uploading image");
+				Alert.alert("Error", "Could not upload image. Please try again.");
 			}
 		} finally {
 			clearTimeout(timeoutId);
@@ -188,7 +188,7 @@ const ProfilePage = () => {
 			});
 		} catch (error) {
 			console.error("Error saving profile URL:", error);
-			alert("Failed to save profile picture");
+			Alert.alert("Error", "Failed to save profile picture. Please try again.");
 		}
 	};
 
@@ -247,7 +247,7 @@ const ProfilePage = () => {
 		try {
 			const user = FIREBASE_AUTH.currentUser;
 			if (!user) {
-				alert("No user logged in");
+				Alert.alert("Error", "No user logged in");
 				return;
 			}
 
@@ -277,7 +277,7 @@ const ProfilePage = () => {
 			console.log(`✅ Updated ${fieldName}:`, value);
 		} catch (error) {
 			console.error("❌ Error updating profile:", error);
-			alert("Failed to update profile. Please try again.");
+			Alert.alert("Error", "Failed to update profile. Please try again.");
 		} finally {
 			setUpdating(false);
 		}

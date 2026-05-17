@@ -12,12 +12,19 @@ import DriverEarnings from "../screens/DriverScreens/DriverEarnings";
 import AcceptTab from "../components/DriversModal/AcceptTab";
 import DriverSettings from "../screens/DriverScreens/DriverSetting";
 import BankAccountDetails from "../screens/AuthScreens/BankAccountDetails";
+import { useDriverDetails } from "../constants/Store";
 
 const Stack = createNativeStackNavigator();
 
 const DriverStack = () => {
+	const bankDetailsVerified = useDriverDetails((state) => state.bankDetailsVerified);
+	const bankDetailsSkipped = useDriverDetails((state) => state.bankDetailsSkipped);
+
 	return (
-		<Stack.Navigator screenOptions={{ headerShown: false }}>
+		<Stack.Navigator
+			screenOptions={{ headerShown: false }}
+			initialRouteName={(bankDetailsVerified || bankDetailsSkipped) ? "DriverHome" : "BankAccountDetails"}
+		>
 			<Stack.Screen component={HomePage} name="DriverHome" />
 			<Stack.Screen name="Support" component={Support} />
 			<Stack.Screen name="About" component={About} />

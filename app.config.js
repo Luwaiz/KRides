@@ -6,14 +6,22 @@ const appJson = require('./app.json');
 //   - Local dev: .env file (gitignored)
 //   - EAS builds: eas.json env section or EAS Secrets (preferred for production)
 
+const mapsKey = process.env.GOOGLE_MAPS_API_KEY || '';
+
 module.exports = {
     ...appJson.expo,
     android: {
         ...appJson.expo.android,
         config: {
             googleMaps: {
-                apiKey: process.env.GOOGLE_MAPS_API_KEY || '',
+                apiKey: mapsKey,
             },
+        },
+    },
+    ios: {
+        ...appJson.expo.ios,
+        config: {
+            googleMapsApiKey: mapsKey,
         },
     },
 };

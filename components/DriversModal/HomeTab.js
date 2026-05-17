@@ -33,7 +33,7 @@ import { getRideCoordinates } from "../../helpers/getLocationCoordinates";
 import { listenToPendingRides, declineRide } from "../../helpers/firebaseRides";
 import { calculateDriverEarnings } from "../../constants/commission";
 import { notifyCustomerRideAccepted } from "../../helpers/notificationHelpers";
-import { doc, updateDoc, runTransaction, serverTimestamp } from "firebase/firestore";
+import { doc, updateDoc, setDoc, runTransaction, serverTimestamp } from "firebase/firestore";
 import { FIREBASE_DB } from "../../firebaseConfig";
 import { sp, fs, br, ms } from "../../constants/responsive";
 import { useNavigation } from "@react-navigation/native";
@@ -44,6 +44,7 @@ const HomeTab = () => {
 	const fullName = useDriverDetails((state) => state.fullName);
 	const phone = useDriverDetails((state) => state.phone);
 	const uid = useDriverDetails((state) => state.uid);
+	const bankDetailsVerified = useDriverDetails((state) => state.bankDetailsVerified);
 
 	const navigation = useNavigation();
 
@@ -83,6 +84,8 @@ const HomeTab = () => {
 
 	// ✅ Listen to pending rides from Firestore (real-time)
 	useEffect(() => {
+		if (!uid || !bankDetailsVerified) return;
+
 		console.log("🔍 Setting up Firestore listener for pending rides...");
 		setLoading(true);
 
@@ -96,10 +99,12 @@ const HomeTab = () => {
 			console.log("🔌 Cleaning up pending rides listener");
 			unsubscribe();
 		};
-	}, [uid]);
+	}, [uid, bankDetailsVerified]);
 
 	// Show modal for first ride when rides update
 	useEffect(() => {
+		if (!bankDetailsVerified) return;
+
 		const isOnline = useDriverAvailability.getState().isOnline;
 
 		// Don't show modal if driver is offline
@@ -122,7 +127,7 @@ const HomeTab = () => {
 				setShowRideModal(true);
 			}
 		}
-	}, [rides, showRideModal, currentRideRequest, accepting]);
+	}, [rides, showRideModal, currentRideRequest, accepting, bankDetailsVerified]);
 
 	const onRefresh = () => {
 		console.log("🔄 Manual refresh - Firestore listeners auto-update");
@@ -154,7 +159,7 @@ const HomeTab = () => {
 				errorMessage = "This ride is no longer available.";
 			}
 
-			alert(errorMessage);
+			Alert.alert("Error", errorMessage);
 		} finally {
 			setDeclining(null);
 		}
@@ -188,7 +193,7 @@ const HomeTab = () => {
 	// ✅ Accept ride — atomic Firestore transaction prevents double-acceptance
 	const AcceptRide = async (rideId) => {
 		if (!uid) {
-			alert("Driver account not loaded. Please log out and log back in.");
+			Alert.alert("Error", "Driver account not loaded. Please log out and log back in.");
 			return;
 		}
 
@@ -227,7 +232,7 @@ const HomeTab = () => {
 
 		const rideDetails = rides.find((r) => (r.rideId || r.id) === rideId);
 		if (!rideDetails) {
-			alert("This ride is no longer available.");
+			Alert.alert("Not Available", "This ride is no longer available.");
 			return;
 		}
 
@@ -301,14 +306,14 @@ const HomeTab = () => {
 
 		const watchId = Geolocation.watchPosition(
 			(position) => {
-				const driverRef = doc(FIREBASE_DB, "drivers", uid);
-				updateDoc(driverRef, {
+				const locationRef = doc(FIREBASE_DB, "driver_locations", uid);
+				setDoc(locationRef, {
 					location: {
 						latitude: position.coords.latitude,
 						longitude: position.coords.longitude,
 					},
 					locationUpdatedAt: serverTimestamp(),
-				}).catch(() => {});
+				}, { merge: true }).catch(() => {});
 			},
 			(error) => {
 				console.warn("⚠️ Location tracking error:", error);

@@ -38,7 +38,6 @@
     "react-native": "0.76.9",
     "react-native-app-intro-slider": "^4.0.4",
     "react-native-dotenv": "^3.4.11",
-    "react-native-geolocation-service": "^5.3.1",
     "react-native-gesture-handler": "~2.20.2",
     "react-native-maps": "1.18.0",
     "react-native-maps-directions": "^1.9.0",
@@ -52,11 +51,11 @@
     "react-native-svg": "15.8.0",
     "react-native-toast-message": "^2.2.0",
     "react-native-webview": "13.12.5",
-    "socket.io-client": "^4.8.1",
     "zustand": "^4.5.4"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
+    "babel-plugin-transform-remove-console": "^6.9.4",
     "patch-package": "^8.0.1",
     "react-native-svg-transformer": "^1.4.0"
   },

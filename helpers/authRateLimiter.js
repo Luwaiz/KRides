@@ -1,14 +1,35 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 const WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 const MAX_ATTEMPTS = 5;
+const KEY_PREFIX = 'rate_limit_';
 
-// identifier (email or phone) → { count, windowStart }
-const attempts = new Map();
+async function getEntry(identifier) {
+    try {
+        const raw = await AsyncStorage.getItem(KEY_PREFIX + identifier);
+        return raw ? JSON.parse(raw) : null;
+    } catch {
+        return null;
+    }
+}
 
-export function checkRateLimit(identifier) {
+async function setEntry(identifier, entry) {
+    try {
+        await AsyncStorage.setItem(KEY_PREFIX + identifier, JSON.stringify(entry));
+    } catch {
+        // Non-fatal — fail open so a storage error never locks the user out
+    }
+}
+
+export async function checkRateLimit(identifier) {
     const now = Date.now();
-    const entry = attempts.get(identifier);
+    const entry = await getEntry(identifier);
 
-    if (!entry || now - entry.windowStart > WINDOW_MS) {
+    if (!entry) return { blocked: false };
+
+    if (now - entry.windowStart > WINDOW_MS) {
+        // Window expired — remove stale key
+        AsyncStorage.removeItem(KEY_PREFIX + identifier).catch(() => {});
         return { blocked: false };
     }
 
@@ -20,17 +41,21 @@ export function checkRateLimit(identifier) {
     return { blocked: false };
 }
 
-export function recordAttempt(identifier) {
+export async function recordAttempt(identifier) {
     const now = Date.now();
-    const entry = attempts.get(identifier);
+    const entry = await getEntry(identifier);
 
     if (!entry || now - entry.windowStart > WINDOW_MS) {
-        attempts.set(identifier, { count: 1, windowStart: now });
+        await setEntry(identifier, { count: 1, windowStart: now });
     } else {
-        attempts.set(identifier, { count: entry.count + 1, windowStart: entry.windowStart });
+        await setEntry(identifier, { count: entry.count + 1, windowStart: entry.windowStart });
     }
 }
 
-export function clearAttempts(identifier) {
-    attempts.delete(identifier);
+export async function clearAttempts(identifier) {
+    try {
+        await AsyncStorage.removeItem(KEY_PREFIX + identifier);
+    } catch {
+        // Non-fatal
+    }
 }

@@ -17,7 +17,6 @@ import AcceptHeader from "../../components/DriverHeader/AcceptHeader";
 import { GOOGLE_MAPS_API_KEY } from "@env";
 import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import MapViewDirections from "react-native-maps-directions";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import Geolocation from "@react-native-community/geolocation";
 import { registerForPushNotificationsAsync } from "../../helpers/pushNotifications";
 import { doc, updateDoc, getDoc } from "firebase/firestore";
@@ -61,22 +60,6 @@ const HomePage = () => {
 	// Request permissions on mount
 	useEffect(() => {
 		requestLocationPermissions();
-	}, []);
-
-	// Check if new driver and redirect to bank details
-	useEffect(() => {
-		const checkNewDriver = async () => {
-			try {
-				const isNewDriver = await AsyncStorage.getItem("isNewDriver");
-				if (isNewDriver === "true") {
-					await AsyncStorage.removeItem("isNewDriver");
-					navigation.navigate("BankAccountDetails");
-				}
-			} catch (error) {
-				console.error("Error checking new driver status:", error);
-			}
-		};
-		checkNewDriver();
 	}, []);
 
 	// Register for push notifications

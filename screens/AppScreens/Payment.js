@@ -4,16 +4,21 @@ import React, { useState } from "react";
 import { FLUTTERWAVE_PUBLIC_KEY } from "@env";
 import Toast from "react-native-toast-message";
 
-const generateTransactionRef = (length) => {
-	var result = "";
-	var characters =
-		"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-	for (var i = 0; i < length; i++) {
-		result += characters.charAt(
-			Math.floor(Math.random() * characters.length)
-		);
+const generateTransactionRef = (length = 12) => {
+	const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+	let result = "";
+	try {
+		const bytes = new Uint8Array(length);
+		crypto.getRandomValues(bytes);
+		result = Array.from(bytes).map(b => chars[b % chars.length]).join("");
+	} catch {
+		// Fallback for environments where crypto is unavailable
+		for (let i = 0; i < length; i++) {
+			result += chars.charAt(Math.floor(Math.random() * chars.length));
+		}
 	}
-	return `flw_tx_ref_${result}`;
+	// Append timestamp to guarantee uniqueness even if randomness collides
+	return `flw_tx_ref_${result}_${Date.now()}`;
 };
 
 const Payment = ({ email, amount, name, phoneNumber, BookRide, loading = false }) => {

@@ -23,7 +23,13 @@
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
       "Bash(del \"patches\\\\flutterwave-react-native+1.0.4.patch\")",
-      "Bash(git rm *)"
+      "Bash(git rm *)",
+      "Bash(grep -iE \"\\(^|/\\)\\\\.env\\($|\\\\.|local|production|development|prod|dev\\)\")",
+      "Bash(git check-ignore *)",
+      "Bash(node -e \"const fs=require\\('fs'\\); console.log\\(Buffer.from\\(fs.readFileSync\\('c:/Users/Administrator/Documents/REACTNATIVE/KRides/kampusride-firebase-adminsdk-fbsvc-9dc8424136.json'\\)\\).toString\\('base64'\\)\\)\")",
+      "Bash(rm -f build_log.txt build_log_verify.txt prebuild_log.txt prebuild_log_2.txt fix_snippet.txt sha1_output.txt socket-server.js fcm-v1-key.json kampusride-f546b40d90a1.json kampusride-firebase-adminsdk-fbsvc-9dc8424136.json APK_CRASH_FIX_GUIDE.md APK_CRASH_TROUBLESHOOTING.md BUILD_ERROR_FIX.md CRITICAL_BUILD_ANALYSIS.md FIREBASE_EMAIL_CONFIGURATION.md FIRESTORE_RULES_FIX.md FIRESTORE_SETUP.md FIXES_APPLIED.md FLUTTERWAVE_AND_CRASH_ANALYSIS.md GOOGLE_SIGNIN_TROUBLESHOOTING.md LOCATION_FIXES_SUMMARY.md LOCATION_SETUP_README.md MAP_RENDERING_FIX.md QUICK_FIX_GUIDE.md SIGNUP_CRASH_ANALYSIS.md KRides_PRD.md SCHOOL_MANAGEMENT_PROPOSAL.md PRE_DEPLOYMENT_CHECKLIST.md TESTING_QUICK_REFERENCE.md)",
+      "Bash(rm -rf coverage/ dist/ functions/)",
+      "Bash(eas project:info)"
     ]
   }
 }
