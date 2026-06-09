@@ -1,6 +1,7 @@
 # KRides — Campus Ride-Hailing App
 
-<img width="301" height="100" alt="Logos" src="https://github.com/user-attachments/assets/4665c396-d198-4e08-a5e8-e8f7f075d34d" />
+<img width="390" height="844" alt="image" src="https://github.com/user-attachments/assets/830a75ef-4b59-4794-b695-e04396308fdd" />
+
 
 KRides (Kampus Ride) is a mobile ride-hailing platform built for university campuses. Students request rides from verified campus drivers — think of it as a campus-scoped Bolt/Uber with wallet-based payments, real-time driver tracking, and in-app ratings.
 
