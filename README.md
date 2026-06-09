@@ -373,28 +373,8 @@ eas submit --platform android
 
 ---
 
-## Environment & Build Info
 
-| Key | Value |
-|---|---|
-| Bundle ID (iOS) | `com.eluwaiz.KRides` |
-| Package name (Android) | `com.eluwaiz.KRides` |
-| EAS Project ID | `61bd7aca-e58d-4cf2-840c-28773922c9d1` |
-| Expo owner | `uwaiz` |
-| Minimum iOS target | iOS 13.4+ (Expo SDK 52 default) |
-| Android permissions | `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION` |
-| Notification server | Render (Express.js, Node >= 18) |
 
----
-
-## Contributing
-
-1. Create a feature branch from `main`: `git checkout -b feature/your-feature`
-2. Make your changes and ensure tests pass: `npx jest`
-3. Commit with a descriptive message: `git commit -m "feat: add wallet balance display"`
-4. Push and open a pull request against `main`
-
----
 
 ## License
 
