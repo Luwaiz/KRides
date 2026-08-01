@@ -423,17 +423,23 @@ export const declineRide = async (rideId, driverId) => {
 };
 
 /**
- * Check and update pending refund statuses
+ * Check and update pending refund statuses for one customer
  * Useful for monitoring refunds that are still processing
+ * @param {string} customerId - Customer ID (required — firestore.rules rejects
+ *   an unscoped query across the whole rides collection outright, since it
+ *   can't guarantee every match belongs to the requesting user)
  * @returns {Promise<Array>} Array of refund status updates
  */
-export const checkPendingRefunds = async () => {
+export const checkPendingRefunds = async (customerId) => {
+	if (!customerId) return [];
+
 	try {
 		const { checkRefundStatus } = require('./flutterwaveRefund');
 
 		const ridesRef = collection(FIREBASE_DB, "rides");
 		const q = query(
 			ridesRef,
+			where("customerId", "==", customerId),
 			where("refundStatus", "==", "pending")
 		);
 
