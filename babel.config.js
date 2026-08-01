@@ -1,5 +1,8 @@
 module.exports = function (api) {
-	api.cache(true);
+	// api.env() configures its own caching internally (keyed on the env
+	// name) — calling api.cache(true) first locks the cache to "forever"
+	// mode, and api.env() then tries to reconfigure it, which throws
+	// "Caching has already been configured with .never or .forever()".
 	const isProduction = api.env('production');
 	return {
 		presets: ["babel-preset-expo"],

@@ -1684,16 +1684,28 @@ async function sweepStalePendingRides() {
             if (!claimed) continue;
 
             const amount = Number(ride.amount) || 0;
+            const needsRefund = amount > 0 && (ride.paymentMethod === 'wallet' || ride.paymentMethod === 'flutterwave');
             let refunded = false;
+            let refundAttempted = false;
 
             try {
                 if (amount > 0 && ride.paymentMethod === 'wallet' && ride.customerId) {
+                    refundAttempted = true;
                     await refundWalletForRide(rideRef, ride.customerId, amount, 'Ride auto-cancelled — no driver found');
                     refunded = true;
                 } else if (amount > 0 && ride.paymentMethod === 'flutterwave' && ride.transactionId) {
+                    refundAttempted = true;
                     await refundFlutterwaveTransaction(ride.transactionId, amount, 'No driver accepted the ride in time');
                     await rideRef.update({ refundStatus: 'completed', refundedAt: admin.firestore.FieldValue.serverTimestamp() });
                     refunded = true;
+                } else if (amount > 0 && ride.paymentMethod === 'flutterwave' && !ride.transactionId) {
+                    // Paid by card but the transaction ID was never recorded — the
+                    // same "needs manual review" flag used elsewhere for this gap.
+                    await rideRef.update({
+                        refundStatus: 'needs_review',
+                        needsManualRefundReview: true,
+                        refundReviewReason: 'Flutterwave transactionId missing at auto-cancel time',
+                    });
                 }
             } catch (err) {
                 console.error(`❌ Auto-cancel refund failed for ride ${rideDoc.id}:`, err);
@@ -1703,7 +1715,12 @@ async function sweepStalePendingRides() {
                 await rideRef.update(failureUpdate).catch(() => {});
             }
 
-            console.log(`✅ Auto-cancelled stale pending ride ${rideDoc.id}${refunded ? ' (refunded)' : ' (refund pending/failed — see ride doc)'}`);
+            const refundLabel = refunded
+                ? 'refunded'
+                : refundAttempted
+                    ? 'refund attempt failed — see ride doc'
+                    : 'no refund needed';
+            console.log(`✅ Auto-cancelled stale pending ride ${rideDoc.id} (${refundLabel})`);
 
             // Best-effort push notification — a failure here shouldn't block the sweep
             try {
@@ -1711,14 +1728,21 @@ async function sweepStalePendingRides() {
                     const customerSnap = await db.collection('users').doc(ride.customerId).get();
                     const pushToken = customerSnap.exists ? customerSnap.data()?.fcmToken : null;
                     if (pushToken) {
-                        await sendFCMNotification(
+                        const message = !needsRefund
+                            ? "We couldn't find a driver in time, so your ride was cancelled."
+                            : refunded
+                                ? "We couldn't find a driver in time, so your ride was cancelled and refunded."
+                                : "We couldn't find a driver in time, so your ride was cancelled. Contact support about your refund.";
+                        const result = await sendFCMNotification(
                             pushToken,
                             'Ride Cancelled',
-                            refunded || amount <= 0
-                                ? "We couldn't find a driver in time, so your ride was cancelled and refunded."
-                                : "We couldn't find a driver in time, so your ride was cancelled. Contact support about your refund.",
+                            message,
                             { type: 'ride_auto_cancelled', rideId: rideDoc.id }
                         );
+                        if (result.permanent) {
+                            await db.collection('users').doc(ride.customerId).update({ fcmToken: null });
+                            console.log(`🧹 Cleared stale FCM token for customer ${ride.customerId}`);
+                        }
                     }
                 }
             } catch (err) {

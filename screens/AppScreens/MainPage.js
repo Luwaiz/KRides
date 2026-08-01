@@ -188,7 +188,7 @@ const MainPage = () => {
 	// On mount, retry any refunds that previously failed or are still pending
 	useEffect(() => {
 		if (!UserId) return;
-		checkPendingRefunds().catch(() => {});
+		checkPendingRefunds(UserId).catch(() => {});
 	}, [UserId]);
 
 	// Reset per-ride flags whenever the active ride changes
