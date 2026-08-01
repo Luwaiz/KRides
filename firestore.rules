@@ -113,10 +113,14 @@ service cloud.firestore {
     }
 
     // ── Driver locations ──────────────────────────────────────────────────────
-    // Read restricted to the driver themselves — live tracking is not a
-    // client-facing feature, so no customer needs to read this collection.
+    // The driver always reads/writes their own doc. A customer may also read
+    // it, but only while `activeRideCustomerId` on the doc names them — the
+    // driver app sets that field to match their accepted ride's customer and
+    // clears it when the ride ends, so a rider can never read another rider's
+    // driver-tracking data.
     match /driver_locations/{driverId} {
-      allow read:  if isOwner(driverId);
+      allow read:  if isOwner(driverId) ||
+                      (isAuth() && resource.data.activeRideCustomerId == request.auth.uid);
       allow write: if isOwner(driverId);
     }
 
@@ -124,6 +128,16 @@ service cloud.firestore {
     match /locations/{locationId} {
       allow read:  if isAuth();
       allow write: if false;
+    }
+
+    // ── Orphaned charges (reconciliation) ───────────────────────────────────────
+    // Written by the client when a card charge succeeds but ride creation and
+    // the automatic refund both fail. Only the charged customer may create one;
+    // reviewing/resolving these happens via the Firebase console (Admin SDK),
+    // so no client read/update/delete is allowed.
+    match /orphanedCharges/{chargeId} {
+      allow create: if isAuth() && request.resource.data.customerId == request.auth.uid;
+      allow read, update, delete: if false;
     }
 
     // ── Catch-all: deny everything not listed above ───────────────────────────

@@ -11,7 +11,6 @@ import {
 } from "react-native";
 import BottomSheet, { BottomSheetFlatList } from "@gorhom/bottom-sheet";
 import React, { useEffect, useState, useRef } from "react";
-import Geolocation from "@react-native-community/geolocation";
 import { Feather } from "@expo/vector-icons";
 import ActiveButton from "../buttons/ActiveButton";
 import { colors } from "../../constants/styling";
@@ -33,7 +32,7 @@ import { getRideCoordinates } from "../../helpers/getLocationCoordinates";
 import { listenToPendingRides, declineRide } from "../../helpers/firebaseRides";
 import { calculateDriverEarnings } from "../../constants/commission";
 import { notifyCustomerRideAccepted } from "../../helpers/notificationHelpers";
-import { doc, updateDoc, setDoc, runTransaction, serverTimestamp } from "firebase/firestore";
+import { doc, updateDoc, runTransaction, serverTimestamp } from "firebase/firestore";
 import { FIREBASE_DB } from "../../firebaseConfig";
 import { sp, fs, br, ms } from "../../constants/responsive";
 import { useNavigation } from "@react-navigation/native";
@@ -300,35 +299,9 @@ const HomeTab = () => {
 		console.log("✅ Ride accepted atomically, switched to AcceptTab");
 	};
 
-	// Track driver location — only while online
-	useEffect(() => {
-		if (!uid || !isOnline) return;
-
-		const watchId = Geolocation.watchPosition(
-			(position) => {
-				const locationRef = doc(FIREBASE_DB, "driver_locations", uid);
-				setDoc(locationRef, {
-					location: {
-						latitude: position.coords.latitude,
-						longitude: position.coords.longitude,
-					},
-					locationUpdatedAt: serverTimestamp(),
-				}, { merge: true }).catch(() => {});
-			},
-			(error) => {
-				console.warn("⚠️ Location tracking error:", error);
-			},
-			{ enableHighAccuracy: true, distanceFilter: 10, interval: 10000 }
-		);
-
-		return () => {
-			try {
-				Geolocation.clearWatch(watchId);
-			} catch (e) {
-				console.warn('⚠️ Geolocation.clearWatch failed:', e.message);
-			}
-		};
-	}, [uid, isOnline]);
+	// Driver location tracking now lives in HomePage.js (the shared parent of
+	// HomeTab and AcceptTab) so it keeps running across the HomeTab → AcceptTab
+	// switch instead of stopping the moment a ride is accepted.
 
 	return (
 		<>

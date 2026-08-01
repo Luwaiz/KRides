@@ -27,6 +27,7 @@ import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import { doc, deleteDoc } from "firebase/firestore";
 import Toast from "react-native-toast-message";
 import { colors } from "../../constants/styling";
+import notificationManager from "../../helpers/notificationManager";
 
 const Confirmation1 = ({ modal, setModal, title }) => {
 	const navigation = useNavigation();
@@ -131,6 +132,15 @@ const Confirmation1 = ({ modal, setModal, title }) => {
 	const logOut = async () => {
 		try {
 			setLoading(true);
+
+			// Clear this device's push token from Firestore while still
+			// authenticated — otherwise the next person to log into this
+			// device could receive push notifications meant for this account.
+			const currentUser = FIREBASE_AUTH.currentUser;
+			if (currentUser) {
+				const { role } = useAuthStore.getState();
+				await notificationManager.cleanup(currentUser.uid, role);
+			}
 
 			// Sign out from Firebase
 			await signOut(FIREBASE_AUTH);

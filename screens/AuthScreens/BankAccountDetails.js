@@ -107,6 +107,11 @@ const BankAccountDetails = ({ navigation, route }) => {
             if (result.success) {
                 const subaccountId = result.data.subaccount_id;
                 const verifiedBankName = result.data.bank_name || bankName;
+                // Server resolves the account number against the bank before
+                // creating the subaccount — use that verified name rather than
+                // the driver's app profile name, which is often different from
+                // the name on their bank account.
+                const verifiedAccountName = result.data.verified_account_name || accountName;
 
                 // 2. Update Firestore locally
                 const driverRef = doc(FIREBASE_DB, "drivers", driverId);
@@ -114,7 +119,7 @@ const BankAccountDetails = ({ navigation, route }) => {
                     bankName: verifiedBankName,
                     bankCode: bankCode,
                     accountNumber: accountNumber,
-                    accountName: fullName || accountName,
+                    accountName: verifiedAccountName,
                     subaccountId: subaccountId,
                     subaccountCreatedAt: serverTimestamp(),
                     bankDetailsVerified: true,
@@ -126,7 +131,7 @@ const BankAccountDetails = ({ navigation, route }) => {
                     bankName: verifiedBankName,
                     bankCode: bankCode,
                     accountNumber: accountNumber,
-                    accountName: fullName || accountName,
+                    accountName: verifiedAccountName,
                     bankDetailsVerified: true,
                 });
 

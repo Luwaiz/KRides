@@ -1,6 +1,7 @@
 const express = require('express');
 const admin = require('firebase-admin');
 const cors = require('cors');
+const { sendDriverReportEmail } = require('./emailservice');
 require('dotenv').config();
 
 const app = express();
@@ -55,36 +56,6 @@ const db = admin.firestore();
 
 // Using Firebase Cloud Messaging (FCM) for push notifications
 console.log('✅ Firebase Admin SDK initialized for FCM notifications');
-
-// Notify customer that driver has arrived
-app.post('/api/notifications/notify-driver-arrived', async (req, res) => {
-    const { customerId, driverName } = req.body;
-    console.log('\ud83d\udccd Driver arrival notification request:', { customerId, driverName });
-    if (!customerId || !driverName) {
-        return res.status(400).json({ error: 'Missing required fields' });
-    }
-    try {
-        const customerDoc = await db.collection('users').doc(customerId).get();
-        if (!customerDoc.exists) {
-            return res.status(404).json({ error: 'Customer not found' });
-        }
-        const pushToken = customerDoc.data()?.fcmToken;
-        if (!pushToken) {
-            return res.json({ success: false, skipped: true, reason: 'no_push_token' });
-        }
-        await sendFCMNotification(
-            pushToken,
-            'Driver Arrived! 🚗',
-            `${driverName} has arrived at your pickup location`,
-            { type: 'driver_arrived', driverName }
-        );
-        console.log('\u2705 Driver arrival notification sent');
-        res.json({ success: true });
-    } catch (error) {
-        console.error('\u274c Error:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
 
 /**
  * Helper function to send FCM Push Notification with retry logic
@@ -586,46 +557,56 @@ app.post('/api/rides/rate', async (req, res) => {
 
     try {
         const rideRef = db.collection('rides').doc(rideId);
-        const rideSnap = await rideRef.get();
-
-        if (!rideSnap.exists) {
-            return res.status(404).json({ error: 'Ride not found' });
-        }
-
-        const ride = rideSnap.data();
-
-        if (ride.customerId !== decoded.uid) {
-            return res.status(403).json({ error: 'Forbidden — not your ride' });
-        }
-
-        if (ride.customerRating) {
-            return res.status(409).json({ error: 'Already rated' });
-        }
-
+        const driverRef = db.collection('drivers').doc(driverId);
         const now = new Date();
-        const batch = db.batch();
 
-        batch.update(db.collection('drivers').doc(driverId), {
-            ratings: admin.firestore.FieldValue.arrayUnion({
+        // A transaction (not a plain read + batch) so the "already rated"
+        // check and the write happen atomically — otherwise two near-
+        // simultaneous requests (double tap, client retry) can both pass the
+        // check and both commit, double-counting toward the driver's rating.
+        await db.runTransaction(async (txn) => {
+            const rideSnap = await txn.get(rideRef);
+            if (!rideSnap.exists) {
+                throw Object.assign(new Error('Ride not found'), { httpStatus: 404 });
+            }
+
+            const ride = rideSnap.data();
+            if (ride.customerId !== decoded.uid) {
+                throw Object.assign(new Error('Forbidden — not your ride'), { httpStatus: 403 });
+            }
+            if (ride.customerRating) {
+                throw Object.assign(new Error('Already rated'), { httpStatus: 409 });
+            }
+
+            const driverSnap = await txn.get(driverRef);
+            const existingRatings = driverSnap.exists ? (driverSnap.data().ratings || []) : [];
+            const updatedRatings = [...existingRatings, {
                 rideId,
                 rating,
                 feedback: (feedback || '').trim(),
                 createdAt: now,
-            }),
-            totalRatings: admin.firestore.FieldValue.increment(1),
-            ratingSum: admin.firestore.FieldValue.increment(rating),
+            }];
+
+            // Cap stored history so a long-tenured driver's document can't
+            // approach Firestore's 1MB limit — keep the most recent entries.
+            const RATINGS_CAP = 500;
+            const cappedRatings = updatedRatings.length > RATINGS_CAP
+                ? updatedRatings.slice(updatedRatings.length - RATINGS_CAP)
+                : updatedRatings;
+
+            txn.update(driverRef, { ratings: cappedRatings });
+            txn.set(rideRef, {
+                customerRating: rating,
+                customerFeedback: (feedback || '').trim(),
+                ratedAt: now,
+            }, { merge: true });
         });
-
-        batch.set(rideRef, {
-            customerRating: rating,
-            customerFeedback: (feedback || '').trim(),
-            ratedAt: now,
-        }, { merge: true });
-
-        await batch.commit();
 
         res.json({ success: true });
     } catch (error) {
+        if (error.httpStatus) {
+            return res.status(error.httpStatus).json({ error: error.message });
+        }
         console.error('❌ Error submitting rating:', error);
         res.status(500).json({ error: 'Failed to submit rating. Please try again.' });
     }
@@ -743,6 +724,30 @@ app.post('/api/payments/create-subaccount', async (req, res) => {
     }
 
     try {
+        // Resolve the account number against the bank before creating a payout
+        // subaccount for it — catches a mistyped account number up front instead
+        // of silently routing future ride earnings to the wrong account.
+        const resolveResponse = await fetch('https://api.flutterwave.com/v3/accounts/resolve', {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${secretKey}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                account_number: accountNumber,
+                account_bank: bankCode,
+            }),
+        });
+        const resolveResult = await resolveResponse.json();
+
+        if (resolveResult.status !== 'success' || !resolveResult.data?.account_name) {
+            return res.status(400).json({
+                error: 'Could not verify this account number with the selected bank. Please double-check the details.',
+            });
+        }
+
+        const verifiedAccountName = resolveResult.data.account_name;
+
         const response = await fetch('https://api.flutterwave.com/v3/subaccounts', {
             method: 'POST',
             headers: {
@@ -752,7 +757,7 @@ app.post('/api/payments/create-subaccount', async (req, res) => {
             body: JSON.stringify({
                 account_bank: bankCode,
                 account_number: accountNumber,
-                business_name: businessName || accountName,
+                business_name: businessName || verifiedAccountName,
                 business_email: `${phone}@rideapp.com`,
                 business_mobile: phone,
                 country: 'NG',
@@ -764,7 +769,7 @@ app.post('/api/payments/create-subaccount', async (req, res) => {
         const result = await response.json();
 
         if (result.status === 'success') {
-            res.json({ success: true, data: result.data });
+            res.json({ success: true, data: { ...result.data, verified_account_name: verifiedAccountName } });
         } else {
             res.status(400).json({ error: result.message || 'Subaccount creation failed' });
         }
@@ -864,6 +869,57 @@ app.post('/api/auth/driver-email', async (req, res) => {
     } catch (error) {
         console.error('❌ Driver email lookup error:', error);
         return res.status(500).json({ error: 'Lookup failed. Please try again.' });
+    }
+});
+
+/**
+ * POST /api/auth/check-phone
+ * Checks whether a phone number is already registered (as a customer or
+ * driver) before the client creates a Firebase Auth account for it.
+ * Runs with Admin SDK so this can be checked pre-signup, before the caller
+ * has any Firebase session the client-side Firestore rules could key off.
+ *
+ * Body: { phone: string }
+ * Response: { available: boolean }
+ */
+app.post('/api/auth/check-phone', async (req, res) => {
+    const { phone } = req.body;
+    if (!phone || typeof phone !== 'string' || !phone.trim()) {
+        return res.status(400).json({ error: 'phone is required' });
+    }
+
+    const normalized = (() => {
+        const digits = phone.replace(/\D/g, '');
+        if (digits.startsWith('234') && digits.length === 13) return '0' + digits.slice(3);
+        if (/^0[789]\d{9}$/.test(digits)) return digits;
+        return null;
+    })();
+
+    if (!normalized) {
+        return res.status(400).json({ error: 'Invalid Nigerian phone number format' });
+    }
+
+    // Shares the driver-email lookup's rate limit bucket — both are
+    // phone-keyed pre-auth lookups exposed to the same abuse pattern.
+    const rateCheck = checkDriverEmailRateLimit(normalized);
+    if (rateCheck.blocked) {
+        console.warn(`🚫 Rate limit hit for check-phone: ${normalized}`);
+        return res.status(429).json({
+            error: 'Too many attempts. Please wait before trying again.',
+            retryAfterSeconds: rateCheck.retryAfterSec,
+        });
+    }
+
+    try {
+        const [usersSnap, driversSnap] = await Promise.all([
+            db.collection('users').where('phone', '==', normalized).limit(1).get(),
+            db.collection('drivers').where('phone', '==', normalized).limit(1).get(),
+        ]);
+
+        return res.json({ available: usersSnap.empty && driversSnap.empty });
+    } catch (error) {
+        console.error('❌ Phone availability check error:', error);
+        return res.status(500).json({ error: 'Check failed. Please try again.' });
     }
 });
 
@@ -1367,18 +1423,34 @@ app.post('/api/payments/wallet-refund', async (req, res) => {
         }
 
         const userRef = db.collection('users').doc(customerId);
+        let alreadyRefunded = false;
+        let refundedAmount = amount;
+
         await db.runTransaction(async (txn) => {
+            // Re-read the ride *inside* the transaction so Firestore serializes
+            // concurrent refund attempts against it, instead of both racing past
+            // the walletRefunded check made outside the transaction above.
+            const rideTxnSnap = await txn.get(rideRef);
+            if (!rideTxnSnap.exists) throw new Error('Ride not found');
+
+            if (rideTxnSnap.data().walletRefunded === true) {
+                alreadyRefunded = true;
+                return;
+            }
+
+            refundedAmount = Number(rideTxnSnap.data().amount) || 0;
+
             const userSnap = await txn.get(userRef);
             if (!userSnap.exists) throw new Error('Customer not found');
 
             const currentBalance = Number(userSnap.data().walletBalance) || 0;
-            txn.update(userRef, { walletBalance: currentBalance + amount });
+            txn.update(userRef, { walletBalance: currentBalance + refundedAmount });
 
             const txRef = db.collection('walletTransactions').doc();
             txn.set(txRef, {
                 userId: customerId,
                 type: 'refund',
-                amount,
+                amount: refundedAmount,
                 description: 'Ride cancellation refund',
                 rideId,
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -1388,8 +1460,12 @@ app.post('/api/payments/wallet-refund', async (req, res) => {
             txn.update(rideRef, { walletRefunded: true });
         });
 
-        console.log(`✅ Wallet refund of ₦${amount} credited to customer ${customerId} (ride ${rideId})`);
-        return res.json({ success: true, refundedAmount: amount });
+        if (alreadyRefunded) {
+            return res.json({ success: true, alreadyRefunded: true });
+        }
+
+        console.log(`✅ Wallet refund of ₦${refundedAmount} credited to customer ${customerId} (ride ${rideId})`);
+        return res.json({ success: true, refundedAmount });
 
     } catch (error) {
         console.error('❌ wallet-refund error:', error);
@@ -1476,9 +1552,26 @@ app.post('/api/reports/driver', async (req, res) => {
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
 
-        // TODO: enable email notifications when ready
-        // Set GMAIL_USER, GMAIL_APP_PASSWORD, and ADMIN_EMAIL (kampusrides24@gmail.com) on Render
-        console.log(`📋 Report saved for ride ${rideId} — email notifications disabled`);
+        const emailResult = await sendDriverReportEmail({
+            driverName: driver.fullName || driver.name || ride.driverName || 'Unknown',
+            driverPhone: driver.phone || ride.driverPhone || 'N/A',
+            driverEmail: driver.email || 'N/A',
+            driverVehicleId: driver.vehicle_id || 'N/A',
+            customerName: customer.firstName ? `${customer.firstName} ${customer.lastName || ''}`.trim() : 'Unknown',
+            customerPhone: customer.phone || ride.customerPhone || 'N/A',
+            pickupLocation: pickupStr,
+            destination: destStr,
+            rideAmount: ride.amount || 0,
+            rideStatus: ride.status,
+            rideId,
+            reason,
+            description,
+        }).catch((err) => {
+            console.error('❌ Driver report email error:', err.message);
+            return { sent: false, reason: 'send_failed' };
+        });
+
+        console.log(`📋 Report saved for ride ${rideId}${emailResult.sent ? ' — admin notified by email' : ` — email not sent (${emailResult.reason})`}`);
 
         return res.json({ success: true });
 
@@ -1487,6 +1580,157 @@ app.post('/api/reports/driver', async (req, res) => {
         return res.status(500).json({ error: 'Could not submit report. Please try again.' });
     }
 });
+
+/**
+ * Auto-cancel pending rides nobody accepts in time.
+ * Without this, a ride the customer paid for but that no driver accepted —
+ * e.g. because the customer closed the app — sits at status 'pending'
+ * indefinitely with the charge never resolved.
+ */
+const PENDING_RIDE_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+const PENDING_RIDE_SWEEP_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
+
+async function refundFlutterwaveTransaction(transactionId, amount, comments) {
+    const secretKey = process.env.FLUTTERWAVE_SECRET_KEY;
+    if (!secretKey) throw new Error('Payment service not configured');
+
+    const payload = { comments: comments || 'Ride cancelled' };
+    if (amount) payload.amount = amount;
+
+    const response = await fetch(
+        `https://api.flutterwave.com/v3/transactions/${transactionId}/refund`,
+        {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${secretKey}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+        }
+    );
+    const result = await response.json();
+    if (result.status !== 'success') {
+        throw new Error(result.message || 'Refund failed');
+    }
+    return result.data;
+}
+
+async function refundWalletForRide(rideRef, customerId, amount, description) {
+    await db.runTransaction(async (txn) => {
+        // Re-read the ride inside the transaction (same fix as /wallet-refund)
+        // so this can never double-credit a ride refunded through another path.
+        const rideTxnSnap = await txn.get(rideRef);
+        if (!rideTxnSnap.exists || rideTxnSnap.data().walletRefunded === true) return;
+
+        const userRef = db.collection('users').doc(customerId);
+        const userSnap = await txn.get(userRef);
+        if (!userSnap.exists) throw new Error('Customer not found');
+
+        const currentBalance = Number(userSnap.data().walletBalance) || 0;
+        txn.update(userRef, { walletBalance: currentBalance + amount });
+
+        const txRef = db.collection('walletTransactions').doc();
+        txn.set(txRef, {
+            userId: customerId,
+            type: 'refund',
+            amount,
+            description,
+            rideId: rideRef.id,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        txn.update(rideRef, { walletRefunded: true });
+    });
+}
+
+async function sweepStalePendingRides() {
+    try {
+        const cutoff = admin.firestore.Timestamp.fromMillis(Date.now() - PENDING_RIDE_TIMEOUT_MS);
+        const snap = await db.collection('rides')
+            .where('status', '==', 'pending')
+            .where('createdAt', '<', cutoff)
+            .get();
+
+        if (snap.empty) return;
+
+        console.log(`⏱️ Auto-cancel sweep: ${snap.size} stale pending ride(s) found`);
+
+        for (const rideDoc of snap.docs) {
+            const rideRef = rideDoc.ref;
+            const ride = rideDoc.data();
+
+            // Atomically claim the ride so a driver accepting, or the customer
+            // cancelling, at the same moment wins the race instead of us.
+            let claimed = false;
+            try {
+                await db.runTransaction(async (txn) => {
+                    const freshSnap = await txn.get(rideRef);
+                    if (!freshSnap.exists) return;
+                    const fresh = freshSnap.data();
+                    if (fresh.status !== 'pending' || fresh.refundProcessing === true) return;
+                    txn.update(rideRef, {
+                        status: 'cancelled',
+                        cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
+                        cancelledBy: 'system',
+                        cancellationReason: 'no_driver_timeout',
+                    });
+                    claimed = true;
+                });
+            } catch (err) {
+                console.error(`❌ Auto-cancel transaction failed for ride ${rideDoc.id}:`, err);
+                continue;
+            }
+
+            if (!claimed) continue;
+
+            const amount = Number(ride.amount) || 0;
+            let refunded = false;
+
+            try {
+                if (amount > 0 && ride.paymentMethod === 'wallet' && ride.customerId) {
+                    await refundWalletForRide(rideRef, ride.customerId, amount, 'Ride auto-cancelled — no driver found');
+                    refunded = true;
+                } else if (amount > 0 && ride.paymentMethod === 'flutterwave' && ride.transactionId) {
+                    await refundFlutterwaveTransaction(ride.transactionId, amount, 'No driver accepted the ride in time');
+                    await rideRef.update({ refundStatus: 'completed', refundedAt: admin.firestore.FieldValue.serverTimestamp() });
+                    refunded = true;
+                }
+            } catch (err) {
+                console.error(`❌ Auto-cancel refund failed for ride ${rideDoc.id}:`, err);
+                const failureUpdate = { autoCancelRefundError: err.message };
+                if (ride.paymentMethod === 'flutterwave') failureUpdate.refundStatus = 'failed';
+                if (ride.paymentMethod === 'wallet') failureUpdate.walletRefundStatus = 'failed';
+                await rideRef.update(failureUpdate).catch(() => {});
+            }
+
+            console.log(`✅ Auto-cancelled stale pending ride ${rideDoc.id}${refunded ? ' (refunded)' : ' (refund pending/failed — see ride doc)'}`);
+
+            // Best-effort push notification — a failure here shouldn't block the sweep
+            try {
+                if (ride.customerId) {
+                    const customerSnap = await db.collection('users').doc(ride.customerId).get();
+                    const pushToken = customerSnap.exists ? customerSnap.data()?.fcmToken : null;
+                    if (pushToken) {
+                        await sendFCMNotification(
+                            pushToken,
+                            'Ride Cancelled',
+                            refunded || amount <= 0
+                                ? "We couldn't find a driver in time, so your ride was cancelled and refunded."
+                                : "We couldn't find a driver in time, so your ride was cancelled. Contact support about your refund.",
+                            { type: 'ride_auto_cancelled', rideId: rideDoc.id }
+                        );
+                    }
+                }
+            } catch (err) {
+                console.error(`⚠️ Auto-cancel notification failed for ride ${rideDoc.id}:`, err);
+            }
+        }
+    } catch (error) {
+        console.error('❌ sweepStalePendingRides error:', error);
+    }
+}
+
+setInterval(sweepStalePendingRides, PENDING_RIDE_SWEEP_INTERVAL_MS);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

@@ -1,5 +1,5 @@
-import { StyleSheet, Text, View } from "react-native";
-import React from "react";
+import { StyleSheet, Text, View, Alert } from "react-native";
+import React, { useState } from "react";
 import { colors } from "../../constants/styling";
 import { SafeAreaView } from "react-native-safe-area-context";
 import BackButton from "../../components/buttons/BackButton";
@@ -8,10 +8,20 @@ import ActiveButton from "../../components/buttons/ActiveButton";
 import { useNavigation } from "@react-navigation/native";
 
 const Promo = () => {
-    const navigation= useNavigation()
-    const toHome= ()=>{
-        navigation.goBack()
-    }
+    const navigation = useNavigation();
+    const [code, setCode] = useState("");
+
+    // There is no promo/voucher backend yet — this used to accept any input
+    // (or none) and silently navigate back, which looked like a code had
+    // been applied when nothing happened. Say so honestly until redemption
+    // is actually implemented, instead of faking success.
+    const submitCode = () => {
+        if (!code.trim()) {
+            Alert.alert("Enter a Code", "Please enter a promo code.");
+            return;
+        }
+        Alert.alert("Not Available Yet", "Promo codes aren't supported yet. Check back soon!");
+    };
 
 	return (
 		<SafeAreaView style={styles.container}>
@@ -24,10 +34,13 @@ const Promo = () => {
 				<TextInput1
 					placeholder={"e.g PTY204"}
 					text={<Text>Enter the code to claim your voucher</Text>}
+					value={code}
+					onChangeText={setCode}
+					autoCapitalize="characters"
 				/>
 
 				<View style={styles.button}>
-					<ActiveButton title={"Submit"} onPress={toHome}/>
+					<ActiveButton title={"Submit"} onPress={submitCode}/>
 				</View>
 			</View>
 		</SafeAreaView>

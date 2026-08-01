@@ -93,7 +93,6 @@ import {
 const PAYMENTS_SERVER_URL = 'https://krides.onrender.com/api/payments';
 import {
 	notifyDriversAboutNewRide,
-	notifyCustomerRideAccepted,
 	notifyCustomerRideCompleted,
 } from "./notificationHelpers";
 
@@ -204,44 +203,6 @@ export const createRide = async (rideData) => {
 };
 
 /**
- * Accept a ride (driver side)
- * @param {string} rideId - Ride ID
- * @param {Object} driverData - Driver details
- * @returns {Promise<void>}
- */
-export const acceptRide = async (rideId, driverData) => {
-	try {
-		const { FIREBASE_AUTH: auth } = require("../firebaseConfig");
-		const currentUser = auth.currentUser;
-		if (!currentUser) throw new Error("Not authenticated");
-		// Force driverId to the authenticated UID — never trust a caller-supplied value.
-		const verifiedDriverId = currentUser.uid;
-
-		const rideRef = doc(FIREBASE_DB, "rides", rideId);
-
-		await updateDoc(rideRef, {
-			status: "accepted",
-			driverId: verifiedDriverId,
-			driverName: (driverData.driverName || "").trim(),
-			driverPhone: (driverData.driverPhone || "").trim(),
-			vehicleId: (driverData.vehicleId || "").trim(),
-			acceptedAt: serverTimestamp(),
-		});
-
-		const rideDoc = await getDoc(rideRef);
-		const rideData = rideDoc.data();
-		console.log("✅ Ride accepted:", rideId);
-		// Notify customer that ride was accepted
-		if (rideData.customerId) {
-			await notifyCustomerRideAccepted(rideData.customerId, rideId, driverData.driverName);
-		}
-	} catch (error) {
-		console.error("❌ Error accepting ride:", error);
-		throw error;
-	}
-};
-
-/**
  * Update ride status
  * @param {string} rideId - Ride ID
  * @param {string} status - New status
@@ -275,41 +236,6 @@ export const updateRideStatus = async (rideId, status) => {
 		}
 	} catch (error) {
 		console.error("❌ Error updating ride status:", error);
-		throw error;
-	}
-};
-
-/**
- * Cancel a ride
- * @param {string} rideId - Ride ID
- * @param {string} cancelledBy - Who cancelled the ride ('customer' or 'driver')
- * @param {string} reason - Cancellation reason (optional)
- * @returns {Promise<void>}
- */
-export const cancelRide = async (rideId, cancelledBy = 'customer', reason = '') => {
-	try {
-		const rideRef = doc(FIREBASE_DB, "rides", rideId);
-		const updates = {
-			status: "cancelled",
-			cancelledAt: serverTimestamp(),
-			cancelledBy,
-		};
-
-		if (reason) {
-			updates.cancellationReason = reason;
-		}
-
-		await updateDoc(rideRef, updates);
-		console.log(`✅ Ride cancelled by ${cancelledBy}:`, rideId);
-
-		// Get customer ID for notification
-		const rideDoc = await getDoc(rideRef);
-		if (rideDoc.exists()) {
-			// Logic for other updates if needed 
-		}
-		return updates;
-	} catch (error) {
-		console.error("❌ Error cancelling ride:", error);
 		throw error;
 	}
 };
@@ -397,15 +323,26 @@ export const cancelRideWithRefund = async (rideId, cancelledBy = 'customer', rea
 			const idToken = await FIREBASE_AUTH.currentUser?.getIdToken();
 			if (!idToken) throw new Error("No authenticated user for wallet refund");
 
-			const response = await fetch(`${PAYMENTS_SERVER_URL}/wallet-refund`, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					'x-api-key': NOTIFICATION_API_KEY || '',
-					'Authorization': `Bearer ${idToken}`,
-				},
-				body: JSON.stringify({ idToken, rideId }),
-			});
+			// Match flutterwaveRefund.js's timeout — an unbounded fetch here could
+			// hang indefinitely after the server already committed the credit,
+			// leaving walletRefundStatus stuck out of sync with reality.
+			const controller = new AbortController();
+			const timeoutId = setTimeout(() => controller.abort(), 10000);
+			let response;
+			try {
+				response = await fetch(`${PAYMENTS_SERVER_URL}/wallet-refund`, {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+						'x-api-key': NOTIFICATION_API_KEY || '',
+						'Authorization': `Bearer ${idToken}`,
+					},
+					body: JSON.stringify({ idToken, rideId }),
+					signal: controller.signal,
+				});
+			} finally {
+				clearTimeout(timeoutId);
+			}
 			const result = await response.json();
 
 			if (result.success) {
@@ -944,23 +881,28 @@ export const getCustomerHistoryPaginated = async (customerId, pageSize = 20, las
 	try {
 		const ridesRef = collection(FIREBASE_DB, "rides");
 
-		// Build queries for completed rides (without orderBy to avoid index requirement)
-		const completedQueryParts = [
+		// Ordered by date so startAfter(lastDoc) actually advances the page
+		// instead of re-fetching the same first batch every time — this needs
+		// a composite index per status (customerId + status + completedAt /
+		// cancelledAt); Firestore will log a console link to create it on
+		// first use if it's missing.
+		const completedQuery = query(
 			ridesRef,
 			where("customerId", "==", customerId),
 			where("status", "==", "completed"),
-			limit(pageSize * 2) // Fetch more to ensure we have enough after sorting
-		];
-		const completedQuery = query(...completedQueryParts);
+			orderBy("completedAt", "desc"),
+			...(lastDoc?.completed ? [startAfter(lastDoc.completed)] : []),
+			limit(pageSize)
+		);
 
-		// Build queries for cancelled rides (without orderBy to avoid index requirement)
-		const cancelledQueryParts = [
+		const cancelledQuery = query(
 			ridesRef,
 			where("customerId", "==", customerId),
 			where("status", "==", "cancelled"),
-			limit(pageSize * 2) // Fetch more to ensure we have enough after sorting
-		];
-		const cancelledQuery = query(...cancelledQueryParts);
+			orderBy("cancelledAt", "desc"),
+			...(lastDoc?.cancelled ? [startAfter(lastDoc.cancelled)] : []),
+			limit(pageSize)
+		);
 
 		const [completedSnapshot, cancelledSnapshot] = await Promise.all([
 			getDocs(completedQuery),
@@ -968,8 +910,8 @@ export const getCustomerHistoryPaginated = async (customerId, pageSize = 20, las
 		]);
 
 		const rides = [];
-		let lastCompletedDoc = null;
-		let lastCancelledDoc = null;
+		let lastCompletedDoc = lastDoc?.completed || null;
+		let lastCancelledDoc = lastDoc?.cancelled || null;
 
 		completedSnapshot.forEach((doc) => {
 			rides.push({ ...doc.data(), rideId: doc.id });
@@ -1022,23 +964,28 @@ export const getDriverHistoryPaginated = async (driverId, pageSize = 20, lastDoc
 	try {
 		const ridesRef = collection(FIREBASE_DB, "rides");
 
-		// Build queries for completed rides (without orderBy to avoid index requirement)
-		const completedQueryParts = [
+		// Ordered by date so startAfter(lastDoc) actually advances the page
+		// instead of re-fetching the same first batch every time — this needs
+		// a composite index per status (driverId + status + completedAt /
+		// cancelledAt); Firestore will log a console link to create it on
+		// first use if it's missing.
+		const completedQuery = query(
 			ridesRef,
 			where("driverId", "==", driverId),
 			where("status", "==", "completed"),
-			limit(pageSize * 2) // Fetch more to ensure we have enough after sorting
-		];
-		const completedQuery = query(...completedQueryParts);
+			orderBy("completedAt", "desc"),
+			...(lastDoc?.completed ? [startAfter(lastDoc.completed)] : []),
+			limit(pageSize)
+		);
 
-		// Build queries for cancelled rides (without orderBy to avoid index requirement)
-		const cancelledQueryParts = [
+		const cancelledQuery = query(
 			ridesRef,
 			where("driverId", "==", driverId),
 			where("status", "==", "cancelled"),
-			limit(pageSize * 2) // Fetch more to ensure we have enough after sorting
-		];
-		const cancelledQuery = query(...cancelledQueryParts);
+			orderBy("cancelledAt", "desc"),
+			...(lastDoc?.cancelled ? [startAfter(lastDoc.cancelled)] : []),
+			limit(pageSize)
+		);
 
 		const [completedSnapshot, cancelledSnapshot] = await Promise.all([
 			getDocs(completedQuery),
@@ -1046,8 +993,8 @@ export const getDriverHistoryPaginated = async (driverId, pageSize = 20, lastDoc
 		]);
 
 		const rides = [];
-		let lastCompletedDoc = null;
-		let lastCancelledDoc = null;
+		let lastCompletedDoc = lastDoc?.completed || null;
+		let lastCancelledDoc = lastDoc?.cancelled || null;
 
 		completedSnapshot.forEach((doc) => {
 			rides.push({ ...doc.data(), rideId: doc.id });

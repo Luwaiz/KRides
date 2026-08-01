@@ -32,7 +32,9 @@ const DriverLogin = ({ navigation }) => {
 			return;
 		}
 
-		const identifier = phone.trim();
+		// Normalize so "08123456789" and "+2348123456789" for the same number
+		// share one rate-limit bucket instead of doubling the attempt budget.
+		const identifier = Firebase.normalizeNigerianPhone(phone) || phone.trim();
 		const rateCheck = await checkRateLimit(identifier);
 		if (rateCheck.blocked) {
 			Alert.alert("Too Many Attempts", `Please wait ${rateCheck.minutesRemaining} minute${rateCheck.minutesRemaining === 1 ? '' : 's'} before trying again.`);

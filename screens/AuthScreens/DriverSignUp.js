@@ -155,7 +155,13 @@ const DriverSignup = ({ navigation }) => {
 			setVehicleId(vehicle_id);
 			setPhone(normalizedPhone);
 
-			await Firebase.registerFcmToken(user.uid);
+			try {
+				await Firebase.registerFcmToken(user.uid);
+			} catch (fcmError) {
+				// Don't fail signup if FCM registration fails — the account and
+				// Firestore doc are already committed at this point.
+				console.warn("⚠️ FCM token registration failed:", fcmError);
+			}
 
 			setLoading(false);
 			navigation.replace("BankAccountDetails");

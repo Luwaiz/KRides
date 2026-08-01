@@ -87,3 +87,9 @@ kampusride-f546b40d90a1.json
 fcm-v1-key.json
 *.serviceaccount.json
 google-services-admin*.json
+
+# Firebase client config files — contain client OAuth IDs / API keys.
+# Semi-public by design, but kept out of version control. See README "Credentials".
+# Provide these locally and to EAS via file env vars / EAS file secrets.
+google-services.json
+GoogleService-Info.plist

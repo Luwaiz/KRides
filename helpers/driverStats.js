@@ -1,5 +1,6 @@
 import { FIREBASE_DB } from "../firebaseConfig";
 import { collection, query, where, getDocs } from "firebase/firestore";
+import { calculateDriverEarnings } from "../constants/commission";
 
 /**
  * Get driver's statistics for today
@@ -33,15 +34,7 @@ export const getDriverTodayStats = async (driverId) => {
             const completedAt = ride.completedAt?.toDate();
             if (completedAt && completedAt >= startOfToday) {
                 completedTrips++;
-
-                // Calculate driver's net earnings (after commission)
-                // Assuming the ride amount includes a commission split
-                // If you have a specific commission structure, adjust here
-                const rideAmount = ride.amount || 0;
-                const commission = ride.commission || 0; // Commission amount if stored
-                const netEarnings = rideAmount - commission;
-
-                earnedToday += netEarnings;
+                earnedToday += calculateDriverEarnings(ride.amount || 0, ride.numberOfPassengers || 1);
             }
         });
 
@@ -86,12 +79,7 @@ export const getDriverAllTimeStats = async (driverId) => {
         snapshot.forEach((doc) => {
             const ride = doc.data();
             totalTrips++;
-
-            // Calculate earnings
-            const rideAmount = ride.amount || 0;
-            const commission = ride.commission || 0;
-            const netEarnings = rideAmount - commission;
-            totalEarnings += netEarnings;
+            totalEarnings += calculateDriverEarnings(ride.amount || 0, ride.numberOfPassengers || 1);
 
             // Calculate average rating if available
             if (ride.driverRating) {

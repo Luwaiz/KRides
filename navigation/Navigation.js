@@ -112,16 +112,31 @@ const Navigation = () => {
 							}
 
 							if (pendingRole === 'customer') {
-								// Google sign-in explicitly requested customer — honour it
-								setAuthData(currentUser, {
-									email: currentUser.email,
-									name: currentUser.displayName || "User",
-								}, "customer");
-								setUserId(currentUser.uid);
-								setEmail(currentUser.email || "");
-								const nameParts = (currentUser.displayName || "User").split(" ");
-								setFirstName(nameParts[0] || "");
-								setLastName(nameParts.slice(1).join(" ") || "");
+								// Google sign-in explicitly requested customer — but don't
+								// honour that if this account is already registered as a
+								// driver (e.g. the same Google account used for driver
+								// signup, tapped from the customer Login/Signup screen).
+								const driverRef = doc(FIREBASE_DB, "drivers", currentUser.uid);
+								const driverSnap = await getDoc(driverRef);
+
+								if (!mounted) return;
+
+								if (driverSnap.exists()) {
+									const profile = driverSnap.data();
+									setAuthData(currentUser, profile, "driver");
+									await AsyncStorage.setItem(`role_${currentUser.uid}`, "driver");
+									setDriverProfile({ ...profile, uid: currentUser.uid });
+								} else {
+									setAuthData(currentUser, {
+										email: currentUser.email,
+										name: currentUser.displayName || "User",
+									}, "customer");
+									setUserId(currentUser.uid);
+									setEmail(currentUser.email || "");
+									const nameParts = (currentUser.displayName || "User").split(" ");
+									setFirstName(nameParts[0] || "");
+									setLastName(nameParts.slice(1).join(" ") || "");
+								}
 							} else {
 								// pending_role='driver' (DriverLogin) OR unknown — check drivers first
 								const driverRef = doc(FIREBASE_DB, "drivers", currentUser.uid);

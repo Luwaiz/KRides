@@ -10,9 +10,9 @@ import { useAcceptedRideStore, useDriverDetails } from "../../constants/Store";
 import useAuthStore from "../../constants/Store";
 import Avatar from "../../assets/svg/Frame 77avatar.svg";
 import Arrival from "../modals/Arrival";
-import { updateRideStatus, listenToPendingRides, declineRide, getRide } from "../../helpers/firebaseRides";
+import { updateRideStatus, listenToPendingRides, listenToRide, declineRide, getRide } from "../../helpers/firebaseRides";
 import { getRideCoordinates } from "../../helpers/getLocationCoordinates";
-import { doc, updateDoc, runTransaction, serverTimestamp } from "firebase/firestore";
+import { doc, runTransaction, serverTimestamp } from "firebase/firestore";
 import { FIREBASE_DB, FIREBASE_AUTH } from "../../firebaseConfig";
 import { NOTIFICATION_API_KEY } from "@env";
 import { DrawerActions, useNavigation } from "@react-navigation/native";
@@ -63,6 +63,25 @@ const AcceptTab = () => {
 		}, uid);
 		return unsubscribe;
 	}, [uid, acceptedRide]);
+
+	// Listen for the customer cancelling this ride out from under the driver.
+	// Without this, the only signal was a best-effort push notification, which
+	// can silently fail (stale token, backgrounded app, notifications denied) —
+	// leaving the driver believing they still have an active ride.
+	useEffect(() => {
+		if (!acceptedRide?.rideId) return;
+
+		const unsubscribe = listenToRide(acceptedRide.rideId, (rideData) => {
+			if (rideData && rideData.status === 'cancelled') {
+				Alert.alert("Ride Cancelled", "The customer cancelled this ride.");
+				clearAcceptedRide();
+				setHasArrived(false);
+				setEndRide(false);
+			}
+		});
+
+		return unsubscribe;
+	}, [acceptedRide?.rideId]);
 
 	const RideEnded = () => {
 		if (!acceptedRide?.rideId) return;
@@ -149,6 +168,21 @@ const AcceptTab = () => {
 			});
 			const result = await response.json();
 			if (!result.success) throw new Error(result.error || 'Could not complete ride');
+
+			// The ride can complete successfully while the payout to the driver's
+			// bank account fails or is skipped — don't let that go unnoticed.
+			if (!result.payout && result.reason === 'no_bank_details') {
+				Alert.alert(
+					"Ride Completed — Add Bank Details to Get Paid",
+					"You haven't set up your payout bank account yet, so this ride's earnings haven't been sent. Add your bank details in Settings, then contact support to receive this payout."
+				);
+			} else if (!result.payout && result.reason === 'transfer_failed') {
+				Alert.alert(
+					"Ride Completed — Payout Failed",
+					"This ride is complete, but the transfer to your bank account didn't go through. Our team has been notified — contact support if you don't see it within 24 hours."
+				);
+			}
+
 			setEndRide(true);
 		} catch (error) {
 			if (error.name === 'AbortError') {
@@ -211,10 +245,19 @@ const AcceptTab = () => {
 			console.log('📤 Notifying customer with driver name:', driverName);
 
 			const rideRef = doc(FIREBASE_DB, 'rides', acceptedRide.rideId);
-			await updateDoc(rideRef, {
-				hasArrived: true,
-				arrivedAt: serverTimestamp(),
-				status: 'in_progress',
+
+			// Guard against the ride having been cancelled (and refunded) between
+			// when this screen loaded and when the driver tapped Arrived — a plain
+			// updateDoc here would silently flip a cancelled ride back to in_progress.
+			await runTransaction(FIREBASE_DB, async (txn) => {
+				const snap = await txn.get(rideRef);
+				if (!snap.exists()) throw new Error("RIDE_NOT_FOUND");
+				if (snap.data().status === 'cancelled') throw new Error("RIDE_CANCELLED");
+				txn.update(rideRef, {
+					hasArrived: true,
+					arrivedAt: serverTimestamp(),
+					status: 'in_progress',
+				});
 			});
 			console.log('✅ Ride updated with arrival status');
 
@@ -226,8 +269,15 @@ const AcceptTab = () => {
 			setHasArrived(true);
 			Alert.alert('Success', 'You have arrived. You can now complete the ride.');
 		} catch (error) {
-			console.error('Error notifying arrival:', error);
-			Alert.alert('Error', 'Could not update arrival status. Please try again.');
+			if (error.message === 'RIDE_CANCELLED' || error.message === 'RIDE_NOT_FOUND') {
+				console.warn('⚠️ Cannot mark arrival — ride was cancelled');
+				Alert.alert('Ride Cancelled', 'This ride was cancelled by the customer.');
+				clearAcceptedRide();
+				setHasArrived(false);
+			} else {
+				console.error('Error notifying arrival:', error);
+				Alert.alert('Error', 'Could not update arrival status. Please try again.');
+			}
 		} finally {
 			setArriving(false);
 		}

@@ -11,7 +11,52 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-export const PENDING_RATING_KEY = "pending_customer_rating";
+// Deferred ratings are stored as a list keyed by rideId rather than a single
+// flat object — a single shared key meant deferring one ride's rating and
+// then completing another before returning to it would silently discard the
+// first one (whichever write happened last won).
+export const PENDING_RATINGS_KEY = "pending_customer_ratings";
+
+async function readPendingRatings() {
+	try {
+		const raw = await AsyncStorage.getItem(PENDING_RATINGS_KEY);
+		if (!raw) return [];
+		const parsed = JSON.parse(raw);
+		return Array.isArray(parsed) ? parsed : [];
+	} catch {
+		return [];
+	}
+}
+
+async function writePendingRatings(list) {
+	try {
+		await AsyncStorage.setItem(PENDING_RATINGS_KEY, JSON.stringify(list));
+	} catch {
+		// Non-fatal — worst case the reminder is lost for this session
+	}
+}
+
+export async function addPendingRating(entry) {
+	const list = await readPendingRatings();
+	const withoutThisRide = list.filter((r) => r.rideId !== entry.rideId);
+	withoutThisRide.push(entry);
+	await writePendingRatings(withoutThisRide);
+}
+
+export async function removePendingRating(rideId) {
+	const list = await readPendingRatings();
+	const filtered = list.filter((r) => r.rideId !== rideId);
+	if (filtered.length !== list.length) {
+		await writePendingRatings(filtered);
+	}
+}
+
+// Oldest deferred rating first — first deferred, first re-surfaced.
+export async function getNextPendingRating() {
+	const list = await readPendingRatings();
+	return list.length > 0 ? list[0] : null;
+}
+
 import { AntDesign } from "@expo/vector-icons";
 import ActiveButton from "../buttons/ActiveButton";
 import { colors } from "../../constants/styling";
@@ -62,7 +107,7 @@ const RatingModal = ({ visible, onClose, rideId, driverId, driverName, pickupLoc
 				throw new Error(result.error || 'Rating submission failed');
 			}
 
-			await AsyncStorage.removeItem(PENDING_RATING_KEY).catch(() => {});
+			await removePendingRating(rideId);
 			Alert.alert("Thank you!", "Your feedback has been submitted.");
 
 			setRating(0);
@@ -70,7 +115,18 @@ const RatingModal = ({ visible, onClose, rideId, driverId, driverName, pickupLoc
 			onClose();
 		} catch (error) {
 			console.error("❌ Error submitting rating:", error);
-			Alert.alert("Error", "Unable to submit rating. Please try again.");
+			// Keep the rating from vanishing if this was a network/server hiccup —
+			// queue it the same way a deferred rating is queued so it resurfaces
+			// instead of being lost the moment the user backs out of the alert.
+			await addPendingRating({
+				rideId,
+				driverId,
+				driverName,
+				pickupLocation,
+				destination,
+				amount,
+			});
+			Alert.alert("Error", "Unable to submit rating. We'll try again next time you open the app.");
 		} finally {
 			setLoading(false);
 		}
@@ -79,7 +135,7 @@ const RatingModal = ({ visible, onClose, rideId, driverId, driverName, pickupLoc
 	const handleRateLater = async () => {
 		if (isReminder) {
 			// Second dismissal — treat as a permanent skip
-			await AsyncStorage.removeItem(PENDING_RATING_KEY).catch(() => {});
+			await removePendingRating(rideId);
 			setRating(0);
 			setFeedback("");
 			onClose();
@@ -94,19 +150,17 @@ const RatingModal = ({ visible, onClose, rideId, driverId, driverName, pickupLoc
 				{
 					text: "Remind Me Later",
 					onPress: async () => {
-						// Persist the ride details so we can re-surface the modal on next open
-						const pendingRating = {
+						// Persist the ride details so we can re-surface the modal on next
+						// open — keyed by rideId alongside any other deferred ratings so
+						// completing a different ride in the meantime doesn't discard it.
+						await addPendingRating({
 							rideId,
 							driverId,
 							driverName,
 							pickupLocation,
 							destination,
 							amount,
-						};
-						await AsyncStorage.setItem(
-							PENDING_RATING_KEY,
-							JSON.stringify(pendingRating)
-						).catch(() => {});
+						});
 						setRating(0);
 						setFeedback("");
 						onClose();

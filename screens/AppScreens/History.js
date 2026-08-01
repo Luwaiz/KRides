@@ -1,5 +1,6 @@
 import { FlatList, StyleSheet, Text, View, Dimensions, TouchableOpacity, ScrollView } from "react-native";
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import { colors } from "../../constants/styling";
 import { SafeAreaView } from "react-native-safe-area-context";
 import BackButton from "../../components/buttons/BackButton";
@@ -14,26 +15,33 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 
 const History = () => {
 	const [loading, setLoading] = useState(false);
+	const [loadingMore, setLoadingMore] = useState(false);
 	const [error, setError] = useState(false);
 	const [history, setHistory] = useState([]);
+	const [lastVisible, setLastVisible] = useState(null);
+	const [hasMore, setHasMore] = useState(false);
 	const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 	const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
 	const [selectedDay, setSelectedDay] = useState(null);
 	const UserId = useUserDetails((state) => state?.UserId);
 	const driverUid = useDriverDetails((state) => state?.uid);
+	const PAGE_SIZE = 50;
+
+	const isDriver = !!driverUid && !UserId;
+	const userId = isDriver ? driverUid : UserId;
 
 	const getHistory = async () => {
-		const isDriver = !!driverUid && !UserId;
-		const userId = isDriver ? driverUid : UserId;
 		if (!userId) return;
 
 		setLoading(true);
 		setError(false);
 		try {
 			const result = isDriver
-				? await getDriverHistoryPaginated(userId, 200)
-				: await getCustomerHistoryPaginated(userId, 200);
+				? await getDriverHistoryPaginated(userId, PAGE_SIZE)
+				: await getCustomerHistoryPaginated(userId, PAGE_SIZE);
 			setHistory(result.rides);
+			setLastVisible(result.lastVisible);
+			setHasMore(result.hasMore);
 		} catch (err) {
 			console.error("❌ Error fetching history:", err);
 			setError(true);
@@ -42,9 +50,36 @@ const History = () => {
 		}
 	};
 
-	useEffect(() => {
-		getHistory();
-	}, [UserId, driverUid]);
+	// Older rides beyond the first page — previously there was no way to
+	// reach them at all once a rider/driver passed the fixed single-page
+	// fetch, so they'd silently vanish from history with no indication.
+	const loadMoreHistory = async () => {
+		if (!userId || !hasMore || loadingMore) return;
+
+		setLoadingMore(true);
+		try {
+			const result = isDriver
+				? await getDriverHistoryPaginated(userId, PAGE_SIZE, lastVisible)
+				: await getCustomerHistoryPaginated(userId, PAGE_SIZE, lastVisible);
+			setHistory((prev) => [...prev, ...result.rides]);
+			setLastVisible(result.lastVisible);
+			setHasMore(result.hasMore);
+		} catch (err) {
+			console.error("❌ Error loading more history:", err);
+		} finally {
+			setLoadingMore(false);
+		}
+	};
+
+	// Re-fetch the first page every time this screen regains focus (not just
+	// on mount) — otherwise a ride completed while this screen stayed mounted
+	// further down the stack wouldn't show up until something else forced a
+	// remount.
+	useFocusEffect(
+		useCallback(() => {
+			getHistory();
+		}, [userId, isDriver])
+	);
 
 	// Reset day selection when month or year changes
 	useEffect(() => {
@@ -182,6 +217,21 @@ const History = () => {
 						</Text>
 					}
 					ListEmptyComponent={renderEmpty}
+					ListFooterComponent={
+						hasMore ? (
+							<TouchableOpacity
+								style={styles.loadMoreButton}
+								onPress={loadMoreHistory}
+								disabled={loadingMore}
+							>
+								{loadingMore ? (
+									<ActivityIndicator size={18} color={colors.primaryBlue} />
+								) : (
+									<Text style={styles.loadMoreText}>Load older rides</Text>
+								)}
+							</TouchableOpacity>
+						) : null
+					}
 					contentContainerStyle={styles.contentContainer}
 					style={{ width, flex: 1 }}
 				/>
@@ -287,6 +337,24 @@ const styles = StyleSheet.create({
 	},
 	dayTextDisabled: {
 		color: colors.lightGrey3,
+	},
+	loadMoreButton: {
+		alignSelf: "center",
+		marginTop: 16,
+		marginBottom: 8,
+		paddingHorizontal: 20,
+		paddingVertical: 10,
+		borderRadius: 20,
+		borderWidth: 1,
+		borderColor: colors.primaryBlue,
+		minWidth: 140,
+		alignItems: "center",
+		justifyContent: "center",
+	},
+	loadMoreText: {
+		fontSize: 14,
+		fontFamily: "Albert-SemiBold",
+		color: colors.primaryBlue,
 	},
 	monthDate: {
 		marginTop: 8,

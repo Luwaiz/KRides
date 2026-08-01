@@ -14,6 +14,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { doc, collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Toast from 'react-native-toast-message';
 import BackButton from '../../components/buttons/BackButton';
 import { colors } from '../../constants/styling';
 import { sp, fs, br } from '../../constants/responsive';
@@ -22,6 +24,7 @@ import { useUserDetails } from '../../constants/Store';
 import { createTopupAccount } from '../../helpers/walletHelpers';
 
 const MIN_TOPUP = 100;
+const TOPUP_ACCOUNT_KEY_PREFIX = 'pending_topup_account_';
 
 const Wallet = () => {
     const [balance, setBalance] = useState(0);
@@ -62,6 +65,25 @@ const Wallet = () => {
         return () => unsub();
     }, [user?.uid]);
 
+    // Restore a still-pending top-up account if the rider navigated away
+    // (e.g. to their banking app) and came back — previously this was plain
+    // component state, so leaving the screen lost the account details with
+    // no way to see them again short of generating a brand new one.
+    useEffect(() => {
+        if (!user) return;
+        AsyncStorage.getItem(TOPUP_ACCOUNT_KEY_PREFIX + user.uid)
+            .then((raw) => {
+                if (!raw) return;
+                const saved = JSON.parse(raw);
+                if (saved.expiryDate && new Date(saved.expiryDate) < new Date()) {
+                    AsyncStorage.removeItem(TOPUP_ACCOUNT_KEY_PREFIX + user.uid).catch(() => {});
+                    return;
+                }
+                setTopupAccount(saved);
+            })
+            .catch(() => {});
+    }, [user?.uid]);
+
     const handleGenerateAccount = async () => {
         const amount = Number(topupAmount);
         if (!amount || amount < MIN_TOPUP) {
@@ -76,6 +98,7 @@ const Wallet = () => {
             const result = await createTopupAccount(user.uid, user.email, fullName, amount);
             setTopupAccount(result);
             setTopupAmount('');
+            AsyncStorage.setItem(TOPUP_ACCOUNT_KEY_PREFIX + user.uid, JSON.stringify(result)).catch(() => {});
         } catch (err) {
             console.error('❌ Top-up account error:', err);
             setError('Could not generate account. Please try again.');
@@ -90,7 +113,15 @@ const Wallet = () => {
             await Share.share({
                 message: `KRides Wallet Top-up\nBank: ${topupAccount.bankName}\nAccount number: ${topupAccount.accountNumber}\nAccount name: ${topupAccount.accountName}\nAmount: ₦${topupAccount.amount?.toLocaleString('en-NG')}`,
             });
-        } catch (_) {}
+        } catch (error) {
+            console.warn('⚠️ Share failed:', error.message);
+            Toast.show({
+                type: 'tomatoToast',
+                text1: 'Could Not Share',
+                text2: 'Please try again or copy the details manually.',
+                position: 'top',
+            });
+        }
     };
 
     const formatBalance = (amount) =>
@@ -187,7 +218,10 @@ const Wallet = () => {
                                         <Ionicons name="share-outline" size={18} color={colors.primaryBlue} />
                                         <Text style={styles.shareText}>Share Details</Text>
                                     </TouchableOpacity>
-                                    <TouchableOpacity style={styles.newTopupButton} onPress={() => setTopupAccount(null)}>
+                                    <TouchableOpacity style={styles.newTopupButton} onPress={() => {
+                                        setTopupAccount(null);
+                                        if (user) AsyncStorage.removeItem(TOPUP_ACCOUNT_KEY_PREFIX + user.uid).catch(() => {});
+                                    }}>
                                         <Text style={styles.newTopupText}>New Top-up</Text>
                                     </TouchableOpacity>
                                 </View>

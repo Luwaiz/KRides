@@ -11,17 +11,18 @@ import { colors } from "../../constants/styling";
 import { DrawerActions, useNavigation } from "@react-navigation/native";
 import HomeTab from "../../components/DriversModal/HomeTab";
 import HomeHeader from "../../components/DriverHeader/HomeHeader";
-import { useAcceptedRideStore } from "../../constants/Store";
+import { useAcceptedRideStore, useDriverAvailability } from "../../constants/Store";
 import AcceptTab from "../../components/DriversModal/AcceptTab";
 import AcceptHeader from "../../components/DriverHeader/AcceptHeader";
 import { GOOGLE_MAPS_API_KEY } from "@env";
 import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import MapViewDirections from "react-native-maps-directions";
 import Geolocation from "@react-native-community/geolocation";
-import { registerForPushNotificationsAsync } from "../../helpers/pushNotifications";
-import { doc, updateDoc, getDoc } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { FIREBASE_DB } from "../../firebaseConfig";
+import notificationManager from "../../helpers/notificationManager";
 import { useDriverDetails } from "../../constants/Store";
+import Toast from "react-native-toast-message";
 
 const HomePage = () => {
 	const acceptedRide = useAcceptedRideStore((state) => state.acceptedRide);
@@ -30,6 +31,7 @@ const HomePage = () => {
 	const mapRef = useRef(null);
 	const [mapReady, setMapReady] = useState(false);
 	const { uid } = useDriverDetails((state) => ({ uid: state.uid }));
+	const directionsErrorShown = useRef(false);
 
 	// Request location permissions
 	const requestLocationPermissions = async () => {
@@ -49,6 +51,13 @@ const HomePage = () => {
 				return true;
 			} else {
 				console.log("❌ Location permission denied");
+				Toast.show({
+					type: 'tomatoToast',
+					text1: 'Location Access Needed',
+					text2: "Enable location for KRides in your device settings — riders can't be matched to you without it.",
+					position: 'top',
+					visibilityTime: 6000,
+				});
 				return false;
 			}
 		} catch (err) {
@@ -62,40 +71,60 @@ const HomePage = () => {
 		requestLocationPermissions();
 	}, []);
 
-	// Register for push notifications
+	// Register for push notifications. notificationManager also clears any
+	// stale token left behind by a previous account on this device before
+	// writing this driver's token — see helpers/notificationManager.js.
 	useEffect(() => {
-		const setupNotifications = async () => {
-			if (!uid) return;
+		if (!uid) return;
+		notificationManager.initialize(uid, 'driver').catch((error) => {
+			console.error("❌ Error setting up notifications:", error);
+		});
+	}, [uid]);
 
+	const isOnline = useDriverAvailability((state) => state.isOnline);
+
+	// Track driver location — while online, and (independent of the online
+	// toggle) for the duration of an active ride, so the rider's map can show
+	// it. Lives here rather than in HomeTab so it keeps running across the
+	// HomeTab → AcceptTab switch instead of stopping the moment a ride is
+	// accepted. activeRideCustomerId is denormalized onto the location doc so
+	// firestore.rules can grant read access to just that one rider.
+	useEffect(() => {
+		if (!uid || !(isOnline || acceptedRide)) return;
+
+		const activeRideCustomerId = acceptedRide?.customerId || null;
+		const locationRef = doc(FIREBASE_DB, "driver_locations", uid);
+
+		// Write immediately on ride-state change, decoupled from the next GPS
+		// fix — otherwise a rider whose ride just ended could keep read access
+		// until the driver's position next updates.
+		setDoc(locationRef, { activeRideCustomerId }, { merge: true }).catch(() => {});
+
+		const watchId = Geolocation.watchPosition(
+			(position) => {
+				setDoc(locationRef, {
+					location: {
+						latitude: position.coords.latitude,
+						longitude: position.coords.longitude,
+					},
+					locationUpdatedAt: serverTimestamp(),
+					activeRideCustomerId,
+				}, { merge: true }).catch(() => {});
+			},
+			(error) => {
+				console.warn("⚠️ Location tracking error:", error);
+			},
+			{ enableHighAccuracy: true, distanceFilter: 10, interval: 10000 }
+		);
+
+		return () => {
 			try {
-				console.log("📱 Registering driver for push notifications...");
-				const token = await registerForPushNotificationsAsync();
-
-				if (token) {
-					console.log("✅ Driver FCM token obtained:", token.substring(0, 30) + "...");
-
-					const driverRef = doc(FIREBASE_DB, "drivers", uid);
-					const snap = await getDoc(driverRef);
-					if (snap.exists() && snap.data()?.fcmToken === token) {
-						console.log("✅ Driver FCM token unchanged, skipping write");
-					} else {
-						await updateDoc(driverRef, {
-							fcmToken: token,
-							lastTokenUpdate: new Date(),
-						});
-						console.log("✅ Driver FCM token saved to Firestore");
-					}
-				} else {
-					console.warn("⚠️ Failed to get FCM token");
-					// Non-critical: driver still works, just won't get push notifications
-				}
-			} catch (error) {
-				console.error("❌ Error setting up notifications:", error);
+				Geolocation.clearWatch(watchId);
+			} catch (e) {
+				console.warn('⚠️ Geolocation.clearWatch failed:', e.message);
 			}
 		};
-
-		setupNotifications();
-	}, [uid]);
+	}, [uid, isOnline, acceptedRide?.rideId, acceptedRide?.customerId]);
 
 	// Validated, stable coordinate objects — prevent NaN from reaching the map
 	// when acceptedRide coords are missing or malformed.
@@ -175,7 +204,17 @@ const HomePage = () => {
 								console.log(`Duration: ${result.duration} min.`);
 							}}
 							onError={(errorMessage) => {
-								console.log('Directions error:', errorMessage);
+								console.warn('⚠️ Directions error:', errorMessage);
+								if (!directionsErrorShown.current) {
+									directionsErrorShown.current = true;
+									Toast.show({
+										type: 'tomatoToast',
+										text1: 'Could Not Load Route',
+										text2: 'The route line may not display — use your regular navigation app to get there.',
+										position: 'top',
+										visibilityTime: 4000,
+									});
+								}
 							}}
 						/>
 					)}

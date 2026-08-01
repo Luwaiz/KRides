@@ -50,6 +50,14 @@ export async function signUpWithEmail({
 	role = "customer",
 	vehicle_id = null,
 }) {
+	if (phone) {
+		const available = await checkPhoneAvailable(phone);
+		if (!available) {
+			const err = new Error("An account with this phone number already exists. Please log in instead.");
+			err.code = "auth/phone-already-in-use";
+			throw err;
+		}
+	}
 
 	const credential = await createUserWithEmailAndPassword(
 		FIREBASE_AUTH,
@@ -86,6 +94,13 @@ export async function signUpWithEmail({
 		console.error(`❌ Failed to create user document in ${collectionName}/${uid}:`, firestoreError);
 		console.error("Error code:", firestoreError.code);
 		console.error("Error message:", firestoreError.message);
+
+		// The Auth account now exists but has no profile doc. Sign it back out
+		// so onAuthStateChanged (Navigation.js) doesn't pick up this session on
+		// the next check and silently fall back to a default "customer" role
+		// with a placeholder profile — leaving the user (possibly a driver
+		// applicant) stuck in the wrong app with no profile.
+		await firebaseSignOut(FIREBASE_AUTH).catch(() => {});
 
 		// Always throw so the signup screen shows an error instead of silently
 		// leaving the user in a broken state (Auth account exists, no profile).
@@ -257,6 +272,40 @@ export async function getDriverEmailByPhone(phone) {
 	return data.email;
 }
 
+/**
+ * Check whether a phone number is already registered (as a customer or
+ * driver) before creating a Firebase Auth account for it. Runs server-side
+ * with the Admin SDK since Firestore rules can't be queried pre-auth.
+ * Fails open (returns true) on network/server errors — this is a data
+ * integrity nicety, not a security gate, so a flaky check shouldn't block
+ * signup entirely.
+ * @param {string} phone
+ * @returns {Promise<boolean>} true if available (or the check itself failed)
+ */
+export async function checkPhoneAvailable(phone) {
+	if (!phone) return true;
+
+	try {
+		const response = await fetch(`${NOTIFICATION_SERVER}/api/auth/check-phone`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'x-api-key': NOTIFICATION_API_KEY || '',
+			},
+			body: JSON.stringify({ phone }),
+		});
+		const data = await response.json();
+		if (!response.ok) {
+			console.warn('⚠️ Phone availability check failed:', data.error);
+			return true;
+		}
+		return data.available !== false;
+	} catch (error) {
+		console.warn('⚠️ Phone availability check — network error:', error.message);
+		return true;
+	}
+}
+
 /** ---------- USER DOC FETCH ---------- **/
 
 export async function getUserDoc(uid) {
@@ -299,7 +348,22 @@ export async function handleGoogleSignIn(firebaseUser, googleUser, role = 'custo
 
 	const uid = firebaseUser.uid;
 	const collectionName = role === "driver" ? "drivers" : "users";
+	const otherCollectionName = role === "driver" ? "users" : "drivers";
 	const userRef = doc(FIREBASE_DB, collectionName, uid);
+
+	// This Google account may already be registered under the other role
+	// (e.g. a driver tapping "Continue with Google" on the customer screen).
+	// Don't silently create a second profile in the requested role.
+	const otherRoleSnap = await getDoc(doc(FIREBASE_DB, otherCollectionName, uid));
+	if (otherRoleSnap.exists()) {
+		const err = new Error(
+			role === "driver"
+				? "This Google account is already registered as a customer. Please use customer login instead."
+				: "This Google account is already registered as a driver. Please use driver login instead."
+		);
+		err.code = "auth/wrong-role-account";
+		throw err;
+	}
 
 	// Extract user data from Google profile
 	const userData = {

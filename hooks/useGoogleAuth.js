@@ -100,6 +100,10 @@ export function useGoogleAuth() {
                 errorMessage = 'Sign-in is already in progress';
             } else if (err.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
                 errorMessage = 'Google Play Services not available';
+            } else if (err.code === 'auth/account-exists-with-different-credential') {
+                errorMessage = 'An account already exists with this email using a different sign-in method. Please log in with your email and password instead.';
+            } else if (err.code === 'auth/wrong-role-account') {
+                errorMessage = err.message;
             }
 
             throw new Error(errorMessage);
