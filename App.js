@@ -10,6 +10,10 @@ import { PaperProvider } from "react-native-paper";
 import Toast from "react-native-toast-message";
 import ToastConfig from "./components/ToastConfig";
 import ErrorBoundary from "./components/ErrorBoundary";
+import NetworkBanner from "./components/NetworkBanner";
+import { installGlobalErrorHandlers } from "./helpers/globalErrorHandler";
+
+installGlobalErrorHandlers();
 
 import {
 	configureReanimatedLogger,
@@ -63,6 +67,7 @@ function App() {
 					<SafeAreaProvider>
 						<PaperProvider>
 							<Navigation />
+							<NetworkBanner />
 							<StatusBar style="auto" />
 							<Toast config={ToastConfig} />
 						</PaperProvider>

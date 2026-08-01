@@ -11,6 +11,7 @@ import Firebase from "../../hooks/Firebase";
 import Toast from "react-native-toast-message";
 import { useGoogleAuth } from "../../hooks/useGoogleAuth";
 import useAuthStore from "../../constants/Store";
+import { checkRateLimit, recordAttempt, clearAttempts } from "../../helpers/authRateLimiter";
 
 const Signup = ({ navigation }) => {
 	const [email, setEmail] = useState("");
@@ -101,6 +102,13 @@ const Signup = ({ navigation }) => {
 			return;
 		}
 
+		const identifier = email.toLowerCase().trim();
+		const rateCheck = await checkRateLimit(identifier);
+		if (rateCheck.blocked) {
+			Alert.alert("Too Many Attempts", `Please wait ${rateCheck.minutesRemaining} minute${rateCheck.minutesRemaining === 1 ? '' : 's'} before trying again.`);
+			return;
+		}
+
 		setLoading(true);
 		try {
 			console.log("🚀 Starting customer signup process...");
@@ -115,6 +123,7 @@ const Signup = ({ navigation }) => {
 			});
 
 			console.log("✅ Customer signup success:", user.uid);
+			clearAttempts(identifier);
 
 			try {
 				// Register FCM token for notifications
@@ -138,6 +147,7 @@ const Signup = ({ navigation }) => {
 			// No need to manually navigate
 		} catch (error) {
 			setLoading(false);
+			recordAttempt(identifier);
 			console.error("❌ Customer signup error:", error);
 
 			let errorMessage = "Sign up failed. Please try again.";
@@ -148,6 +158,8 @@ const Signup = ({ navigation }) => {
 				errorMessage = "Invalid email address";
 			} else if (error.code === "auth/weak-password") {
 				errorMessage = "Password is too weak";
+			} else if (error.code === "auth/phone-already-in-use") {
+				errorMessage = error.message;
 			}
 
 			Alert.alert("Sign Up Failed", errorMessage);

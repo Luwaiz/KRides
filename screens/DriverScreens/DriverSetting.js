@@ -10,7 +10,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors } from "../../constants/styling";
 import Confirmation1 from "../../components/modals/Confirmation1";
-import { FIREBASE_AUTH, FIREBASE_DB } from "../../firebaseConfig";
+import { FIREBASE_DB } from "../../firebaseConfig";
 import { doc, onSnapshot } from "firebase/firestore";
 
 const DriverSettings = ({ navigation }) => {
@@ -22,27 +22,28 @@ const DriverSettings = ({ navigation }) => {
 	}));
 	const [modalTitle, setModalTitle] = useState("");
 
+	// A plain synchronous subscription — the previous version wrapped this in
+	// an async function and called it without forwarding its return value, so
+	// React never saw the unsubscribe as a cleanup function and the listener
+	// was never torn down (leaking on unmount, and never re-pointing at a new
+	// driver's doc if a different account logged in without a full remount).
 	useEffect(() => {
-		const fetchProfile = async () => {
-			try {
-				const auth = FIREBASE_AUTH;
-				const db = FIREBASE_DB;
-				const user = auth.currentUser;
+		if (!uid) return;
 
-				if (user) {
-					const unsub = onSnapshot(doc(db, "drivers", user.uid), (doc) => {
-						if (doc.exists()) {
-							setProfileUrl(doc.data()?.profileUrl || null);
-						}
-					});
-					return unsub;
+		const unsub = onSnapshot(
+			doc(FIREBASE_DB, "drivers", uid),
+			(docSnap) => {
+				if (docSnap.exists()) {
+					setProfileUrl(docSnap.data()?.profileUrl || null);
 				}
-			} catch (error) {
+			},
+			(error) => {
 				console.error("Error fetching driver profile:", error);
 			}
-		};
-		fetchProfile();
-	}, []);
+		);
+
+		return unsub;
+	}, [uid]);
 
 	const openModal = (title) => {
 		setModalTitle(title);

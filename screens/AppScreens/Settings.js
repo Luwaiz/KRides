@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View, Image } from "react-native";
+import { Pressable, StyleSheet, Text, View, Image, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
 import React, { useEffect, useState } from "react";
 import useAuthStore, { useUserDetails } from "../../constants/Store";
 import Avatar from "../../assets/svg/Frame 91profile.svg";
@@ -11,13 +11,17 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { colors } from "../../constants/styling";
 import Confirmation1 from "../../components/modals/Confirmation1";
 import { FIREBASE_AUTH, FIREBASE_DB } from "../../firebaseConfig";
-import { doc, onSnapshot } from "firebase/firestore";
+import { doc, onSnapshot, updateDoc } from "firebase/firestore";
+import { CLOUDINARY_CLOUD_NAME, CLOUDINARY_UPLOAD_PRESET } from "@env";
+import * as ImagePicker from "expo-image-picker";
+import Toast from "react-native-toast-message";
 
 const Settings = ({ navigation }) => {
 	const [modal, setModal] = useState(false);
 	const [name, setName] = useState("");
 	const [profileUrl, setProfileUrl] = useState(null);
 	const [loading, setLoading] = useState(false);
+	const [uploadingImage, setUploadingImage] = useState(false);
 
 	const { user } = useAuthStore((state) => ({
 		user: state.user,
@@ -71,18 +75,112 @@ const Settings = ({ navigation }) => {
 		fetchUserProfile();
 	}, []);
 
+	const pickImage = async () => {
+		const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+		if (status !== "granted") {
+			Alert.alert("Permission Required", "Camera roll permission is needed to update your profile picture.");
+			return;
+		}
+
+		let result = await ImagePicker.launchImageLibraryAsync({
+			mediaTypes: ImagePicker.MediaTypeOptions.Images,
+			allowsEditing: true,
+			aspect: [1, 1],
+			quality: 0.5,
+			base64: true,
+		});
+
+		if (!result.canceled) {
+			const selectedImage = result.assets[0];
+			uploadToCloudinary(selectedImage);
+		}
+	};
+
+	const uploadToCloudinary = async (imageAsset) => {
+		setUploadingImage(true);
+		const controller = new AbortController();
+		const timeoutId = setTimeout(() => controller.abort(), 30000);
+		try {
+			const cloudName = CLOUDINARY_CLOUD_NAME;
+			const uploadPreset = CLOUDINARY_UPLOAD_PRESET;
+
+			const base64Img = `data:image/jpg;base64,${imageAsset.base64}`;
+			const data = {
+				file: base64Img,
+				upload_preset: uploadPreset,
+			};
+
+			const response = await fetch(
+				`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+				{
+					body: JSON.stringify(data),
+					headers: {
+						"content-type": "application/json",
+					},
+					method: "POST",
+					signal: controller.signal,
+				}
+			);
+
+			const result = await response.json();
+			if (result.secure_url) {
+				await saveProfileUrl(result.secure_url);
+			} else {
+				Alert.alert("Upload Failed", "Image upload did not return a URL. Please try again.");
+			}
+		} catch (error) {
+			if (error.name === "AbortError") {
+				Alert.alert("Timeout", "Upload timed out. Please check your connection and try again.");
+			} else {
+				console.error("Error uploading image:", error);
+				Alert.alert("Error", "Could not upload image. Please try again.");
+			}
+		} finally {
+			clearTimeout(timeoutId);
+			setUploadingImage(false);
+		}
+	};
+
+	const saveProfileUrl = async (url) => {
+		try {
+			const currentUser = FIREBASE_AUTH.currentUser;
+			if (!currentUser) return;
+
+			await updateDoc(doc(FIREBASE_DB, "users", currentUser.uid), {
+				profileUrl: url,
+			});
+
+			setProfileUrl(url);
+			Toast.show({
+				type: "tomatoToast",
+				text1: "Success!",
+				text2: "Profile picture updated",
+				position: "top",
+			});
+		} catch (error) {
+			console.error("Error saving profile URL:", error);
+			Alert.alert("Error", "Failed to save profile picture. Please try again.");
+		}
+	};
+
 	return (
 		<SafeAreaView style={styles.container}>
 			<View style={styles.topContainer}>
 				<Text style={styles.name}>{name}</Text>
-				{profileUrl ? (
-					<Image
-						source={{ uri: profileUrl }}
-						style={{ width: 80, height: 80, borderRadius: 40 }}
-					/>
-				) : (
-					<Avatar height={80} width={80} />
-				)}
+				<TouchableOpacity onPress={pickImage} disabled={uploadingImage}>
+					{uploadingImage ? (
+						<View style={[styles.avatarImage, styles.avatarLoading]}>
+							<ActivityIndicator size="small" color={colors.primaryBlue} />
+						</View>
+					) : profileUrl ? (
+						<Image
+							source={{ uri: profileUrl }}
+							style={styles.avatarImage}
+						/>
+					) : (
+						<Avatar height={80} width={80} />
+					)}
+				</TouchableOpacity>
 			</View>
 			<View style={styles.middleContainer}>
 				<Pressable
@@ -171,6 +269,16 @@ const styles = StyleSheet.create({
 		// fontWeight:"bold",
 		fontFamily: "Albert-SemiBold",
 		maxWidth: "70%",
+	},
+	avatarImage: {
+		width: 80,
+		height: 80,
+		borderRadius: 40,
+	},
+	avatarLoading: {
+		justifyContent: "center",
+		alignItems: "center",
+		backgroundColor: colors.lightGrey2,
 	},
 	middleContainer: {
 		flexDirection: "row",

@@ -14,13 +14,12 @@ import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import MapViewDirections from "react-native-maps-directions";
 import Geolocation from "@react-native-community/geolocation";
 import { useShallow } from "zustand/react/shallow";
-import { cancelRideWithRefund, listenToRide, checkPendingRefunds } from "../../helpers/firebaseRides";
+import { cancelRideWithRefund, listenToRide, checkPendingRefunds, getRide } from "../../helpers/firebaseRides";
 import { notifyDriverRideCancelled } from "../../helpers/notificationHelpers";
 import Toast from "react-native-toast-message";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { PENDING_RATING_KEY } from "../../components/modals/RatingModal";
-import { registerForPushNotificationsAsync } from "../../helpers/pushNotifications";
-import { doc, updateDoc, getDoc } from "firebase/firestore";
+import { getNextPendingRating } from "../../components/modals/RatingModal";
+import notificationManager from "../../helpers/notificationManager";
+import { doc, onSnapshot } from "firebase/firestore";
 import { FIREBASE_DB } from "../../firebaseConfig";
 
 const MainPage = () => {
@@ -106,98 +105,84 @@ const MainPage = () => {
 					buttonPositive: "OK",
 				}
 			);
-			console.log(permission);
 			if (permission === "granted") {
 				return true;
-			} else {
-				return false;
 			}
-		} catch (e) { }
+			Toast.show({
+				type: 'tomatoToast',
+				text1: 'Location Access Needed',
+				text2: "Enable location for KRides in your device settings to see your position and get accurate pickups.",
+				position: 'top',
+				visibilityTime: 6000,
+			});
+			return false;
+		} catch (e) {
+			console.warn('⚠️ Error requesting location permission:', e.message);
+			return false;
+		}
 	};
 
 	const getLocationN = async () => {
-		const response = await requestLocationPermissions();
-		try {
-			if (response) {
-				Geolocation.getCurrentPosition(
-					(position) => {
-						setLocation(position);
-					},
-					(error) => {
-						setLocation(false);
-					},
-					{ enableHighAccuracy: false, timeout: 15000 }
-				);
-			} else {
-			}
-		} catch (error) { }
+		const granted = await requestLocationPermissions();
+		if (!granted) {
+			setLocation(false);
+			return;
+		}
+		Geolocation.getCurrentPosition(
+			(position) => {
+				setLocation(position);
+			},
+			(error) => {
+				console.warn('⚠️ Error getting current position:', error.message);
+				setLocation(false);
+				Toast.show({
+					type: 'tomatoToast',
+					text1: 'Could Not Get Your Location',
+					text2: "Showing the default map view. Check your GPS signal and try again.",
+					position: 'top',
+					visibilityTime: 5000,
+				});
+			},
+			{ enableHighAccuracy: false, timeout: 15000 }
+		);
 	};
 
 	useEffect(() => {
 		getLocationN();
 	}, []);
 
-	// Register for push notifications
+	// Register for push notifications. notificationManager also clears any
+	// stale token left behind by a previous account on this device before
+	// writing this user's token — see helpers/notificationManager.js.
 	useEffect(() => {
-		const setupNotifications = async () => {
-			if (!UserId) return;
-
-			try {
-				console.log("📱 Registering customer for push notifications...");
-				const token = await registerForPushNotificationsAsync();
-
-				if (token) {
-					console.log("✅ Customer FCM token obtained:", token.substring(0, 30) + "...");
-
-					const userRef = doc(FIREBASE_DB, "users", UserId);
-					const snap = await getDoc(userRef);
-					if (snap.exists() && snap.data()?.fcmToken === token) {
-						console.log("✅ Customer FCM token unchanged, skipping write");
-					} else {
-						await updateDoc(userRef, {
-							fcmToken: token,
-							lastTokenUpdate: new Date(),
-						});
-						console.log("✅ Customer FCM token saved to Firestore");
-					}
-				} else {
-					console.warn("⚠️ Failed to get FCM token");
-					Toast.show({
-						type: 'tomatoToast',
-						text1: 'Notifications unavailable',
-						text2: 'You may not receive ride updates. Restart the app to retry.',
-						position: 'top',
-						visibilityTime: 5000,
-					});
-				}
-			} catch (error) {
-				console.warn("⚠️ Error setting up notifications (non-critical):", error);
-			}
-		};
-
-		setupNotifications();
+		if (!UserId) return;
+		notificationManager.initialize(UserId, 'customer').catch((error) => {
+			console.warn("⚠️ Error setting up notifications (non-critical):", error);
+			Toast.show({
+				type: 'tomatoToast',
+				text1: 'Notifications unavailable',
+				text2: 'You may not receive ride updates. Restart the app to retry.',
+				position: 'top',
+				visibilityTime: 5000,
+			});
+		});
 	}, [UserId]);
 
 	// Track whether we've already shown the notification-failure warning for
 	// the current ride (ref so it doesn't trigger re-renders)
 	const notificationWarningShown = useRef(false);
 	const arrivalToastShown = useRef(false);
+	const directionsErrorShown = useRef(false);
 	const [pendingRatingData, setPendingRatingData] = useState(null);
 
 	// On mount, check if the customer deferred a rating from a previous session
 	useEffect(() => {
-		AsyncStorage.getItem(PENDING_RATING_KEY).then((raw) => {
-			if (!raw) return;
-			try {
-				const data = JSON.parse(raw);
-				if (data?.rideId && data?.driverId) {
-					setPendingRatingData(data);
-					setShowRatingModal(true);
-				}
-			} catch {
-				AsyncStorage.removeItem(PENDING_RATING_KEY).catch(() => {});
+		getNextPendingRating().then((data) => {
+			if (data?.rideId && data?.driverId) {
+				setPendingRatingData(data);
+				setShowRatingModal(true);
 			}
-		}).catch(() => {});
+		});
 	}, []);
 
 	// On mount, retry any refunds that previously failed or are still pending
@@ -303,6 +288,53 @@ const MainPage = () => {
 		return () => unsubscribe();
 	}, [activeRide?.rideId]);
 
+	// Track the assigned driver's live position once a ride is accepted. The
+	// driver app only grants read access on driver_locations while this rider
+	// is the one it's currently tracking for (see firestore.rules), so this
+	// listener naturally stops receiving updates once the ride ends.
+	const [driverLocation, setDriverLocation] = useState(null);
+	useEffect(() => {
+		const driverId = activeRide?.driverId;
+		const canTrack = driverId && (rideStatus === 'accepted' || rideStatus === 'in_progress');
+		if (!canTrack) {
+			setDriverLocation(null);
+			return;
+		}
+
+		const unsubscribe = onSnapshot(
+			doc(FIREBASE_DB, 'driver_locations', driverId),
+			(snap) => {
+				const data = snap.data();
+				if (data?.location) {
+					setDriverLocation({
+						latitude: data.location.latitude,
+						longitude: data.location.longitude,
+						updatedAt: data.locationUpdatedAt?.toMillis ? data.locationUpdatedAt.toMillis() : null,
+					});
+				} else {
+					setDriverLocation(null);
+				}
+			},
+			(error) => {
+				// permission-denied is expected right after the ride ends, once the
+				// driver clears activeRideCustomerId — not worth logging loudly.
+				if (error.code !== 'permission-denied') {
+					console.warn('⚠️ Driver location listener error:', error.message);
+				}
+				setDriverLocation(null);
+			}
+		);
+
+		return unsubscribe;
+	}, [activeRide?.driverId, rideStatus]);
+
+	// Stale beyond ~2 minutes — the driver may have lost connectivity. Hide the
+	// marker rather than leave a frozen pin that looks like it's up to date.
+	const DRIVER_LOCATION_STALE_MS = 2 * 60 * 1000;
+	const driverLocationIsFresh = driverLocation?.updatedAt
+		? (Date.now() - driverLocation.updatedAt) < DRIVER_LOCATION_STALE_MS
+		: false;
+
 	// Fit map once the map is ready and coordinates are available
 	useEffect(() => {
 		if (mapReady && pickupCoords && destCoords && mapRef.current) {
@@ -330,6 +362,11 @@ const MainPage = () => {
 					onPress: async () => {
 						setCancelling(true);
 						try {
+							// Re-fetch live ride state instead of trusting rideStatus/
+							// activeRide from the closure — a driver may have accepted
+							// while this confirmation dialog was open.
+							const rideSnapshot = await getRide(activeRide.rideId);
+
 							const result = await cancelRideWithRefund(
 								activeRide.rideId,
 								'customer',
@@ -337,9 +374,9 @@ const MainPage = () => {
 							);
 
 							// Notify driver if ride was accepted
-							if (rideStatus === "accepted" && activeRide.driverId) {
+							if (rideSnapshot?.driverId) {
 								await notifyDriverRideCancelled(
-									activeRide.driverId,
+									rideSnapshot.driverId,
 									activeRide.rideId,
 									`${firstName} ${lastName}`
 								);
@@ -438,7 +475,19 @@ const MainPage = () => {
 						strokeWidth={5}
 						strokeColor="#007AFF"
 						optimizeWaypoints={true}
-						onError={() => {}}
+						onError={(errorMessage) => {
+							console.warn('⚠️ Directions API error:', errorMessage);
+							if (!directionsErrorShown.current) {
+								directionsErrorShown.current = true;
+								Toast.show({
+									type: 'tomatoToast',
+									text1: 'Could Not Load Route',
+									text2: 'The route line may not display, but your ride is unaffected.',
+									position: 'top',
+									visibilityTime: 4000,
+								});
+							}
+						}}
 					/>
 				)}
 
@@ -457,6 +506,16 @@ const MainPage = () => {
 						title="Destination"
 						description={destination.name || "Destination"}
 						pinColor="#1976D2"
+					/>
+				)}
+
+				{driverLocationIsFresh && (
+					<Marker
+						coordinate={{ latitude: driverLocation.latitude, longitude: driverLocation.longitude }}
+						title={activeRide?.driverName || "Your driver"}
+						description="Live location"
+						pinColor="#FF9500"
+						zIndex={10}
 					/>
 				)}
 			</MapView>
@@ -486,10 +545,20 @@ const MainPage = () => {
 						visible={showRatingModal}
 						isReminder={isReminder}
 						onClose={() => {
+							const justShownRideId = data.rideId;
 							setShowRatingModal(false);
 							setCompletedRideData(null);
 							setPendingRatingData(null);
 							if (!isReminder) setHomePage();
+
+							// Chain to the next deferred rating, if any — skip the one
+							// just shown in case it was re-deferred rather than resolved.
+							getNextPendingRating().then((next) => {
+								if (next && next.rideId !== justShownRideId) {
+									setPendingRatingData(next);
+									setShowRatingModal(true);
+								}
+							});
 						}}
 						rideId={data.rideId}
 						driverId={data.driverId}

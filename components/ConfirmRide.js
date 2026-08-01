@@ -11,10 +11,9 @@ import Star from "../assets/svg/Rating.svg";
 import Direction from "../assets/svg/Frame 34direction.svg";
 import Naira from "../assets/svg/Naira.svg";
 import RideConfirm from "./modals/RideConfirm";
-import RatingModal, { PENDING_RATING_KEY } from "./modals/RatingModal";
+import RatingModal from "./modals/RatingModal";
 import { sp, fs, br, ms } from "../constants/responsive";
 import Toast from "react-native-toast-message";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
 	useRideStore,
 	useUserDetails,
@@ -28,11 +27,12 @@ import Payment from "../screens/AppScreens/Payment";
 import { createRide, listenToRide, cancelRideWithRefund, getRide } from "../helpers/firebaseRides";
 import { calculateDistance, calculateFare } from "../helpers/rideCalculations";
 import { FIREBASE_DB, FIREBASE_AUTH } from "../firebaseConfig";
-import { doc, onSnapshot, updateDoc } from "firebase/firestore";
+import { doc, onSnapshot, updateDoc, addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import useAuthStore from "../constants/Store";
 import { notifyDriversAboutNewRide, notifyDriverRideCancelled } from "../helpers/notificationHelpers";
 import { payWithWallet } from "../helpers/walletHelpers";
+import { processRefund } from "../helpers/flutterwaveRefund";
 
 const ConfirmRide = () => {
 	const [selectRider, setSelectRider] = useState(false);
@@ -105,7 +105,6 @@ const ConfirmRide = () => {
 		if (!UserId || bookingInFlight.current) return;
 		bookingInFlight.current = true;
 		setLoading(true);
-		AsyncStorage.removeItem(PENDING_RATING_KEY).catch(() => {});
 		try {
 			const result = await payWithWallet({
 				customerName: `${firstName || ''} ${lastName || ''}`.trim() || 'Customer',
@@ -241,8 +240,6 @@ const ConfirmRide = () => {
 		if (bookingInFlight.current) return;
 		bookingInFlight.current = true;
 		setLoading(true);
-		// Clear any deferred rating reminder so it doesn't pop up mid-new-ride
-		AsyncStorage.removeItem(PENDING_RATING_KEY).catch(() => {});
 		try {
 			const rideData = {
 				customerId: UserId,
@@ -293,34 +290,57 @@ const ConfirmRide = () => {
 			}, 500);
 		} catch (error) {
 			console.error("❌ Error creating ride:", error);
+
+			let messageTitle = 'Booking Failed';
+			let messageBody = "Failed to create ride. Please try again.";
 			if (error.code === "permission-denied") {
-				Toast.show({
-					type: 'tomatoToast',
-					text1: 'Database Error',
-					text2: "Permission denied. Please contact support.",
-					position: 'top',
-					visibilityTime: 5000,
-				});
+				messageTitle = 'Database Error';
+				messageBody = "Permission denied. Please contact support.";
 			} else if (
 				error.name === "AbortError" ||
 				error.message?.toLowerCase().includes("network") ||
 				error.message?.toLowerCase().includes("internet") ||
 				error.code === "unavailable"
 			) {
-				Toast.show({
-					type: 'tomatoToast',
-					text1: 'Connection Error',
-					text2: "Please check your internet connection.",
-					position: 'top',
-				});
-			} else {
-				Toast.show({
-					type: 'tomatoToast',
-					text1: 'Booking Failed',
-					text2: "Failed to create ride. Please try again.",
-					position: 'top',
-				});
+				messageTitle = 'Connection Error';
+				messageBody = "Please check your internet connection.";
 			}
+
+			// The card was already charged (transactionId exists) but no ride
+			// document exists to refund against — reconcile the charge instead
+			// of letting it silently disappear.
+			if (transactionId) {
+				try {
+					await processRefund(transactionId, Price, 'Ride creation failed after payment');
+					messageTitle = 'Payment Refunded';
+					messageBody = "Your payment couldn't be turned into a booking, so we refunded it. Please try again.";
+				} catch (refundError) {
+					console.error("❌ Auto-refund failed for orphaned charge:", refundError);
+					try {
+						await addDoc(collection(FIREBASE_DB, "orphanedCharges"), {
+							customerId: UserId,
+							transactionId,
+							amount: Price,
+							rideCreationError: error.message || String(error),
+							refundError: refundError.message || String(refundError),
+							status: "unresolved",
+							createdAt: serverTimestamp(),
+						});
+					} catch (logError) {
+						console.error("❌ Failed to record orphaned charge for reconciliation:", logError);
+					}
+					messageTitle = 'Payment Received, Booking Failed';
+					messageBody = `You were charged but the ride wasn't created. Support has been notified — reference ${transactionId}.`;
+				}
+			}
+
+			Toast.show({
+				type: 'tomatoToast',
+				text1: messageTitle,
+				text2: messageBody,
+				position: 'top',
+				visibilityTime: 6000,
+			});
 		} finally {
 			bookingInFlight.current = false;
 			setLoading(false);

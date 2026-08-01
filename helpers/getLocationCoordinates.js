@@ -79,9 +79,14 @@ export const getLocationCoordinates = async (locationName) => {
 			}
 		}
 
+		// Genuinely no matching location in Firestore — not an error, just no result.
+		console.warn(`No location found matching "${locationName}"`);
 		return null;
 	} catch (error) {
-		console.error("Error fetching location coordinates:", error);
+		// A real backend/network failure, distinct from "no match found" above —
+		// kept as a separate log line so the two cases aren't indistinguishable
+		// when diagnosing production issues from logs.
+		console.error("Error fetching location coordinates (network/backend):", error);
 		return null;
 	}
 };

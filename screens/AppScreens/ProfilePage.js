@@ -1,5 +1,4 @@
 import {
-	StatusBar,
 	StyleSheet,
 	Text,
 	View,
@@ -8,6 +7,7 @@ import {
 	TouchableOpacity,
 	Alert,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import React, { useState, useEffect } from "react";
 import { colors } from "../../constants/styling";
 import BackButton from "../../components/buttons/BackButton";
@@ -73,7 +73,7 @@ const ProfilePage = () => {
 					phone: data.phone || "",
 					email: data.email || "",
 				});
-				console.log("✅ Profile loaded:", data);
+				if (__DEV__) console.log("✅ Profile loaded:", data);
 			}
 		} catch (error) {
 			console.error("❌ Error fetching profile:", error);
@@ -274,7 +274,7 @@ const ProfilePage = () => {
 				visibilityTime: 2000,
 			});
 
-			console.log(`✅ Updated ${fieldName}:`, value);
+			if (__DEV__) console.log(`✅ Updated ${fieldName}:`, value);
 		} catch (error) {
 			console.error("❌ Error updating profile:", error);
 			Alert.alert("Error", "Failed to update profile. Please try again.");
@@ -285,7 +285,7 @@ const ProfilePage = () => {
 
 	if (loading) {
 		return (
-			<View
+			<SafeAreaView
 				style={[
 					styles.container,
 					{ justifyContent: "center", alignItems: "center" },
@@ -293,11 +293,11 @@ const ProfilePage = () => {
 			>
 				<ActivityIndicator size="large" color={colors.primaryBlue} />
 				<Text style={{ marginTop: 10 }}>Loading profile...</Text>
-			</View>
+			</SafeAreaView>
 		);
 	}
 	return (
-		<View style={styles.container}>
+		<SafeAreaView style={styles.container}>
 			<BackButton text={<Text style={styles.headText}>Edit Profile</Text>} />
 			<View style={styles.avatarCont}>
 				<TouchableOpacity onPress={pickImage} disabled={uploadingImage}>
@@ -341,7 +341,7 @@ const ProfilePage = () => {
 					loading={updating}
 				/>
 			</View>
-		</View>
+		</SafeAreaView>
 	);
 };
 
@@ -350,7 +350,6 @@ export default ProfilePage;
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		paddingTop: StatusBar.currentHeight,
 		backgroundColor: colors.secondary,
 	},
 

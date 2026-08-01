@@ -1,4 +1,5 @@
-import { StatusBar, StyleSheet, Text, View, Image, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
+import { StyleSheet, Text, View, Image, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { AntDesign } from "@expo/vector-icons";
 import React, { useState, useEffect } from "react";
 import { colors } from "../../constants/styling";
@@ -287,7 +288,7 @@ const DriverProfilePage = () => {
 	};
 
 	return (
-		<View style={styles.container}>
+		<SafeAreaView style={styles.container}>
 			<ScrollView contentContainerStyle={styles.scrollContainer}>
 
 				<BackButton text={<Text style={styles.headText}>Driver Profile</Text>} />
@@ -398,7 +399,7 @@ const DriverProfilePage = () => {
 					)}
 				</View>
 			</ScrollView>
-		</View>
+		</SafeAreaView>
 	);
 };
 
@@ -407,7 +408,6 @@ export default DriverProfilePage;
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		paddingTop: StatusBar.currentHeight,
 		backgroundColor: colors.secondary,
 	},
 	scrollContainer: {

@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import {
     View,
     Text,
@@ -36,9 +37,14 @@ const DriverEarnings = () => {
         averagePerRide: 0,
     });
 
-    useEffect(() => {
-        fetchEarnings();
-    }, [uid, selectedYear, selectedMonth]);
+    // Re-fetch on focus (not just mount) so a ride completed while this
+    // screen stayed mounted further down the stack shows up without needing
+    // an unrelated remount.
+    useFocusEffect(
+        useCallback(() => {
+            fetchEarnings();
+        }, [uid, selectedYear, selectedMonth])
+    );
 
     // Reset day selection when month or year changes
     useEffect(() => {

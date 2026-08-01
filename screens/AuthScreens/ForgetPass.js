@@ -9,6 +9,7 @@ import TextInput1 from "../../components/TextInput1";
 import { FIREBASE_AUTH } from "../../firebaseConfig";
 import { sendPasswordResetEmail } from "firebase/auth";
 import Toast from "react-native-toast-message";
+import { checkRateLimit, recordAttempt } from "../../helpers/authRateLimiter";
 
 const ForgetPass = ({ navigation }) => {
 	const [modal, setModal] = useState(false);
@@ -31,10 +32,21 @@ const ForgetPass = ({ navigation }) => {
 			return;
 		}
 
+		const identifier = email.toLowerCase().trim();
+		const rateCheck = await checkRateLimit(identifier);
+		if (rateCheck.blocked) {
+			Alert.alert("Too Many Attempts", `Please wait ${rateCheck.minutesRemaining} minute${rateCheck.minutesRemaining === 1 ? '' : 's'} before trying again.`);
+			return;
+		}
+
 		setLoading(true);
 		try {
 			console.log("🔐 Sending password reset email to:", email);
-			
+
+			// Record every request (not just failures) — a successful send is
+			// itself the spammy action a rate limit here needs to bound.
+			recordAttempt(identifier);
+
 			// Send password reset email (without action code settings to avoid domain errors)
 			// To use custom redirect URLs, you need to allowlist them in Firebase Console:
 			// Authentication → Settings → Authorized domains
