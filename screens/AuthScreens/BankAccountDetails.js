@@ -48,17 +48,26 @@ const NIGERIAN_BANKS = [
 ];
 
 const BankAccountDetails = ({ navigation, route }) => {
-    const [bankCode, setBankCode] = useState(NIGERIAN_BANKS[0].value);
-    const [accountNumber, setAccountNumber] = useState("");
-    const [accountName, setAccountName] = useState("");
-    const [loading, setLoading] = useState(false);
+    const isEditing = !!route?.params?.isEditing;
 
     // Get driver details from store or route params
-    const { fullName, phone, uid } = useDriverDetails((state) => ({
+    const { fullName, phone, uid, existingBankCode, existingAccountNumber, existingAccountName } = useDriverDetails((state) => ({
         fullName: state.fullName,
         phone: state.phone,
         uid: state.uid || FIREBASE_AUTH.currentUser?.uid,
+        existingBankCode: state.bankCode,
+        existingAccountNumber: state.accountNumber,
+        existingAccountName: state.accountName,
     }));
+
+    // Pre-fill with what's already on file when editing, instead of making
+    // the driver re-enter everything from scratch to fix one field.
+    const [bankCode, setBankCode] = useState(
+        (isEditing && existingBankCode) || NIGERIAN_BANKS[0].value
+    );
+    const [accountNumber, setAccountNumber] = useState(isEditing ? existingAccountNumber || "" : "");
+    const [accountName, setAccountName] = useState(isEditing ? existingAccountName || "" : "");
+    const [loading, setLoading] = useState(false);
 
     const handleSubmit = async () => {
         if (!accountNumber || !/^\d{10}$/.test(accountNumber)) {
@@ -137,12 +146,16 @@ const BankAccountDetails = ({ navigation, route }) => {
 
                 Alert.alert(
                     "Success",
-                    "Bank account details saved successfully!",
+                    isEditing ? "Bank account details updated successfully!" : "Bank account details saved successfully!",
                     [
                         {
                             text: "Continue",
                             onPress: () => {
-                                navigation.replace("DriverHome");
+                                if (isEditing) {
+                                    navigation.goBack();
+                                } else {
+                                    navigation.replace("DriverHome");
+                                }
                             },
                         },
                     ]
@@ -198,16 +211,20 @@ const BankAccountDetails = ({ navigation, route }) => {
             <ScrollView style={{ flex: 1 }}>
                 <View style={styles.topCont}>
                     <View style={styles.headerRow}>
-                        <BackButton text={<Text style={styles.headText}>Bank Details</Text>} />
-                        <TouchableOpacity onPress={handleSkip} disabled={loading}>
-                            <Text style={styles.skipText}>{loading ? "..." : "Skip"}</Text>
-                        </TouchableOpacity>
+                        <BackButton text={<Text style={styles.headText}>{isEditing ? "Edit Bank Details" : "Bank Details"}</Text>} />
+                        {!isEditing && (
+                            <TouchableOpacity onPress={handleSkip} disabled={loading}>
+                                <Text style={styles.skipText}>{loading ? "..." : "Skip"}</Text>
+                            </TouchableOpacity>
+                        )}
                     </View>
                 </View>
                 <View style={styles.bottomCont}>
                     <View style={styles.sheetCont}>
                         <Text style={styles.subText}>
-                            Please provide your bank account details to receive payments.
+                            {isEditing
+                                ? "Update your bank account details below."
+                                : "Please provide your bank account details to receive payments."}
                         </Text>
 
                         <View style={styles.inputContainer}>
@@ -247,7 +264,7 @@ const BankAccountDetails = ({ navigation, route }) => {
 
                         <View style={{ marginTop: 30 }}>
                             <ActiveButton
-                                title={loading ? "Processing..." : "Save & Continue"}
+                                title={loading ? "Processing..." : (isEditing ? "Save Changes" : "Save & Continue")}
                                 onPress={handleSubmit}
                                 disabled={loading}
                                 loading={loading}

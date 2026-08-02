@@ -19,7 +19,22 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-font"
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow KRides to access your photos to update your profile picture.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ],
+      "@react-native-google-signin/google-signin",
+      [
+        "expo-notifications",
+        {
+          "color": "#0066F5"
+        }
+      ]
     ],
     "extra": {
       "eas": {
@@ -54,7 +69,6 @@
       },
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "KRides needs your location to find nearby drivers and calculate routes.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "KRides needs your location to track rides and show driver arrival.",
         "ITSAppUsesNonExemptEncryption": false
       }
     }

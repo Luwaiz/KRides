@@ -4,7 +4,7 @@ import { StatusBar } from "expo-status-bar";
 import { enableScreens } from "react-native-screens";
 import { StyleSheet, Text, View, Alert } from "react-native";
 import Navigation from "./navigation/Navigation";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import FontResources from "./react-native-config";
 import { PaperProvider } from "react-native-paper";
 import Toast from "react-native-toast-message";
@@ -55,6 +55,15 @@ configureReanimatedLogger({
 	level: ReanimatedLogLevel.warn,
 	strict: false, // Reanimated runs in strict mode by default
 });
+// Toast's default topOffset (40px, fixed) doesn't account for a notch/dynamic
+// island — on those devices it can render up under the status bar. Needs to
+// be a child of SafeAreaProvider to read insets, so it can't just be inlined
+// where <SafeAreaProvider> itself is created.
+function AppToast() {
+	const insets = useSafeAreaInsets();
+	return <Toast config={ToastConfig} topOffset={insets.top + 12} />;
+}
+
 function App() {
 	const fontLoaded = FontResources();
 
@@ -69,7 +78,7 @@ function App() {
 							<Navigation />
 							<NetworkBanner />
 							<StatusBar style="auto" />
-							<Toast config={ToastConfig} />
+							<AppToast />
 						</PaperProvider>
 					</SafeAreaProvider>
 				</GestureHandlerRootView>
