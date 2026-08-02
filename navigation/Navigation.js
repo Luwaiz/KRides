@@ -123,9 +123,17 @@ const Navigation = () => {
 
 								if (driverSnap.exists()) {
 									const profile = driverSnap.data();
-									setAuthData(currentUser, profile, "driver");
-									await AsyncStorage.setItem(`role_${currentUser.uid}`, "driver");
+									// Populate the full driver profile (bankDetailsVerified
+									// included) BEFORE flipping role to "driver" — DriverStack
+									// reads bankDetailsVerified for its initialRouteName the
+									// instant it mounts (triggered by this role change), and
+									// initialRouteName is only ever evaluated once, not
+									// reactively. Doing this in the wrong order let an
+									// already-verified driver get sent through bank-details
+									// onboarding again on cold start/reload.
 									setDriverProfile({ ...profile, uid: currentUser.uid });
+									setAuthData(currentUser, profile, "driver");
+									AsyncStorage.setItem(`role_${currentUser.uid}`, "driver").catch(() => {});
 								} else {
 									setAuthData(currentUser, {
 										email: currentUser.email,
@@ -147,9 +155,10 @@ const Navigation = () => {
 								if (driverSnap.exists()) {
 									const profile = driverSnap.data();
 									const role = "driver";
-									setAuthData(currentUser, profile, role);
-									await AsyncStorage.setItem(`role_${currentUser.uid}`, role);
+									// Same ordering fix as above — see comment there.
 									setDriverProfile({ ...profile, uid: currentUser.uid });
+									setAuthData(currentUser, profile, role);
+									AsyncStorage.setItem(`role_${currentUser.uid}`, role).catch(() => {});
 								} else if (pendingRole !== 'driver') {
 									// Only fall back to customer if we weren't explicitly told it's a driver
 									setAuthData(currentUser, {

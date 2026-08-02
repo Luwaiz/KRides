@@ -27,11 +27,13 @@ export default ToastConfig;
 const styles = StyleSheet.create({
 	container: {
 		backgroundColor: colors.secondary,
-		height: 70,
-		width: "90%",
+		minHeight: 70,
+		maxWidth: "92%",
+		alignSelf: "center",
 		flexDirection: "row",
 		alignItems: "center",
 		paddingHorizontal: 16,
+		paddingVertical: 12,
 		borderRadius: 8,
 	},
     icon: {
@@ -41,22 +43,30 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         justifyContent: "center",
         alignItems: "center",
-        marginRight:15
+        marginRight:15,
+        flexShrink: 0,
     },
     textContainer: {
-        gap:5
+        gap:5,
+        // Bounded to the row's remaining width so longer messages wrap
+        // instead of overflowing past the card's right edge or getting
+        // clipped by a fixed-height container.
+        flex: 1,
+        flexShrink: 1,
     },
     text1: {
         fontSize: 14,
         color: "black",
 		fontFamily: "Albert-Regular",
-		fontWeight: "light"
+		fontWeight: "light",
+		flexWrap: "wrap",
     },
     text2: {
 		fontSize: 16,
         color: "black",
         fontFamily: "Albert-Regular",
-        fontWeight: "bold"
+        fontWeight: "bold",
+        flexWrap: "wrap",
     }
-    
+
 });

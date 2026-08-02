@@ -368,12 +368,16 @@ const DriverProfilePage = () => {
 						value={profile?.email || email || ""}
 						editable={false}
 					/>
-					<View style={{ marginTop: 20 }}>
-						<ActiveButton
-							title="Bank Details"
-							onPress={() => navigation.navigate("BankAccountDetails")}
-						/>
-					</View>
+					{/* Only offer to set up bank details when none are on file yet —
+						once they exist, the card below is shown instead. */}
+					{!(profile?.bankName || bankName) && (
+						<View style={{ marginTop: 20 }}>
+							<ActiveButton
+								title="Bank Details"
+								onPress={() => navigation.navigate("BankAccountDetails")}
+							/>
+						</View>
+					)}
 
 					{/* Display Bank Details if available */}
 					{(profile?.bankName || bankName) && (
@@ -395,6 +399,12 @@ const DriverProfilePage = () => {
 									{profile?.accountName || accountName}
 								</Text>
 							</View>
+							<TouchableOpacity
+								style={styles.editBankButton}
+								onPress={() => navigation.navigate("BankAccountDetails", { isEditing: true })}
+							>
+								<Text style={styles.editBankButtonText}>Edit Bank Details</Text>
+							</TouchableOpacity>
 						</View>
 					)}
 				</View>
@@ -492,6 +502,20 @@ const styles = StyleSheet.create({
 		fontSize: 14,
 		fontFamily: "Albert-SemiBold",
 		color: "#333",
+	},
+	editBankButton: {
+		marginTop: 16,
+		alignSelf: "center",
+		paddingHorizontal: 20,
+		paddingVertical: 10,
+		borderRadius: 20,
+		borderWidth: 1.5,
+		borderColor: colors.primaryBlue,
+	},
+	editBankButtonText: {
+		fontSize: 14,
+		fontFamily: "Albert-SemiBold",
+		color: colors.primaryBlue,
 	},
 	reviewsButtonCont: {
 		paddingHorizontal: 16,

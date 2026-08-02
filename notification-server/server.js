@@ -748,30 +748,56 @@ app.post('/api/payments/create-subaccount', async (req, res) => {
 
         const verifiedAccountName = resolveResult.data.account_name;
 
-        const response = await fetch('https://api.flutterwave.com/v3/subaccounts', {
-            method: 'POST',
-            headers: {
-                Authorization: `Bearer ${secretKey}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                account_bank: bankCode,
-                account_number: accountNumber,
-                business_name: businessName || verifiedAccountName,
-                business_email: `${phone}@rideapp.com`,
-                business_mobile: phone,
-                country: 'NG',
-                split_type: 'flat',
-                split_value: 50,
-            }),
-        });
+        // A driver editing existing bank details should update that same
+        // Flutterwave subaccount in place rather than spawning a new one on
+        // every edit. Flutterwave's update endpoint can change account_number
+        // but not account_bank, so a genuine bank change still needs a fresh
+        // subaccount — only reuse the existing one when the bank is unchanged.
+        const driverSnap = await db.collection('drivers').doc(decoded.uid).get();
+        const existing = driverSnap.exists ? driverSnap.data() : null;
+        const isUpdate = !!(existing?.subaccountId && existing?.bankCode === bankCode);
+
+        const response = isUpdate
+            ? await fetch(`https://api.flutterwave.com/v3/subaccounts/${existing.subaccountId}`, {
+                method: 'PUT',
+                headers: {
+                    Authorization: `Bearer ${secretKey}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    account_number: accountNumber,
+                    business_name: businessName || verifiedAccountName,
+                    split_type: 'flat',
+                    split_value: 50,
+                }),
+            })
+            : await fetch('https://api.flutterwave.com/v3/subaccounts', {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${secretKey}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    account_bank: bankCode,
+                    account_number: accountNumber,
+                    business_name: businessName || verifiedAccountName,
+                    business_email: `${phone}@rideapp.com`,
+                    business_mobile: phone,
+                    country: 'NG',
+                    split_type: 'flat',
+                    split_value: 50,
+                }),
+            });
 
         const result = await response.json();
 
         if (result.status === 'success') {
-            res.json({ success: true, data: { ...result.data, verified_account_name: verifiedAccountName } });
+            // The update endpoint's response doesn't echo subaccount_id back —
+            // fall back to the one already on file in that case.
+            const subaccountId = result.data?.subaccount_id || (isUpdate ? existing.subaccountId : undefined);
+            res.json({ success: true, data: { ...result.data, subaccount_id: subaccountId, verified_account_name: verifiedAccountName } });
         } else {
-            res.status(400).json({ error: result.message || 'Subaccount creation failed' });
+            res.status(400).json({ error: result.message || (isUpdate ? 'Subaccount update failed' : 'Subaccount creation failed') });
         }
     } catch (error) {
         console.error('❌ Flutterwave subaccount error:', error);
@@ -1755,6 +1781,135 @@ async function sweepStalePendingRides() {
 }
 
 setInterval(sweepStalePendingRides, PENDING_RIDE_SWEEP_INTERVAL_MS);
+
+/**
+ * Retry refunds that previously failed to confirm.
+ * A ride that lands on refundStatus/walletRefundStatus 'failed' has no
+ * refundId to poll (unlike a 'pending' Flutterwave refund, which
+ * checkPendingRefunds on the client re-checks) — the failure happened before
+ * we ever got a confirmed refund back, often from a transient issue (a
+ * network blip, Flutterwave briefly returning an error page instead of
+ * JSON). The safe move is to retry the refund attempt itself: Flutterwave
+ * rejects refunding an already-refunded transaction rather than double
+ * refunding, and refundWalletForRide's own transaction checks the
+ * `walletRefunded` flag before crediting, so a retry can never double-pay a
+ * refund that actually went through despite our side failing to confirm it.
+ * Capped at a few attempts — after that it's flagged for manual review
+ * instead of retrying forever against a persistent problem.
+ */
+const REFUND_RETRY_MAX_ATTEMPTS = 3;
+const REFUND_RETRY_SWEEP_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
+const REFUND_RETRY_MIN_AGE_MS = 5 * 60 * 1000; // let transient blips clear first
+
+async function retryFlutterwaveRefund(rideDoc) {
+    const rideRef = rideDoc.ref;
+    const ride = rideDoc.data();
+    const attempts = ride.refundRetryCount || 0;
+
+    if (!ride.transactionId) {
+        await rideRef.update({
+            refundStatus: 'needs_review',
+            needsManualRefundReview: true,
+            refundReviewReason: 'Refund failed and no transactionId on record to retry',
+        }).catch(() => {});
+        return;
+    }
+
+    if (attempts >= REFUND_RETRY_MAX_ATTEMPTS) {
+        if (!ride.needsManualRefundReview) {
+            await rideRef.update({
+                needsManualRefundReview: true,
+                refundReviewReason: `Refund retry failed ${attempts} times — needs manual review`,
+            }).catch(() => {});
+        }
+        return;
+    }
+
+    try {
+        console.log(`🔁 Retrying refund for ride ${rideDoc.id} (attempt ${attempts + 1}/${REFUND_RETRY_MAX_ATTEMPTS})`);
+        await refundFlutterwaveTransaction(ride.transactionId, ride.refundAmount || ride.amount, 'Retry of previously failed refund');
+        await rideRef.update({
+            refundStatus: 'completed',
+            refundedAt: admin.firestore.FieldValue.serverTimestamp(),
+            refundRetryCount: attempts + 1,
+        });
+        console.log(`✅ Refund retry succeeded for ride ${rideDoc.id}`);
+    } catch (err) {
+        console.error(`❌ Refund retry failed for ride ${rideDoc.id}:`, err.message);
+        await rideRef.update({
+            refundRetryCount: attempts + 1,
+            autoRetryRefundError: err.message,
+        }).catch(() => {});
+    }
+}
+
+async function retryWalletRefund(rideDoc) {
+    const rideRef = rideDoc.ref;
+    const ride = rideDoc.data();
+    const attempts = ride.walletRefundRetryCount || 0;
+
+    if (attempts >= REFUND_RETRY_MAX_ATTEMPTS) {
+        if (!ride.needsManualRefundReview) {
+            await rideRef.update({
+                needsManualRefundReview: true,
+                refundReviewReason: `Wallet refund retry failed ${attempts} times — needs manual review`,
+            }).catch(() => {});
+        }
+        return;
+    }
+
+    if (!ride.customerId || !(Number(ride.amount) > 0)) return;
+
+    try {
+        console.log(`🔁 Retrying wallet refund for ride ${rideDoc.id} (attempt ${attempts + 1}/${REFUND_RETRY_MAX_ATTEMPTS})`);
+        await refundWalletForRide(rideRef, ride.customerId, Number(ride.amount), 'Retry of previously failed wallet refund');
+        await rideRef.update({
+            walletRefundStatus: 'completed',
+            walletRefundRetryCount: attempts + 1,
+        });
+        console.log(`✅ Wallet refund retry succeeded for ride ${rideDoc.id}`);
+    } catch (err) {
+        console.error(`❌ Wallet refund retry failed for ride ${rideDoc.id}:`, err.message);
+        await rideRef.update({
+            walletRefundRetryCount: attempts + 1,
+            autoRetryRefundError: err.message,
+        }).catch(() => {});
+    }
+}
+
+async function retryFailedRefunds() {
+    try {
+        const cutoff = admin.firestore.Timestamp.fromMillis(Date.now() - REFUND_RETRY_MIN_AGE_MS);
+
+        const [flutterwaveSnap, walletSnap] = await Promise.all([
+            db.collection('rides')
+                .where('refundStatus', '==', 'failed')
+                .where('cancelledAt', '<', cutoff)
+                .limit(20)
+                .get(),
+            db.collection('rides')
+                .where('walletRefundStatus', '==', 'failed')
+                .where('cancelledAt', '<', cutoff)
+                .limit(20)
+                .get(),
+        ]);
+
+        if (flutterwaveSnap.empty && walletSnap.empty) return;
+
+        console.log(`🔁 Refund retry sweep: ${flutterwaveSnap.size} card + ${walletSnap.size} wallet failed refund(s) found`);
+
+        for (const rideDoc of flutterwaveSnap.docs) {
+            await retryFlutterwaveRefund(rideDoc);
+        }
+        for (const rideDoc of walletSnap.docs) {
+            await retryWalletRefund(rideDoc);
+        }
+    } catch (error) {
+        console.error('❌ retryFailedRefunds error:', error);
+    }
+}
+
+setInterval(retryFailedRefunds, REFUND_RETRY_SWEEP_INTERVAL_MS);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
