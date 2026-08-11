@@ -1345,25 +1345,8 @@ app.post('/api/payments/complete-ride', async (req, res) => {
         const reference = `krides_payout_${rideId}`;
         console.log(`💸 Transferring ₦${driverEarnings} to driver ${driverId} (${driver.accountNumber})`);
 
-        const transferResponse = await fetch('https://api.flutterwave.com/v3/transfers', {
-            method: 'POST',
-            headers: {
-                Authorization: `Bearer ${secretKey}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                account_bank: driver.bankCode,
-                account_number: driver.accountNumber,
-                amount: driverEarnings,
-                narration: `KRides ride payment - ${rideId.slice(0, 8)}`,
-                currency: 'NGN',
-                reference,
-            }),
-        });
-
-        const transferResult = await transferResponse.json();
-
-        if (transferResult.status === 'success' || transferResult.status === 'NEW') {
+        try {
+            await transferToDriver(driver, driverEarnings, reference, `KRides ride payment - ${rideId.slice(0, 8)}`);
             console.log(`✅ Payout initiated for driver ${driverId}: ₦${driverEarnings}`);
 
             // Record the payout on the ride document
@@ -1377,15 +1360,15 @@ app.post('/api/payments/complete-ride', async (req, res) => {
                 success: true,
                 payout: { amount: driverEarnings, reference },
             });
-        } else {
-            console.error(`❌ Payout failed for driver ${driverId}:`, transferResult.message);
-            await rideRef.update({ payoutStatus: 'failed', payoutError: transferResult.message });
+        } catch (transferError) {
+            console.error(`❌ Payout failed for driver ${driverId}:`, transferError.message);
+            await rideRef.update({ payoutStatus: 'failed', payoutAmount: driverEarnings, payoutError: transferError.message });
             // Ride is still completed — payout failure is non-blocking
             return res.json({
                 success: true,
                 payout: null,
                 reason: 'transfer_failed',
-                error: transferResult.message,
+                error: transferError.message,
             });
         }
 
@@ -1394,6 +1377,36 @@ app.post('/api/payments/complete-ride', async (req, res) => {
         return res.status(500).json({ error: 'Could not complete ride. Please try again.' });
     }
 });
+
+/**
+ * Executes a Flutterwave transfer to a driver's bank account. Throws with
+ * Flutterwave's own message on any non-success status so callers can treat
+ * "transfer rejected" and "network/parse error" the same way.
+ */
+async function transferToDriver(driver, amount, reference, narration) {
+    const secretKey = process.env.FLUTTERWAVE_SECRET_KEY;
+    const transferResponse = await fetch('https://api.flutterwave.com/v3/transfers', {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${secretKey}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            account_bank: driver.bankCode,
+            account_number: driver.accountNumber,
+            amount,
+            narration,
+            currency: 'NGN',
+            reference,
+        }),
+    });
+
+    const result = await transferResponse.json();
+    if (result.status !== 'success' && result.status !== 'NEW') {
+        throw new Error(result.message || 'Transfer failed');
+    }
+    return result;
+}
 
 /**
  * POST /api/payments/wallet-refund
@@ -1910,6 +1923,94 @@ async function retryFailedRefunds() {
 }
 
 setInterval(retryFailedRefunds, REFUND_RETRY_SWEEP_INTERVAL_MS);
+
+/**
+ * Retry driver payouts that previously failed (e.g. Flutterwave rejecting
+ * the transfer outright — IP whitelisting, insufficient balance, etc).
+ * Safe to retry with a fresh reference each time: transferToDriver only
+ * ever marks a ride 'failed' when Flutterwave's synchronous response
+ * confirms the transfer was rejected, never on an ambiguous timeout, so a
+ * retry can't collide with a transfer that actually went through.
+ * Capped at a few attempts — after that it's flagged for manual review.
+ */
+const PAYOUT_RETRY_MAX_ATTEMPTS = 3;
+const PAYOUT_RETRY_SWEEP_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
+const PAYOUT_RETRY_MIN_AGE_MS = 5 * 60 * 1000; // let transient blips clear first
+
+async function retryFailedPayout(rideDoc) {
+    const rideRef = rideDoc.ref;
+    const ride = rideDoc.data();
+    const attempts = ride.payoutRetryCount || 0;
+
+    if (attempts >= PAYOUT_RETRY_MAX_ATTEMPTS) {
+        if (!ride.needsManualPayoutReview) {
+            await rideRef.update({
+                needsManualPayoutReview: true,
+                payoutReviewReason: `Payout retry failed ${attempts} times — needs manual review`,
+            }).catch(() => {});
+        }
+        return;
+    }
+
+    if (!ride.driverId || !(Number(ride.payoutAmount) > 0)) return;
+
+    const driverSnap = await db.collection('drivers').doc(ride.driverId).get();
+    const driver = driverSnap.exists ? driverSnap.data() : null;
+
+    if (!driver?.bankCode || !driver?.accountNumber) {
+        await rideRef.update({
+            needsManualPayoutReview: true,
+            payoutReviewReason: 'Driver has no bank details on file to retry payout',
+        }).catch(() => {});
+        return;
+    }
+
+    try {
+        console.log(`🔁 Retrying payout for ride ${rideDoc.id} (attempt ${attempts + 1}/${PAYOUT_RETRY_MAX_ATTEMPTS})`);
+        // Flutterwave references must be unique per attempt — the original
+        // reference was already submitted (and rejected), so reusing it
+        // would itself get rejected as a duplicate.
+        const reference = `krides_payout_${rideDoc.id}_retry${attempts + 1}`;
+        await transferToDriver(driver, ride.payoutAmount, reference, `KRides ride payment - ${rideDoc.id.slice(0, 8)}`);
+        await rideRef.update({
+            payoutStatus: 'initiated',
+            payoutReference: reference,
+            payoutRetryCount: attempts + 1,
+            payoutError: admin.firestore.FieldValue.delete(),
+        });
+        console.log(`✅ Payout retry succeeded for ride ${rideDoc.id}`);
+    } catch (err) {
+        console.error(`❌ Payout retry failed for ride ${rideDoc.id}:`, err.message);
+        await rideRef.update({
+            payoutRetryCount: attempts + 1,
+            payoutError: err.message,
+        }).catch(() => {});
+    }
+}
+
+async function retryFailedPayouts() {
+    try {
+        const cutoff = admin.firestore.Timestamp.fromMillis(Date.now() - PAYOUT_RETRY_MIN_AGE_MS);
+
+        const snap = await db.collection('rides')
+            .where('payoutStatus', '==', 'failed')
+            .where('completedAt', '<', cutoff)
+            .limit(20)
+            .get();
+
+        if (snap.empty) return;
+
+        console.log(`🔁 Payout retry sweep: ${snap.size} failed payout(s) found`);
+
+        for (const rideDoc of snap.docs) {
+            await retryFailedPayout(rideDoc);
+        }
+    } catch (error) {
+        console.error('❌ retryFailedPayouts error:', error);
+    }
+}
+
+setInterval(retryFailedPayouts, PAYOUT_RETRY_SWEEP_INTERVAL_MS);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
