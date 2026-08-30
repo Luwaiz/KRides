@@ -79,6 +79,7 @@ export const api = {
             method: 'POST',
             body: JSON.stringify({ reportId }),
         }),
+    getDrivers: () => request('/admin-api/drivers'),
     createDriver: (driver) =>
         request('/admin-api/drivers/create', {
             method: 'POST',
