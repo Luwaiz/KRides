@@ -18,6 +18,7 @@ import { CLOUDINARY_CLOUD_NAME, CLOUDINARY_UPLOAD_PRESET } from "@env";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import Toast from "react-native-toast-message";
 import * as ImagePicker from "expo-image-picker";
+import { useUserDetails, useDriverDetails } from "../../constants/Store";
 
 const ProfilePage = () => {
 	const [name, setName] = useState("");
@@ -265,6 +266,17 @@ const ProfilePage = () => {
 			if (field === "name") setName(value.trim());
 			if (field === "phone") setPhone(value.trim());
 			if (field === "email") setEmail(value.trim());
+
+			// Ride booking (ConfirmRide) reads phone straight from the global
+			// profile store, not Firestore — without this, a phone number
+			// added here wouldn't reach a new ride until the next login.
+			if (field === "phone") {
+				if (isDriver) {
+					useDriverDetails.getState().setPhone(value.trim());
+				} else {
+					useUserDetails.getState().setPhone(value.trim());
+				}
+			}
 
 			Toast.show({
 				type: "tomatoToast",

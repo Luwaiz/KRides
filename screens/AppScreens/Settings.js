@@ -32,7 +32,11 @@ const Settings = ({ navigation }) => {
 		setModalTitle(title);
 		setModal(true);
 	};
-	const fetchUserProfile = async () => {
+	// A plain synchronous function — wrapping this in `async` made `return
+	// unsub` resolve inside a Promise instead of handing the unsubscribe
+	// function to React, so the listener was never torn down on unmount
+	// (same bug already fixed in DriverSetting.js's equivalent effect).
+	const fetchUserProfile = () => {
 		try {
 			setLoading(true);
 			const auth = FIREBASE_AUTH;
@@ -62,7 +66,6 @@ const Settings = ({ navigation }) => {
 					}
 				);
 
-				// cleanup listener on unmount
 				return unsub;
 			}
 		} catch (e) {
@@ -72,7 +75,7 @@ const Settings = ({ navigation }) => {
 	};
 
 	useEffect(() => {
-		fetchUserProfile();
+		return fetchUserProfile();
 	}, []);
 
 	const pickImage = async () => {

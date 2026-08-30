@@ -7,7 +7,6 @@ import About from "../screens/AppScreens/About";
 import Support from "../screens/AppScreens/Support";
 import History from "../screens/AppScreens/History";
 import ProfilePage from "../screens/AppScreens/ProfilePage";
-import AvailableRiders from "../components/AvailableRiders";
 import Passenger from "../components/Passenger";
 import Promo from "../screens/AppScreens/Promo";
 import HomePageNav from "./HomePageNav";
@@ -31,7 +30,6 @@ const AppStack = () => {
 			<Stack.Screen name="Profile" component={ProfilePage} />
 			<Stack.Screen name="Destinations" component={PickDestination} />
 			<Stack.Screen name="Passenger" component={Passenger} />
-			<Stack.Screen name="Riders" component={AvailableRiders} />
 			<Stack.Screen name="Promo" component={Promo} />
 		</Stack.Navigator>
 	);
