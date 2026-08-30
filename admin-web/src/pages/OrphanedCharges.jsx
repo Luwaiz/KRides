@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
+import Toolbar from '../components/Toolbar';
 
 export default function OrphanedCharges() {
     const [charges, setCharges] = useState(null);
     const [error, setError] = useState('');
     const [notes, setNotes] = useState({});
     const [busyId, setBusyId] = useState(null);
+    const [search, setSearch] = useState('');
 
     const load = async () => {
         setError('');
@@ -34,21 +36,50 @@ export default function OrphanedCharges() {
         }
     };
 
+    const filtered = useMemo(() => {
+        if (!charges) return null;
+        const q = search.trim().toLowerCase();
+        if (!q) return charges;
+        return charges.filter((c) => {
+            const haystack = [c.transactionId, c.customerId, c.rideCreationError, c.refundError]
+                .filter(Boolean)
+                .join(' ')
+                .toLowerCase();
+            return haystack.includes(q);
+        });
+    }, [charges, search]);
+
     if (!charges) return <p className="loading">Loading…</p>;
 
     return (
         <div>
-            <h2>Orphaned Charges</h2>
-            <p className="hint">
-                A customer's card was charged but the ride and the automatic refund both failed — nothing else
-                retries these. Check Flutterwave's dashboard for the transaction and refund it manually if the
-                customer never got their ride, then note what you did and mark resolved.
-            </p>
+            <div className="page-header">
+                <div>
+                    <h2>Orphaned Charges</h2>
+                    <p className="hint">
+                        A customer's card was charged but the ride and the automatic refund both failed — nothing else
+                        retries these. Check Flutterwave's dashboard for the transaction and refund it manually if the
+                        customer never got their ride, then note what you did and mark resolved.
+                    </p>
+                </div>
+            </div>
+
+            {charges.length > 0 && (
+                <Toolbar
+                    search={search}
+                    onSearchChange={setSearch}
+                    searchPlaceholder="Search by transaction ID, customer ID…"
+                />
+            )}
+
             {error && <p className="error">{error}</p>}
+
             {charges.length === 0 ? (
                 <p className="empty">Nothing unresolved.</p>
+            ) : filtered.length === 0 ? (
+                <p className="empty">No charges match your search.</p>
             ) : (
-                charges.map((charge) => (
+                filtered.map((charge) => (
                     <div key={charge.chargeId} className="card">
                         <div className="card-header">
                             <div>

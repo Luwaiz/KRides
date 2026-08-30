@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
+import Logo from '../components/Logo';
 
 export default function Login() {
     const [password, setPassword] = useState('');
@@ -25,7 +26,8 @@ export default function Login() {
     return (
         <div className="login-screen">
             <form onSubmit={submit} className="login-card">
-                <h1>KRides Admin</h1>
+                <Logo className="login-logo" />
+                <h1>Admin</h1>
                 <input
                     type="password"
                     placeholder="Admin password"
