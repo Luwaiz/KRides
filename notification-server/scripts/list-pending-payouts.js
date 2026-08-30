@@ -43,6 +43,12 @@ async function main() {
         process.exit(0);
     }
 
+    // pickupLocation/destination are strings on older rides, {name,
+    // address,...} objects on newer ones (see the same normalization in
+    // components/HistoryCard.js on the mobile side).
+    const placeName = (place) =>
+        typeof place === 'object' && place ? (place.name || place.address || null) : (place || null);
+
     // Group by driver
     const byDriver = new Map();
     for (const doc of snap.docs) {
@@ -56,6 +62,11 @@ async function main() {
             amount: Number(ride.payoutAmount) || 0,
             completedAt: ride.completedAt?.toDate?.() || null,
             status: ride.payoutStatus,
+            customerName: ride.customerName || null,
+            pickupLocation: placeName(ride.pickupLocation),
+            destination: placeName(ride.destination),
+            paymentMethod: ride.paymentMethod || null,
+            transactionId: ride.transactionId || null,
         });
     }
 
@@ -79,7 +90,14 @@ async function main() {
         console.log(`Owed:   ₦${total.toLocaleString('en-NG')} across ${rides.length} ride(s)`);
         for (const r of rides) {
             const date = r.completedAt ? r.completedAt.toLocaleDateString('en-NG') : 'unknown date';
+            const route = r.pickupLocation && r.destination ? `${r.pickupLocation} → ${r.destination}` : null;
             console.log(`   - ${r.rideId}  ₦${r.amount.toLocaleString('en-NG')}  (${r.status}, completed ${date})`);
+            if (r.customerName || route) {
+                console.log(`     ${r.customerName || 'Unknown customer'}${route ? `  ·  ${route}` : ''}`);
+            }
+            if (r.paymentMethod || r.transactionId) {
+                console.log(`     ${r.paymentMethod || 'unknown method'}${r.transactionId ? `  ·  txn ${r.transactionId}` : ''}`);
+            }
         }
     }
 

@@ -337,6 +337,41 @@ table td {
     border-top: 1px solid var(--border);
 }
 
+.ride-list {
+    margin-top: 4px;
+}
+
+.ride-row {
+    padding: 10px 0;
+    border-top: 1px solid var(--border);
+}
+
+.ride-row:first-child {
+    border-top: none;
+}
+
+.ride-row-main {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+}
+
+.ride-row-main .amount {
+    font-size: 14px;
+}
+
+.ride-row-line {
+    font-size: 13px;
+    margin-top: 3px;
+}
+
+.ride-row-error {
+    font-size: 12px;
+    color: var(--danger);
+    margin-top: 4px;
+}
+
 @media (max-width: 720px) {
     .app {
         flex-direction: column;

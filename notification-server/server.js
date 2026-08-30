@@ -2121,6 +2121,12 @@ app.get('/admin-api/payouts/pending', async (req, res) => {
             .where('payoutStatus', 'in', ['pending_manual', 'failed', 'awaiting_bank_details'])
             .get();
 
+        // pickupLocation/destination are strings on older rides, {name,
+        // address,...} objects on newer ones (see the same normalization
+        // in components/HistoryCard.js on the mobile side).
+        const placeName = (place) =>
+            typeof place === 'object' && place ? (place.name || place.address || null) : (place || null);
+
         const byDriver = new Map();
         for (const doc of snap.docs) {
             const ride = doc.data();
@@ -2133,6 +2139,14 @@ app.get('/admin-api/payouts/pending', async (req, res) => {
                 amount: Number(ride.payoutAmount) || 0,
                 completedAt: ride.completedAt?.toDate?.()?.toISOString() || null,
                 status: ride.payoutStatus,
+                customerName: ride.customerName || null,
+                pickupLocation: placeName(ride.pickupLocation),
+                destination: placeName(ride.destination),
+                numberOfPassengers: Number(ride.numberOfPassengers) || null,
+                paymentMethod: ride.paymentMethod || null,
+                transactionId: ride.transactionId || null,
+                payoutReference: ride.payoutReference || null,
+                payoutError: ride.payoutError || null,
             });
         }
 
