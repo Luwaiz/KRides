@@ -61,6 +61,14 @@
     "patch-package": "^8.0.1",
     "react-native-svg-transformer": "^1.4.0"
   },
+  "overrides": {
+    "minimatch@3.1.2": {
+      "brace-expansion": "1.1.18"
+    },
+    "minimatch@9.0.5": {
+      "brace-expansion": "2.1.4"
+    }
+  },
   "expo": {
     "doctor": {
       "reactNativeDirectoryCheck": {
