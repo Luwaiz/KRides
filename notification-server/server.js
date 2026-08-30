@@ -2314,6 +2314,85 @@ app.post('/admin-api/orphaned-charges/resolve', async (req, res) => {
     }
 });
 
+// GET /admin-api/reports — driver complaints from POST /api/reports/driver
+// (see driverReports collection there for the exact schema being read here).
+// Reports predating the resolved/open workflow have no `status` field at
+// all, which reads as 'open' — same fail-safe-to-visible approach as the
+// other review queues.
+app.get('/admin-api/reports', async (req, res) => {
+    try {
+        const snap = await db.collection('driverReports')
+            .orderBy('createdAt', 'desc')
+            .limit(200)
+            .get();
+
+        const reports = snap.docs.map((doc) => {
+            const r = doc.data();
+            return {
+                reportId: doc.id,
+                status: r.status === 'resolved' ? 'resolved' : 'open',
+                customerName: r.customerName || null,
+                customerPhone: r.customerPhone || null,
+                driverId: r.driverId || null,
+                driverName: r.driverName || null,
+                driverPhone: r.driverPhone || null,
+                driverEmail: r.driverEmail || null,
+                rideId: r.rideId || null,
+                pickupLocation: r.pickupLocation || null,
+                destination: r.destination || null,
+                rideAmount: Number(r.rideAmount) || 0,
+                rideStatus: r.rideStatus || null,
+                reason: r.reason || null,
+                description: r.description || null,
+                createdAt: r.createdAt?.toDate?.()?.toISOString() || null,
+                resolvedAt: r.resolvedAt?.toDate?.()?.toISOString() || null,
+                resolutionNote: r.resolutionNote || null,
+            };
+        });
+
+        res.json({ success: true, reports });
+    } catch (error) {
+        console.error('❌ admin reports error:', error);
+        res.status(500).json({ error: 'Could not load reports' });
+    }
+});
+
+// POST /admin-api/reports/resolve — body: { reportId, note }
+app.post('/admin-api/reports/resolve', async (req, res) => {
+    const { reportId, note } = req.body || {};
+    if (!reportId) return res.status(400).json({ error: 'reportId is required' });
+
+    try {
+        await db.collection('driverReports').doc(reportId).update({
+            status: 'resolved',
+            resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
+            resolutionNote: note || null,
+        });
+        res.json({ success: true });
+    } catch (error) {
+        console.error('❌ admin reports/resolve error:', error);
+        res.status(500).json({ error: 'Could not resolve report' });
+    }
+});
+
+// POST /admin-api/reports/reopen — body: { reportId }
+// For when a report was marked resolved too early — puts it back in the
+// open queue without losing the earlier resolution note.
+app.post('/admin-api/reports/reopen', async (req, res) => {
+    const { reportId } = req.body || {};
+    if (!reportId) return res.status(400).json({ error: 'reportId is required' });
+
+    try {
+        await db.collection('driverReports').doc(reportId).update({
+            status: 'open',
+        });
+        res.json({ success: true });
+    } catch (error) {
+        console.error('❌ admin reports/reopen error:', error);
+        res.status(500).json({ error: 'Could not reopen report' });
+    }
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', service: 'KRides Notification Server' });

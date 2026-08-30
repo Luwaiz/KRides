@@ -31,6 +31,15 @@ export function RefundIcon(props) {
     );
 }
 
+export function ReportIcon(props) {
+    return (
+        <svg {...base} {...props}>
+            <path d="M5 3v18" />
+            <path d="M5 4h13l-3 4 3 4H5" />
+        </svg>
+    );
+}
+
 export function OrphanedIcon(props) {
     return (
         <svg {...base} {...props}>

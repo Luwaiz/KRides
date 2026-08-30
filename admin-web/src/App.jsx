@@ -4,8 +4,9 @@ import Login from './pages/Login';
 import Payouts from './pages/Payouts';
 import RefundReview from './pages/RefundReview';
 import OrphanedCharges from './pages/OrphanedCharges';
+import Reports from './pages/Reports';
 import Logo from './components/Logo';
-import { PayoutsIcon, RefundIcon, OrphanedIcon, LogoutIcon } from './components/icons';
+import { PayoutsIcon, RefundIcon, OrphanedIcon, ReportIcon, LogoutIcon } from './components/icons';
 
 function RequireAuth({ children }) {
     if (!api.getKey()) return <Navigate to="/login" replace />;
@@ -15,6 +16,7 @@ function RequireAuth({ children }) {
 const NAV_ITEMS = [
     { to: '/payouts', label: 'Payouts', icon: PayoutsIcon },
     { to: '/refunds', label: 'Refund Review', icon: RefundIcon },
+    { to: '/reports', label: 'Report Complaints', icon: ReportIcon },
     { to: '/orphaned-charges', label: 'Orphaned Charges', icon: OrphanedIcon },
 ];
 
@@ -67,6 +69,14 @@ export default function App() {
                     element={
                         <RequireAuth>
                             <Layout><RefundReview /></Layout>
+                        </RequireAuth>
+                    }
+                />
+                <Route
+                    path="/reports"
+                    element={
+                        <RequireAuth>
+                            <Layout><Reports /></Layout>
                         </RequireAuth>
                     }
                 />

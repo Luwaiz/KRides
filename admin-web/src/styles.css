@@ -372,6 +372,24 @@ table td {
     margin-top: 4px;
 }
 
+.badge {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 20px;
+    white-space: nowrap;
+}
+
+.badge-open {
+    color: var(--danger);
+    background: rgba(211, 47, 47, 0.08);
+}
+
+.badge-resolved {
+    color: #2e7d32;
+    background: rgba(46, 125, 50, 0.08);
+}
+
 @media (max-width: 720px) {
     .app {
         flex-direction: column;
