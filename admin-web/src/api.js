@@ -68,4 +68,25 @@ export const api = {
             method: 'POST',
             body: JSON.stringify({ chargeId, note }),
         }),
+    getReports: () => request('/admin-api/reports'),
+    resolveReport: (reportId, note) =>
+        request('/admin-api/reports/resolve', {
+            method: 'POST',
+            body: JSON.stringify({ reportId, note }),
+        }),
+    reopenReport: (reportId) =>
+        request('/admin-api/reports/reopen', {
+            method: 'POST',
+            body: JSON.stringify({ reportId }),
+        }),
+    createDriver: (driver) =>
+        request('/admin-api/drivers/create', {
+            method: 'POST',
+            body: JSON.stringify(driver),
+        }),
+    resendDriverWelcomeEmail: (driverId) =>
+        request('/admin-api/drivers/resend-welcome-email', {
+            method: 'POST',
+            body: JSON.stringify({ driverId }),
+        }),
 };

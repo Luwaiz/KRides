@@ -8,6 +8,9 @@ const FILTER_OPTIONS = [
     { value: 'no_bank', label: 'Awaiting bank details' },
 ];
 
+const PAYMENT_LABELS = { flutterwave: 'Card', wallet: 'Wallet', cash: 'Cash' };
+const paymentLabel = (method) => PAYMENT_LABELS[method] || method || 'Unknown method';
+
 export default function Payouts() {
     const [drivers, setDrivers] = useState(null);
     const [error, setError] = useState('');
@@ -55,7 +58,12 @@ export default function Payouts() {
             if (filter === 'ready' && !hasBank) return false;
             if (filter === 'no_bank' && hasBank) return false;
             if (!q) return true;
-            const haystack = [d.name, d.bankName, d.accountNumber, d.accountName, ...d.rides.map((r) => r.rideId)]
+            const haystack = [
+                d.name, d.bankName, d.accountNumber, d.accountName,
+                ...d.rides.flatMap((r) => [
+                    r.rideId, r.customerName, r.pickupLocation, r.destination, r.transactionId,
+                ]),
+            ]
                 .filter(Boolean)
                 .join(' ')
                 .toLowerCase();
@@ -117,20 +125,32 @@ export default function Payouts() {
                                 </button>
                             </div>
                         </div>
-                        <table>
-                            <tbody>
-                                {driver.rides.map((r) => (
-                                    <tr key={r.rideId}>
-                                        <td className="mono">{r.rideId}</td>
-                                        <td>₦{r.amount.toLocaleString('en-NG')}</td>
-                                        <td className="muted">
-                                            {r.completedAt ? new Date(r.completedAt).toLocaleDateString('en-NG') : '—'}
-                                        </td>
-                                        <td className="muted">{r.status}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                        <div className="ride-list">
+                            {driver.rides.map((r) => (
+                                <div key={r.rideId} className="ride-row">
+                                    <div className="ride-row-main">
+                                        <span className="mono">{r.rideId}</span>
+                                        <span className="amount">₦{r.amount.toLocaleString('en-NG')}</span>
+                                    </div>
+                                    <div className="ride-row-line muted">
+                                        {r.customerName || 'Unknown customer'}
+                                        {r.numberOfPassengers ? ` · ${r.numberOfPassengers} passenger${r.numberOfPassengers > 1 ? 's' : ''}` : ''}
+                                    </div>
+                                    {(r.pickupLocation || r.destination) && (
+                                        <div className="ride-row-line muted">
+                                            {r.pickupLocation || 'Unknown pickup'} → {r.destination || 'Unknown destination'}
+                                        </div>
+                                    )}
+                                    <div className="ride-row-line muted">
+                                        {paymentLabel(r.paymentMethod)}
+                                        {r.transactionId && <> · txn <span className="mono">{r.transactionId}</span></>}
+                                        {' · '}{r.completedAt ? new Date(r.completedAt).toLocaleDateString('en-NG') : 'unknown date'}
+                                        {' · '}{r.status}
+                                    </div>
+                                    {r.payoutError && <div className="ride-row-error">⚠️ {r.payoutError}</div>}
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 ))
             )}
