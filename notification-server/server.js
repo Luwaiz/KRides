@@ -9,6 +9,10 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
+// The mobile app calls this over React Native's fetch, which doesn't enforce
+// browser CORS — origin:false (no CORS headers) is fine for /api. The admin
+// web app is a real browser, so it gets its own CORS policy further down,
+// scoped to /admin-api and an explicit origin allowlist.
 app.use(cors({ origin: false }));
 app.use(express.json());
 
@@ -17,6 +21,43 @@ app.use(express.json());
 // never appears in source control. Set NOTIFICATION_API_KEY in your .env
 // and as an EAS Secret for production builds.
 const API_KEY = process.env.NOTIFICATION_API_KEY;
+
+// Admin web app — separate key from the mobile app's (extracting one
+// shouldn't hand out the other), separate route prefix (so it's exempt from
+// the /api middleware below), and an explicit CORS origin allowlist since,
+// unlike the mobile app, this one's a real browser.
+const ADMIN_API_KEY = process.env.ADMIN_API_KEY;
+const ADMIN_ALLOWED_ORIGINS = (process.env.ADMIN_ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+app.use('/admin-api', cors({
+    origin: (origin, callback) => {
+        // No Origin header = non-browser caller (curl, server-to-server) — allow.
+        if (!origin || ADMIN_ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+        callback(new Error('Not allowed by CORS'));
+    },
+}));
+
+app.use('/admin-api', (req, res, next) => {
+    if (!ADMIN_API_KEY) {
+        console.error('❌ ADMIN_API_KEY is not set');
+        return res.status(503).json({ error: 'Admin panel not configured' });
+    }
+    if (req.path === '/login') return next();
+    const provided = req.headers['x-admin-key'];
+    if (!provided || provided !== ADMIN_API_KEY) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+    next();
+});
+
+// 'manual' (default): driver payouts are queued for manual transfer instead
+// of calling Flutterwave's Transfers API — see the comment on it in
+// complete-ride. Set PAYOUT_MODE=automatic once IP whitelisting is sorted.
+const PAYOUT_MODE = process.env.PAYOUT_MODE || 'manual';
+console.log(`💳 Payout mode: ${PAYOUT_MODE}`);
 
 app.use('/api', (req, res, next) => {
     // Flutterwave webhook uses its own signature verification — exempt from API key check
@@ -1341,6 +1382,26 @@ app.post('/api/payments/complete-ride', async (req, res) => {
             return res.json({ success: true, payout: null, reason: 'no_bank_details' });
         }
 
+        // Flutterwave's live Transfers API currently rejects every call with
+        // an IP-whitelisting error (Render's plan has no static outbound IP
+        // yet). Rather than let every ride burn a doomed API call and sit in
+        // the automatic retry sweep, PAYOUT_MODE=manual (the default until
+        // that's fixed) skips straight to a manual queue — see
+        // scripts/list-pending-payouts.js and scripts/mark-payout-paid.js.
+        // Flip back with PAYOUT_MODE=automatic once IP whitelisting works.
+        if (PAYOUT_MODE === 'manual') {
+            console.log(`📝 Manual payout mode: ₦${driverEarnings} owed to driver ${driverId} for ride ${rideId}`);
+            await rideRef.update({
+                payoutStatus: 'pending_manual',
+                payoutAmount: driverEarnings,
+            });
+            return res.json({
+                success: true,
+                payout: null,
+                reason: 'manual_payout_pending',
+            });
+        }
+
         // Initiate Flutterwave transfer
         const reference = `krides_payout_${rideId}`;
         console.log(`💸 Transferring ₦${driverEarnings} to driver ${driverId} (${driver.accountNumber})`);
@@ -1989,6 +2050,11 @@ async function retryFailedPayout(rideDoc) {
 }
 
 async function retryFailedPayouts() {
+    // In manual mode, retrying through the API is pointless — it's the same
+    // call that's already known to fail. Ride's payoutStatus stays 'failed'
+    // (or whatever it already is) until picked up by the manual queue.
+    if (PAYOUT_MODE === 'manual') return;
+
     try {
         const cutoff = admin.firestore.Timestamp.fromMillis(Date.now() - PAYOUT_RETRY_MIN_AGE_MS);
 
@@ -2011,6 +2077,186 @@ async function retryFailedPayouts() {
 }
 
 setInterval(retryFailedPayouts, PAYOUT_RETRY_SWEEP_INTERVAL_MS);
+
+// ── Admin web app API ────────────────────────────────────────────────────
+// Backs the separately-hosted admin-web app (Vercel/Netlify). Auth and CORS
+// are handled by the /admin-api middleware registered near the top of this
+// file — everything below just assumes a valid request got through.
+
+app.post('/admin-api/login', (req, res) => {
+    const { password } = req.body || {};
+    if (password !== ADMIN_API_KEY) {
+        return res.status(401).json({ error: 'Incorrect password' });
+    }
+    res.json({ success: true });
+});
+
+// GET /admin-api/payouts/pending
+// Same data as scripts/list-pending-payouts.js, grouped by driver.
+app.get('/admin-api/payouts/pending', async (req, res) => {
+    try {
+        const snap = await db.collection('rides')
+            .where('payoutStatus', 'in', ['pending_manual', 'failed'])
+            .get();
+
+        const byDriver = new Map();
+        for (const doc of snap.docs) {
+            const ride = doc.data();
+            const driverId = ride.driverId;
+            if (!driverId) continue;
+
+            if (!byDriver.has(driverId)) byDriver.set(driverId, []);
+            byDriver.get(driverId).push({
+                rideId: doc.id,
+                amount: Number(ride.payoutAmount) || 0,
+                completedAt: ride.completedAt?.toDate?.()?.toISOString() || null,
+                status: ride.payoutStatus,
+            });
+        }
+
+        const drivers = [];
+        for (const [driverId, rides] of byDriver) {
+            const driverSnap = await db.collection('drivers').doc(driverId).get();
+            const driver = driverSnap.exists ? driverSnap.data() : null;
+            drivers.push({
+                driverId,
+                name: driver?.fullname || driver?.name || '(unknown name)',
+                bankName: driver?.bankName || null,
+                accountNumber: driver?.accountNumber || null,
+                accountName: driver?.accountName || null,
+                total: rides.reduce((sum, r) => sum + r.amount, 0),
+                rides: rides.sort((a, b) => (b.completedAt || '').localeCompare(a.completedAt || '')),
+            });
+        }
+        drivers.sort((a, b) => b.total - a.total);
+
+        res.json({ success: true, drivers });
+    } catch (error) {
+        console.error('❌ admin payouts/pending error:', error);
+        res.status(500).json({ error: 'Could not load pending payouts' });
+    }
+});
+
+// POST /admin-api/payouts/mark-paid — body: { rideIds: string[] }
+app.post('/admin-api/payouts/mark-paid', async (req, res) => {
+    const { rideIds } = req.body || {};
+    if (!Array.isArray(rideIds) || rideIds.length === 0) {
+        return res.status(400).json({ error: 'rideIds must be a non-empty array' });
+    }
+
+    const results = [];
+    for (const rideId of rideIds) {
+        try {
+            const rideRef = db.collection('rides').doc(rideId);
+            const rideSnap = await rideRef.get();
+            if (!rideSnap.exists) {
+                results.push({ rideId, ok: false, error: 'not found' });
+                continue;
+            }
+            await rideRef.update({
+                payoutStatus: 'paid_manually',
+                payoutPaidAt: admin.firestore.FieldValue.serverTimestamp(),
+                payoutError: admin.firestore.FieldValue.delete(),
+            });
+            results.push({ rideId, ok: true });
+        } catch (error) {
+            results.push({ rideId, ok: false, error: error.message });
+        }
+    }
+    res.json({ success: true, results });
+});
+
+// GET /admin-api/refunds/review — rides flagged needsManualRefundReview
+app.get('/admin-api/refunds/review', async (req, res) => {
+    try {
+        const snap = await db.collection('rides')
+            .where('needsManualRefundReview', '==', true)
+            .get();
+
+        const rides = snap.docs.map((doc) => {
+            const ride = doc.data();
+            return {
+                rideId: doc.id,
+                customerId: ride.customerId || null,
+                customerName: ride.customerName || null,
+                amount: Number(ride.amount) || 0,
+                refundStatus: ride.refundStatus || null,
+                walletRefundStatus: ride.walletRefundStatus || null,
+                refundReviewReason: ride.refundReviewReason || null,
+                cancelledAt: ride.cancelledAt?.toDate?.()?.toISOString() || null,
+                transactionId: ride.transactionId || null,
+            };
+        });
+
+        res.json({ success: true, rides });
+    } catch (error) {
+        console.error('❌ admin refunds/review error:', error);
+        res.status(500).json({ error: 'Could not load refund review queue' });
+    }
+});
+
+// POST /admin-api/refunds/resolve — body: { rideId, note }
+app.post('/admin-api/refunds/resolve', async (req, res) => {
+    const { rideId, note } = req.body || {};
+    if (!rideId) return res.status(400).json({ error: 'rideId is required' });
+
+    try {
+        await db.collection('rides').doc(rideId).update({
+            needsManualRefundReview: false,
+            refundReviewResolvedAt: admin.firestore.FieldValue.serverTimestamp(),
+            refundReviewNote: note || null,
+        });
+        res.json({ success: true });
+    } catch (error) {
+        console.error('❌ admin refunds/resolve error:', error);
+        res.status(500).json({ error: 'Could not resolve refund review' });
+    }
+});
+
+// GET /admin-api/orphaned-charges — unresolved orphanedCharges docs
+app.get('/admin-api/orphaned-charges', async (req, res) => {
+    try {
+        const snap = await db.collection('orphanedCharges')
+            .where('status', '==', 'unresolved')
+            .get();
+
+        const charges = snap.docs.map((doc) => {
+            const c = doc.data();
+            return {
+                chargeId: doc.id,
+                customerId: c.customerId || null,
+                transactionId: c.transactionId || null,
+                amount: Number(c.amount) || 0,
+                rideCreationError: c.rideCreationError || null,
+                refundError: c.refundError || null,
+                createdAt: c.createdAt?.toDate?.()?.toISOString() || null,
+            };
+        });
+
+        res.json({ success: true, charges });
+    } catch (error) {
+        console.error('❌ admin orphaned-charges error:', error);
+        res.status(500).json({ error: 'Could not load orphaned charges' });
+    }
+});
+
+// POST /admin-api/orphaned-charges/resolve — body: { chargeId, note }
+app.post('/admin-api/orphaned-charges/resolve', async (req, res) => {
+    const { chargeId, note } = req.body || {};
+    if (!chargeId) return res.status(400).json({ error: 'chargeId is required' });
+
+    try {
+        await db.collection('orphanedCharges').doc(chargeId).update({
+            status: 'resolved',
+            resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
+            resolutionNote: note || null,
+        });
+        res.json({ success: true });
+    } catch (error) {
+        console.error('❌ admin orphaned-charges/resolve error:', error);
+        res.status(500).json({ error: 'Could not resolve orphaned charge' });
+    }
+});
 
 // Health check endpoint
 app.get('/health', (req, res) => {

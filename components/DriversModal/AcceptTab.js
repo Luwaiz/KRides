@@ -181,6 +181,11 @@ const AcceptTab = () => {
 					"Ride Completed — Payout Failed",
 					"This ride is complete, but the transfer to your bank account didn't go through. Our team has been notified — contact support if you don't see it within 24 hours."
 				);
+			} else if (!result.payout && result.reason === 'manual_payout_pending') {
+				Alert.alert(
+					"Ride Completed",
+					"Your earnings for this ride are being processed and will be sent to your bank account shortly."
+				);
 			}
 
 			setEndRide(true);

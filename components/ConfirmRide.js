@@ -103,6 +103,17 @@ const ConfirmRide = () => {
 	// Pay for the ride by deducting the wallet balance server-side
 	const handleWalletPay = async () => {
 		if (!UserId || bookingInFlight.current) return;
+		if (!phone) {
+			Alert.alert(
+				"Phone Number Required",
+				"Add a phone number to your profile so your driver can reach you.",
+				[
+					{ text: "Not Now", style: "cancel" },
+					{ text: "Add Phone Number", onPress: () => navigation.navigate("Profile") },
+				]
+			);
+			return;
+		}
 		bookingInFlight.current = true;
 		setLoading(true);
 		try {
@@ -215,6 +226,24 @@ const ConfirmRide = () => {
 				text2: "Please select number of passengers.",
 				position: 'top',
 			});
+			return;
+		}
+
+		// A missing phone number leaves the driver with no way to reach the
+		// customer — block booking instead of silently creating a ride with
+		// blank customerPhone (this is how "N/A" was showing up in driver
+		// history: mainly customers who signed up via Google, which never
+		// collects a phone number).
+		if (!phone) {
+			setLoading(false);
+			Alert.alert(
+				"Phone Number Required",
+				"Add a phone number to your profile so your driver can reach you.",
+				[
+					{ text: "Not Now", style: "cancel" },
+					{ text: "Add Phone Number", onPress: () => navigation.navigate("Profile") },
+				]
+			);
 			return;
 		}
 
