@@ -1,11 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
+import Toolbar from '../components/Toolbar';
+
+const FILTER_OPTIONS = [
+    { value: 'all', label: 'All types' },
+    { value: 'card', label: 'Card refunds' },
+    { value: 'wallet', label: 'Wallet refunds' },
+];
 
 export default function RefundReview() {
     const [rides, setRides] = useState(null);
     const [error, setError] = useState('');
     const [notes, setNotes] = useState({});
     const [busyId, setBusyId] = useState(null);
+    const [search, setSearch] = useState('');
+    const [filter, setFilter] = useState('all');
 
     const load = async () => {
         setError('');
@@ -34,20 +43,53 @@ export default function RefundReview() {
         }
     };
 
+    const filtered = useMemo(() => {
+        if (!rides) return null;
+        const q = search.trim().toLowerCase();
+        return rides.filter((ride) => {
+            const isWallet = !!ride.walletRefundStatus;
+            if (filter === 'card' && isWallet) return false;
+            if (filter === 'wallet' && !isWallet) return false;
+            if (!q) return true;
+            const haystack = [ride.customerName, ride.rideId, ride.transactionId, ride.refundReviewReason]
+                .filter(Boolean)
+                .join(' ')
+                .toLowerCase();
+            return haystack.includes(q);
+        });
+    }, [rides, search, filter]);
+
     if (!rides) return <p className="loading">Loading…</p>;
 
     return (
         <div>
-            <h2>Refund Manual Review</h2>
-            <p className="hint">
-                Rides where the automatic refund retry gave up after 3 attempts. Check Flutterwave's dashboard for
-                the transaction, refund it manually if needed, then note what you did and mark resolved.
-            </p>
+            <div className="page-header">
+                <div>
+                    <h2>Refund Manual Review</h2>
+                    <p className="hint">
+                        Rides where the automatic refund retry gave up after 3 attempts. Check Flutterwave's dashboard for
+                        the transaction, refund it manually if needed, then note what you did and mark resolved.
+                    </p>
+                </div>
+            </div>
+
+            {rides.length > 0 && (
+                <Toolbar
+                    search={search}
+                    onSearchChange={setSearch}
+                    searchPlaceholder="Search by customer, ride ID, transaction ID…"
+                    filter={{ value: filter, onChange: setFilter, options: FILTER_OPTIONS }}
+                />
+            )}
+
             {error && <p className="error">{error}</p>}
+
             {rides.length === 0 ? (
                 <p className="empty">Nothing needs review.</p>
+            ) : filtered.length === 0 ? (
+                <p className="empty">No refunds match your search.</p>
             ) : (
-                rides.map((ride) => (
+                filtered.map((ride) => (
                     <div key={ride.rideId} className="card">
                         <div className="card-header">
                             <div>

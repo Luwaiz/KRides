@@ -4,11 +4,19 @@ import Login from './pages/Login';
 import Payouts from './pages/Payouts';
 import RefundReview from './pages/RefundReview';
 import OrphanedCharges from './pages/OrphanedCharges';
+import Logo from './components/Logo';
+import { PayoutsIcon, RefundIcon, OrphanedIcon, LogoutIcon } from './components/icons';
 
 function RequireAuth({ children }) {
     if (!api.getKey()) return <Navigate to="/login" replace />;
     return children;
 }
+
+const NAV_ITEMS = [
+    { to: '/payouts', label: 'Payouts', icon: PayoutsIcon },
+    { to: '/refunds', label: 'Refund Review', icon: RefundIcon },
+    { to: '/orphaned-charges', label: 'Orphaned Charges', icon: OrphanedIcon },
+];
 
 function Layout({ children }) {
     const navigate = useNavigate();
@@ -19,21 +27,23 @@ function Layout({ children }) {
 
     return (
         <div className="app">
-            <header className="topbar">
-                <h1>KRides Admin</h1>
+            <aside className="sidebar">
+                <div className="sidebar-logo">
+                    <Logo />
+                </div>
                 <nav>
-                    <NavLink to="/payouts" className={({ isActive }) => (isActive ? 'active' : '')}>
-                        Payouts
-                    </NavLink>
-                    <NavLink to="/refunds" className={({ isActive }) => (isActive ? 'active' : '')}>
-                        Refund Review
-                    </NavLink>
-                    <NavLink to="/orphaned-charges" className={({ isActive }) => (isActive ? 'active' : '')}>
-                        Orphaned Charges
-                    </NavLink>
+                    {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
+                        <NavLink key={to} to={to} className={({ isActive }) => (isActive ? 'active' : '')}>
+                            <Icon />
+                            {label}
+                        </NavLink>
+                    ))}
                 </nav>
-                <button className="logout" onClick={logout}>Log out</button>
-            </header>
+                <button className="logout" onClick={logout}>
+                    <LogoutIcon />
+                    Log out
+                </button>
+            </aside>
             <main>{children}</main>
         </div>
     );
