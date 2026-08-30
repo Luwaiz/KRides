@@ -35,7 +35,7 @@ const db = admin.firestore();
 
 async function main() {
     const snap = await db.collection('rides')
-        .where('payoutStatus', 'in', ['pending_manual', 'failed'])
+        .where('payoutStatus', 'in', ['pending_manual', 'failed', 'awaiting_bank_details'])
         .get();
 
     if (snap.empty) {

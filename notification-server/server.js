@@ -10,10 +10,13 @@ const PORT = process.env.PORT || 3001;
 
 // Middleware
 // The mobile app calls this over React Native's fetch, which doesn't enforce
-// browser CORS — origin:false (no CORS headers) is fine for /api. The admin
-// web app is a real browser, so it gets its own CORS policy further down,
-// scoped to /admin-api and an explicit origin allowlist.
-app.use(cors({ origin: false }));
+// browser CORS, so this permissive policy is harmless for /api. Scoped to
+// /api specifically (not global) — the cors package treats `origin: false`
+// as falsy and actually answers every preflight with Allow-Origin: *, and if
+// this ran unscoped it would run first for every /admin-api request too
+// (cors() ends OPTIONS requests itself without calling next()), pre-empting
+// the origin-allowlisted policy registered further down for /admin-api.
+app.use('/api', cors({ origin: false }));
 app.use(express.json());
 
 // API key authentication — all /api/* routes require a valid key.
@@ -36,7 +39,15 @@ app.use('/admin-api', cors({
     origin: (origin, callback) => {
         // No Origin header = non-browser caller (curl, server-to-server) — allow.
         if (!origin || ADMIN_ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
-        callback(new Error('Not allowed by CORS'));
+        // Passing an Error here (rather than `callback(null, false)`) makes the
+        // cors package call next(err) instead of next() — Express then skips
+        // straight to its default error handler and returns a raw stack trace
+        // (confirmed by actually sending a disallowed-origin request). Failing
+        // "quietly" instead just omits Access-Control-Allow-Origin, which is
+        // what actually blocks a real browser — the request still reaches the
+        // real access gate below (the x-admin-key check), same as it would for
+        // any non-browser caller.
+        callback(null, false);
     },
 }));
 
@@ -1379,6 +1390,17 @@ app.post('/api/payments/complete-ride', async (req, res) => {
 
         if (!driver?.bankCode || !driver?.accountNumber) {
             console.warn(`⚠️ Driver ${driverId} has no bank details — skipping payout`);
+            // Still record what's owed — without this, a ride completed before
+            // the driver added bank details had no payoutStatus at all, so the
+            // amount was invisible to every tracking mechanism (admin queue,
+            // retry sweep) forever, even after the driver later added details.
+            // Its own status (not 'failed'/'pending_manual') keeps the
+            // automatic retry sweep from calling Flutterwave with bank fields
+            // it knows are missing.
+            await rideRef.update({
+                payoutStatus: 'awaiting_bank_details',
+                payoutAmount: driverEarnings,
+            });
             return res.json({ success: true, payout: null, reason: 'no_bank_details' });
         }
 
@@ -2096,7 +2118,7 @@ app.post('/admin-api/login', (req, res) => {
 app.get('/admin-api/payouts/pending', async (req, res) => {
     try {
         const snap = await db.collection('rides')
-            .where('payoutStatus', 'in', ['pending_manual', 'failed'])
+            .where('payoutStatus', 'in', ['pending_manual', 'failed', 'awaiting_bank_details'])
             .get();
 
         const byDriver = new Map();
@@ -2201,11 +2223,31 @@ app.post('/admin-api/refunds/resolve', async (req, res) => {
     if (!rideId) return res.status(400).json({ error: 'rideId is required' });
 
     try {
-        await db.collection('rides').doc(rideId).update({
+        const rideRef = db.collection('rides').doc(rideId);
+        const rideSnap = await rideRef.get();
+        if (!rideSnap.exists) return res.status(404).json({ error: 'Ride not found' });
+        const ride = rideSnap.data();
+
+        const updates = {
             needsManualRefundReview: false,
             refundReviewResolvedAt: admin.firestore.FieldValue.serverTimestamp(),
             refundReviewNote: note || null,
-        });
+        };
+
+        // retryFailedRefunds's sweep queries on refundStatus/walletRefundStatus
+        // == 'failed', not on needsManualRefundReview — clearing only the flag
+        // would leave a 'failed' status in place, and the very next sweep
+        // (retryRefundCount already maxed out) immediately re-sets the flag,
+        // undoing this resolve within 10 minutes. Bump the status field itself
+        // to a terminal value so the sweep's query excludes it for good.
+        if (['failed', 'needs_review'].includes(ride.refundStatus)) {
+            updates.refundStatus = 'resolved_manually';
+        }
+        if (ride.walletRefundStatus === 'failed') {
+            updates.walletRefundStatus = 'resolved_manually';
+        }
+
+        await rideRef.update(updates);
         res.json({ success: true });
     } catch (error) {
         console.error('❌ admin refunds/resolve error:', error);

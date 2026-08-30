@@ -196,8 +196,14 @@ const HomeTab = () => {
 			return;
 		}
 
+		// Matches the field the pending-rides listener above and Firestore's
+		// security rules both gate on — accountNumber and bankDetailsVerified
+		// are normally set together, but bankDetailsVerified is the one that's
+		// actually authoritative (only set true after Flutterwave confirms the
+		// subaccount), so checking anything else here risks a confusing raw
+		// "permission denied" from Firestore instead of this friendly prompt.
 		const driverDetails = useDriverDetails.getState();
-		if (!driverDetails.accountNumber) {
+		if (!driverDetails.bankDetailsVerified) {
 			Alert.alert(
 				"Bank Details Required",
 				"You need to add your bank account details before accepting rides so you can receive payments.",

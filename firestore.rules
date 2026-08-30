@@ -26,6 +26,15 @@ service cloud.firestore {
              (!('destination'    in d) || (d.destination    is string && d.destination.size()    <= 200));
     }
 
+    // The app already hides pending rides from an unverified driver client-side,
+    // but that's just UI — this is the actual enforcement, since a client can't
+    // be trusted to police itself. Missing field reads as null, not true, so a
+    // driver doc predating this field fails safe (denied) rather than erroring.
+    function hasVerifiedBankDetails() {
+      return get(/databases/$(database)/documents/drivers/$(request.auth.uid))
+               .data.bankDetailsVerified == true;
+    }
+
     // ── Users (customers) ─────────────────────────────────────────────────────
     match /users/{userId} {
       // Users read and write only their own document.
@@ -84,8 +93,9 @@ service cloud.firestore {
       // Update:
       //   • Customer cancels their own ride.
       //   • Assigned driver updates ride progress.
-      //   • Any authenticated driver may accept an unassigned pending ride
-      //     (sets driverId = themselves, status = 'accepted').
+      //   • Any authenticated driver with verified bank details may accept an
+      //     unassigned pending ride (sets driverId = themselves, status =
+      //     'accepted') — a driver who hasn't set up payouts can't accept.
       //   • Any authenticated driver may add themselves to declined_by.
       allow update: if isAuth() && (
         resource.data.customerId == request.auth.uid ||
@@ -94,7 +104,8 @@ service cloud.firestore {
           resource.data.status == 'pending' &&
           (resource.data.driverId == null || resource.data.driverId == '') &&
           request.resource.data.driverId == request.auth.uid &&
-          request.resource.data.status   == 'accepted'
+          request.resource.data.status   == 'accepted' &&
+          hasVerifiedBankDetails()
         ) ||
         (
           request.resource.data.diff(resource.data)
