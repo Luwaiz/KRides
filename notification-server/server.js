@@ -2405,6 +2405,38 @@ async function sendDriverSetPasswordEmail(driverName, driverEmail) {
     return sendDriverWelcomeEmail({ driverName, driverEmail, resetLink });
 }
 
+// GET /admin-api/drivers — every driver, self-registered or admin-created.
+app.get('/admin-api/drivers', async (req, res) => {
+    try {
+        // Not .orderBy('createdAt') — that silently drops any doc missing
+        // the field entirely, which older driver docs (predating that
+        // field) could well be. Sort in JS instead so nothing vanishes.
+        const snap = await db.collection('drivers').limit(1000).get();
+
+        const drivers = snap.docs.map((doc) => {
+            const d = doc.data();
+            return {
+                driverId: doc.id,
+                fullName: d.fullname || d.name || null,
+                phone: d.phone || null,
+                email: d.email || null,
+                vehicleId: d.vehicle_id || null,
+                bankDetailsVerified: !!d.bankDetailsVerified,
+                bankDetailsSkipped: !!d.bankDetailsSkipped,
+                createdByAdmin: !!d.createdByAdmin,
+                createdAt: d.createdAt?.toDate?.()?.toISOString() || null,
+            };
+        });
+
+        drivers.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+
+        res.json({ success: true, drivers });
+    } catch (error) {
+        console.error('❌ admin drivers error:', error);
+        res.status(500).json({ error: 'Could not load drivers' });
+    }
+});
+
 // POST /admin-api/drivers/create — body: { fullName, phone, email, vehicleId }
 // Creates a driver account the same way self-signup does (same
 // drivers/{uid} schema as hooks/Firebase.js's signUpWithEmail) but from the

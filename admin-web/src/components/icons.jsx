@@ -31,7 +31,7 @@ export function RefundIcon(props) {
     );
 }
 
-export function AddDriverIcon(props) {
+export function DriversIcon(props) {
     return (
         <svg {...base} {...props}>
             <circle cx="9" cy="8" r="3.5" />
