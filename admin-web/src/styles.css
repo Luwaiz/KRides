@@ -390,6 +390,27 @@ table td {
     background: rgba(46, 125, 50, 0.08);
 }
 
+.form-card {
+    max-width: 420px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.form-card label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+}
+
+.form-card button {
+    align-self: flex-start;
+    margin-top: 6px;
+}
+
 @media (max-width: 720px) {
     .app {
         flex-direction: column;

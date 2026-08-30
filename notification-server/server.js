@@ -1,7 +1,8 @@
 const express = require('express');
 const admin = require('firebase-admin');
 const cors = require('cors');
-const { sendDriverReportEmail } = require('./emailservice');
+const crypto = require('crypto');
+const { sendDriverReportEmail, sendDriverWelcomeEmail } = require('./emailservice');
 require('dotenv').config();
 
 const app = express();
@@ -857,6 +858,17 @@ app.post('/api/payments/create-subaccount', async (req, res) => {
     }
 });
 
+// Accepts 08XXXXXXXXX, +234XXXXXXXXXX, 234XXXXXXXXXX — mirrors
+// hooks/Firebase.js's normalizeNigerianPhone on the mobile side. Shared by
+// every phone-keyed pre-auth endpoint (driver-email lookup, check-phone,
+// admin driver creation) so they can't drift out of sync with each other.
+function normalizeNigerianPhone(phone) {
+    const digits = String(phone).replace(/\D/g, '');
+    if (digits.startsWith('234') && digits.length === 13) return '0' + digits.slice(3);
+    if (/^0[789]\d{9}$/.test(digits)) return digits;
+    return null;
+}
+
 // In-memory rate limiter for /api/auth/driver-email
 // Tracks { attempts, resetAt } per normalized phone number.
 // Simple Map is sufficient for a single-instance Render deployment.
@@ -906,13 +918,7 @@ app.post('/api/auth/driver-email', async (req, res) => {
         return res.status(400).json({ error: 'phone is required' });
     }
 
-    // Normalize: accept 08XXXXXXXXX, +234XXXXXXXXXX, 234XXXXXXXXXX
-    const normalized = (() => {
-        const digits = phone.replace(/\D/g, '');
-        if (digits.startsWith('234') && digits.length === 13) return '0' + digits.slice(3);
-        if (/^0[789]\d{9}$/.test(digits)) return digits;
-        return null;
-    })();
+    const normalized = normalizeNigerianPhone(phone);
 
     if (!normalized) {
         return res.status(400).json({ error: 'Invalid Nigerian phone number format' });
@@ -966,12 +972,7 @@ app.post('/api/auth/check-phone', async (req, res) => {
         return res.status(400).json({ error: 'phone is required' });
     }
 
-    const normalized = (() => {
-        const digits = phone.replace(/\D/g, '');
-        if (digits.startsWith('234') && digits.length === 13) return '0' + digits.slice(3);
-        if (/^0[789]\d{9}$/.test(digits)) return digits;
-        return null;
-    })();
+    const normalized = normalizeNigerianPhone(phone);
 
     if (!normalized) {
         return res.status(400).json({ error: 'Invalid Nigerian phone number format' });
@@ -2390,6 +2391,117 @@ app.post('/admin-api/reports/reopen', async (req, res) => {
     } catch (error) {
         console.error('❌ admin reports/reopen error:', error);
         res.status(500).json({ error: 'Could not reopen report' });
+    }
+});
+
+// Generates a fresh password-reset link and emails it to the driver — the
+// only way into an admin-created account, since nobody (including the
+// admin) ever sees or sets the account's actual password. Shared by
+// drivers/create (right after account creation) and
+// drivers/resend-welcome-email (if that first send failed, or the driver
+// says they never got it).
+async function sendDriverSetPasswordEmail(driverName, driverEmail) {
+    const resetLink = await admin.auth().generatePasswordResetLink(driverEmail);
+    return sendDriverWelcomeEmail({ driverName, driverEmail, resetLink });
+}
+
+// POST /admin-api/drivers/create — body: { fullName, phone, email, vehicleId }
+// Creates a driver account the same way self-signup does (same
+// drivers/{uid} schema as hooks/Firebase.js's signUpWithEmail) but from the
+// admin side — for drivers onboarded in person, over the phone, etc. The
+// account gets a random password nobody ever sees; the driver sets their
+// own via the emailed reset link, then logs in through the normal driver
+// login screen (phone number, looked up to the real email server-side)
+// exactly like anyone who signed up themselves.
+app.post('/admin-api/drivers/create', async (req, res) => {
+    const { fullName, phone, email, vehicleId } = req.body || {};
+
+    if (!fullName?.trim() || !phone?.trim() || !email?.trim() || !vehicleId?.trim()) {
+        return res.status(400).json({ error: 'fullName, phone, email, and vehicleId are all required' });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+        return res.status(400).json({ error: 'Invalid email address' });
+    }
+
+    const normalizedPhone = normalizeNigerianPhone(phone);
+    if (!normalizedPhone) {
+        return res.status(400).json({ error: 'Invalid Nigerian phone number format' });
+    }
+
+    try {
+        // Auth enforces email uniqueness itself (caught below); phone isn't
+        // the Auth identifier here, so it needs its own check across both
+        // collections, same as /api/auth/check-phone does pre-signup.
+        const [usersSnap, driversSnap] = await Promise.all([
+            db.collection('users').where('phone', '==', normalizedPhone).limit(1).get(),
+            db.collection('drivers').where('phone', '==', normalizedPhone).limit(1).get(),
+        ]);
+        if (!usersSnap.empty || !driversSnap.empty) {
+            return res.status(409).json({ error: 'A driver or customer with this phone number already exists' });
+        }
+
+        let userRecord;
+        try {
+            userRecord = await admin.auth().createUser({
+                email: email.trim(),
+                password: crypto.randomBytes(18).toString('base64'),
+                displayName: fullName.trim(),
+            });
+        } catch (authError) {
+            if (authError.code === 'auth/email-already-exists') {
+                return res.status(409).json({ error: 'A driver or customer with this email already exists' });
+            }
+            throw authError;
+        }
+
+        await db.collection('drivers').doc(userRecord.uid).set({
+            uid: userRecord.uid,
+            fullname: fullName.trim(),
+            email: email.trim(),
+            phone: normalizedPhone,
+            vehicle_id: vehicleId.trim(),
+            role: 'driver',
+            fcmTokens: {},
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            createdByAdmin: true,
+        });
+
+        const emailResult = await sendDriverSetPasswordEmail(fullName.trim(), email.trim());
+
+        console.log(`👤 Admin created driver ${userRecord.uid} (${fullName.trim()})${emailResult.sent ? ' — welcome email sent' : ` — welcome email NOT sent (${emailResult.reason})`}`);
+
+        res.json({
+            success: true,
+            driverId: userRecord.uid,
+            emailSent: emailResult.sent,
+            emailFailReason: emailResult.sent ? null : emailResult.reason,
+        });
+    } catch (error) {
+        console.error('❌ admin drivers/create error:', error);
+        res.status(500).json({ error: 'Could not create driver account' });
+    }
+});
+
+// POST /admin-api/drivers/resend-welcome-email — body: { driverId }
+app.post('/admin-api/drivers/resend-welcome-email', async (req, res) => {
+    const { driverId } = req.body || {};
+    if (!driverId) return res.status(400).json({ error: 'driverId is required' });
+
+    try {
+        const driverSnap = await db.collection('drivers').doc(driverId).get();
+        if (!driverSnap.exists) return res.status(404).json({ error: 'Driver not found' });
+        const driver = driverSnap.data();
+        if (!driver.email) return res.status(400).json({ error: 'Driver has no email on file' });
+
+        const emailResult = await sendDriverSetPasswordEmail(driver.fullname || driver.name || 'Driver', driver.email);
+        res.json({
+            success: true,
+            emailSent: emailResult.sent,
+            emailFailReason: emailResult.sent ? null : emailResult.reason,
+        });
+    } catch (error) {
+        console.error('❌ admin drivers/resend-welcome-email error:', error);
+        res.status(500).json({ error: 'Could not resend welcome email' });
     }
 });
 

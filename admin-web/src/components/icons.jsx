@@ -31,6 +31,17 @@ export function RefundIcon(props) {
     );
 }
 
+export function AddDriverIcon(props) {
+    return (
+        <svg {...base} {...props}>
+            <circle cx="9" cy="8" r="3.5" />
+            <path d="M2.5 20c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5" />
+            <path d="M18 8v6" />
+            <path d="M15 11h6" />
+        </svg>
+    );
+}
+
 export function ReportIcon(props) {
     return (
         <svg {...base} {...props}>

@@ -79,4 +79,14 @@ export const api = {
             method: 'POST',
             body: JSON.stringify({ reportId }),
         }),
+    createDriver: (driver) =>
+        request('/admin-api/drivers/create', {
+            method: 'POST',
+            body: JSON.stringify(driver),
+        }),
+    resendDriverWelcomeEmail: (driverId) =>
+        request('/admin-api/drivers/resend-welcome-email', {
+            method: 'POST',
+            body: JSON.stringify({ driverId }),
+        }),
 };

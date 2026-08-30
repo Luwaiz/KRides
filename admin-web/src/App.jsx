@@ -5,8 +5,9 @@ import Payouts from './pages/Payouts';
 import RefundReview from './pages/RefundReview';
 import OrphanedCharges from './pages/OrphanedCharges';
 import Reports from './pages/Reports';
+import AddDriver from './pages/AddDriver';
 import Logo from './components/Logo';
-import { PayoutsIcon, RefundIcon, OrphanedIcon, ReportIcon, LogoutIcon } from './components/icons';
+import { PayoutsIcon, RefundIcon, OrphanedIcon, ReportIcon, AddDriverIcon, LogoutIcon } from './components/icons';
 
 function RequireAuth({ children }) {
     if (!api.getKey()) return <Navigate to="/login" replace />;
@@ -14,6 +15,7 @@ function RequireAuth({ children }) {
 }
 
 const NAV_ITEMS = [
+    { to: '/add-driver', label: 'Add Driver', icon: AddDriverIcon },
     { to: '/payouts', label: 'Payouts', icon: PayoutsIcon },
     { to: '/refunds', label: 'Refund Review', icon: RefundIcon },
     { to: '/reports', label: 'Report Complaints', icon: ReportIcon },
@@ -56,6 +58,14 @@ export default function App() {
         <BrowserRouter>
             <Routes>
                 <Route path="/login" element={<Login />} />
+                <Route
+                    path="/add-driver"
+                    element={
+                        <RequireAuth>
+                            <Layout><AddDriver /></Layout>
+                        </RequireAuth>
+                    }
+                />
                 <Route
                     path="/payouts"
                     element={
