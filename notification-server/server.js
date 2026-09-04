@@ -1341,7 +1341,9 @@ app.post('/api/wallet/pay-ride', async (req, res) => {
 /**
  * POST /api/payments/complete-ride
  * Marks a ride as completed and transfers the driver's earnings to their bank account.
- * Platform keeps ₦50 (1–2 passengers) or ₦100 (3+ passengers) per ride.
+ * Platform keeps a flat fee on top of the driver's base-fare earnings —
+ * amount set via admin-web's Pricing page (config/pricing), see
+ * getPricingConfig(). No longer a fixed ₦ figure in code.
  *
  * Body: { idToken, rideId }
  */
