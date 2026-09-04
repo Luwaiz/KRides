@@ -869,6 +869,27 @@ function normalizeNigerianPhone(phone) {
     return null;
 }
 
+// Mirrors constants/pricingConfig.js's PRICING_DEFAULTS on the mobile app —
+// kept in sync manually since this is a separate codebase/runtime, not a
+// shared package. Both sides fall back to these if config/pricing hasn't
+// been touched yet, so nothing breaks before an admin ever visits Pricing.
+const PRICING_DEFAULTS = {
+    baseFarePerPassenger: 200,
+    platformFeeStandard: 100,
+    platformFeeGroup: 150,
+    groupThreshold: 3,
+};
+
+async function getPricingConfig() {
+    try {
+        const snap = await db.collection('config').doc('pricing').get();
+        if (snap.exists) return { ...PRICING_DEFAULTS, ...snap.data() };
+    } catch (error) {
+        console.error('❌ getPricingConfig error, using defaults:', error.message);
+    }
+    return PRICING_DEFAULTS;
+}
+
 // In-memory rate limiter for /api/auth/driver-email
 // Tracks { attempts, resetAt } per normalized phone number.
 // Simple Map is sufficient for a single-instance Render deployment.
@@ -1375,10 +1396,12 @@ app.post('/api/payments/complete-ride', async (req, res) => {
 
         console.log(`✅ Ride ${rideId} marked as completed by driver ${driverId}`);
 
-        // Calculate driver earnings (platform takes ₦50 for <3 passengers, ₦100 for 3+)
+        // Platform fee (the cut on top of the driver's base-fare earnings)
+        // is set from admin-web's Pricing page — see getPricingConfig().
         const totalAmount = Number(ride.amount) || 0;
         const passengers = Number(ride.numberOfPassengers) || 1;
-        const platformFee = passengers >= 3 ? 150 : 100;
+        const pricing = await getPricingConfig();
+        const platformFee = passengers >= pricing.groupThreshold ? pricing.platformFeeGroup : pricing.platformFeeStandard;
         const driverEarnings = Math.max(totalAmount - platformFee, 0);
 
         // Only transfer if ride was paid digitally and driver has bank details
@@ -2404,6 +2427,55 @@ async function sendDriverSetPasswordEmail(driverName, driverEmail) {
     const resetLink = await admin.auth().generatePasswordResetLink(driverEmail);
     return sendDriverWelcomeEmail({ driverName, driverEmail, resetLink });
 }
+
+// GET /admin-api/pricing — current pricing config (or defaults, if
+// config/pricing has never been written).
+app.get('/admin-api/pricing', async (req, res) => {
+    try {
+        const pricing = await getPricingConfig();
+        res.json({ success: true, pricing });
+    } catch (error) {
+        console.error('❌ admin pricing error:', error);
+        res.status(500).json({ error: 'Could not load pricing' });
+    }
+});
+
+// POST /admin-api/pricing/update — body: { baseFarePerPassenger,
+// platformFeeStandard, platformFeeGroup, groupThreshold }
+// Takes effect immediately for every ride booked/completed after this —
+// the mobile app has a live listener on config/pricing (see
+// constants/pricingConfig.js) and complete-ride reads it fresh on every call.
+app.post('/admin-api/pricing/update', async (req, res) => {
+    const { baseFarePerPassenger, platformFeeStandard, platformFeeGroup, groupThreshold } = req.body || {};
+
+    const fields = { baseFarePerPassenger, platformFeeStandard, platformFeeGroup, groupThreshold };
+    for (const [key, value] of Object.entries(fields)) {
+        if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+            return res.status(400).json({ error: `${key} must be a non-negative number` });
+        }
+    }
+    if (baseFarePerPassenger <= 0) {
+        return res.status(400).json({ error: 'baseFarePerPassenger must be greater than 0' });
+    }
+    if (!Number.isInteger(groupThreshold) || groupThreshold < 1) {
+        return res.status(400).json({ error: 'groupThreshold must be a whole number of at least 1' });
+    }
+
+    try {
+        await db.collection('config').doc('pricing').set({
+            baseFarePerPassenger,
+            platformFeeStandard,
+            platformFeeGroup,
+            groupThreshold,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        console.log(`💰 Pricing updated: base=₦${baseFarePerPassenger}/passenger, fee=₦${platformFeeStandard}(<${groupThreshold})/₦${platformFeeGroup}(>=${groupThreshold})`);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('❌ admin pricing/update error:', error);
+        res.status(500).json({ error: 'Could not update pricing' });
+    }
+});
 
 // GET /admin-api/drivers — every driver, self-registered or admin-created.
 app.get('/admin-api/drivers', async (req, res) => {

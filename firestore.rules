@@ -141,6 +141,15 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ── App config (admin-managed) ────────────────────────────────────────────
+    // Pricing (config/pricing) is read by the app to compute fares and driver
+    // earnings, and written only via the Admin SDK from admin-web's Pricing
+    // page — never directly by a client.
+    match /config/{configId} {
+      allow read:  if isAuth();
+      allow write: if false;
+    }
+
     // ── Orphaned charges (reconciliation) ───────────────────────────────────────
     // Written by the client when a card charge succeeds but ride creation and
     // the automatic refund both fail. Only the charged customer may create one;

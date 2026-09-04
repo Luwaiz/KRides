@@ -79,6 +79,12 @@ export const api = {
             method: 'POST',
             body: JSON.stringify({ reportId }),
         }),
+    getPricing: () => request('/admin-api/pricing'),
+    updatePricing: (pricing) =>
+        request('/admin-api/pricing/update', {
+            method: 'POST',
+            body: JSON.stringify(pricing),
+        }),
     getDrivers: () => request('/admin-api/drivers'),
     createDriver: (driver) =>
         request('/admin-api/drivers/create', {
