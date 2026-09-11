@@ -3,157 +3,199 @@ import { api } from '../api';
 import Toolbar from '../components/Toolbar';
 
 const FILTER_OPTIONS = [
+    { value: 'owed', label: 'Owed money' },
     { value: 'all', label: 'All drivers' },
-    { value: 'ready', label: 'Ready to pay' },
-    { value: 'no_bank', label: 'Awaiting bank details' },
+    { value: 'no_bank', label: 'No bank details' },
 ];
 
 const PAYMENT_LABELS = { flutterwave: 'Card', wallet: 'Wallet', cash: 'Cash' };
 const paymentLabel = (method) => PAYMENT_LABELS[method] || method || 'Unknown method';
+const naira = (n) => `₦${Number(n || 0).toLocaleString('en-NG')}`;
 
+// Each driver gets their own tab (the list on the left selects it) instead
+// of one long scroll of every driver's card — "To Be Paid" and "Paid Total"
+// sit at the top of whichever driver is selected. "Mark All As Paid" settles
+// everything owed as of that moment; anything that completes afterward
+// starts a fresh "To Be Paid" total while "Paid Total" keeps its running
+// lifetime sum (see totalPaidOut on the driver doc, server-side).
 export default function Payouts() {
     const [drivers, setDrivers] = useState(null);
     const [error, setError] = useState('');
-    const [busyId, setBusyId] = useState(null);
+    const [busy, setBusy] = useState(false);
     const [search, setSearch] = useState('');
-    const [filter, setFilter] = useState('all');
+    const [filter, setFilter] = useState('owed');
+    const [selectedDriverId, setSelectedDriverId] = useState(null);
 
-    const load = async () => {
+    const load = async (keepSelection) => {
         setError('');
         try {
-            const data = await api.getPendingPayouts();
+            const data = await api.getPayoutsOverview();
             setDrivers(data.drivers);
+            if (!keepSelection || !data.drivers.some((d) => d.driverId === selectedDriverId)) {
+                setSelectedDriverId(data.drivers[0]?.driverId || null);
+            }
         } catch (err) {
             setError(err.message);
         }
     };
 
     useEffect(() => {
-        load();
+        load(false);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
-
-    const markDriverPaid = async (driver) => {
-        const confirmed = window.confirm(
-            `Mark all ${driver.rides.length} ride(s) for ${driver.name} (₦${driver.total.toLocaleString('en-NG')}) as paid?\n\nOnly confirm after you've actually sent the money — this cannot be automatically undone.`
-        );
-        if (!confirmed) return;
-
-        setBusyId(driver.driverId);
-        setError('');
-        try {
-            await api.markPaid(driver.rides.map((r) => r.rideId));
-            await load();
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setBusyId(null);
-        }
-    };
 
     const filtered = useMemo(() => {
         if (!drivers) return null;
         const q = search.trim().toLowerCase();
         return drivers.filter((d) => {
             const hasBank = !!(d.bankName && d.accountNumber);
-            if (filter === 'ready' && !hasBank) return false;
+            if (filter === 'owed' && d.toBePaid <= 0) return false;
             if (filter === 'no_bank' && hasBank) return false;
             if (!q) return true;
-            const haystack = [
-                d.name, d.bankName, d.accountNumber, d.accountName,
-                ...d.rides.flatMap((r) => [
-                    r.rideId, r.customerName, r.pickupLocation, r.destination, r.transactionId,
-                ]),
-            ]
-                .filter(Boolean)
-                .join(' ')
-                .toLowerCase();
+            const haystack = [d.name, d.bankName, d.accountNumber, d.accountName].filter(Boolean).join(' ').toLowerCase();
             return haystack.includes(q);
         });
     }, [drivers, search, filter]);
 
+    const selectedDriver = drivers?.find((d) => d.driverId === selectedDriverId) || null;
+
+    const markAllPaid = async () => {
+        if (!selectedDriver || selectedDriver.rides.length === 0) return;
+        const confirmed = window.confirm(
+            `Mark all ${selectedDriver.rides.length} ride(s) for ${selectedDriver.name} (${naira(selectedDriver.toBePaid)}) as paid?\n\nOnly confirm after you've actually sent the money — this cannot be automatically undone.`
+        );
+        if (!confirmed) return;
+
+        setBusy(true);
+        setError('');
+        try {
+            await api.markPaid(selectedDriver.rides.map((r) => r.rideId));
+            await load(true);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setBusy(false);
+        }
+    };
+
     if (!drivers) return <p className="loading">Loading…</p>;
 
-    const grandTotal = drivers.reduce((sum, d) => sum + d.total, 0);
-
     return (
-        <div>
+        <div className="payouts-page">
             <div className="page-header">
                 <div>
-                    <h2>Pending Driver Payouts</h2>
+                    <h2>Driver Payouts</h2>
                     <p className="hint">
-                        Pay each driver their total below via the Flutterwave dashboard or your bank app, then click
-                        "Mark Paid" — this is what keeps a ride from being paid twice.
+                        Pick a driver on the left to see what they're owed right now and their all-time paid total.
+                        "Mark All As Paid" settles everything owed as of this moment — any ride that completes after
+                        that starts a fresh "To Be Paid" total for next time.
                     </p>
                 </div>
-                {drivers.length > 0 && <p className="total">Total owed: ₦{grandTotal.toLocaleString('en-NG')}</p>}
             </div>
-
-            {drivers.length > 0 && (
-                <Toolbar
-                    search={search}
-                    onSearchChange={setSearch}
-                    searchPlaceholder="Search by driver, bank, account number, ride ID…"
-                    filter={{ value: filter, onChange: setFilter, options: FILTER_OPTIONS }}
-                />
-            )}
 
             {error && <p className="error">{error}</p>}
 
-            {drivers.length === 0 ? (
-                <p className="empty">Nothing owed — all caught up.</p>
-            ) : filtered.length === 0 ? (
-                <p className="empty">No drivers match your search.</p>
-            ) : (
-                filtered.map((driver) => (
-                    <div key={driver.driverId} className="card">
-                        <div className="card-header">
-                            <div>
-                                <strong>{driver.name}</strong>
-                                <div className="muted">
-                                    {driver.bankName && driver.accountNumber
-                                        ? `${driver.bankName} — ${driver.accountNumber} (${driver.accountName || 'name not on file'})`
-                                        : '⚠️ No bank details on file'}
-                                </div>
-                            </div>
-                            <div className="card-actions">
-                                <span className="amount">₦{driver.total.toLocaleString('en-NG')}</span>
+            <div className="payout-layout">
+                <div className="payout-driver-list-wrap">
+                    <Toolbar
+                        search={search}
+                        onSearchChange={setSearch}
+                        searchPlaceholder="Search drivers…"
+                        filter={{ value: filter, onChange: setFilter, options: FILTER_OPTIONS }}
+                    />
+                    <div className="payout-driver-list">
+                        {filtered.length === 0 ? (
+                            <p className="empty">No drivers match.</p>
+                        ) : (
+                            filtered.map((d) => (
                                 <button
-                                    disabled={busyId === driver.driverId}
-                                    onClick={() => markDriverPaid(driver)}
+                                    key={d.driverId}
+                                    type="button"
+                                    className={`payout-driver-item${d.driverId === selectedDriverId ? ' active' : ''}`}
+                                    onClick={() => setSelectedDriverId(d.driverId)}
                                 >
-                                    {busyId === driver.driverId ? 'Marking…' : 'Mark Paid'}
+                                    <span className="payout-driver-name">{d.name}</span>
+                                    <span className={`payout-driver-owed${d.toBePaid > 0 ? ' owed' : ''}`}>
+                                        {naira(d.toBePaid)}
+                                    </span>
                                 </button>
-                            </div>
-                        </div>
-                        <div className="ride-list">
-                            {driver.rides.map((r) => (
-                                <div key={r.rideId} className="ride-row">
-                                    <div className="ride-row-main">
-                                        <span className="mono">{r.rideId}</span>
-                                        <span className="amount">₦{r.amount.toLocaleString('en-NG')}</span>
-                                    </div>
-                                    <div className="ride-row-line muted">
-                                        {r.customerName || 'Unknown customer'}
-                                        {r.numberOfPassengers ? ` · ${r.numberOfPassengers} passenger${r.numberOfPassengers > 1 ? 's' : ''}` : ''}
-                                    </div>
-                                    {(r.pickupLocation || r.destination) && (
-                                        <div className="ride-row-line muted">
-                                            {r.pickupLocation || 'Unknown pickup'} → {r.destination || 'Unknown destination'}
-                                        </div>
-                                    )}
-                                    <div className="ride-row-line muted">
-                                        {paymentLabel(r.paymentMethod)}
-                                        {r.transactionId && <> · txn <span className="mono">{r.transactionId}</span></>}
-                                        {' · '}{r.completedAt ? new Date(r.completedAt).toLocaleDateString('en-NG') : 'unknown date'}
-                                        {' · '}{r.status}
-                                    </div>
-                                    {r.payoutError && <div className="ride-row-error">⚠️ {r.payoutError}</div>}
-                                </div>
-                            ))}
-                        </div>
+                            ))
+                        )}
                     </div>
-                ))
-            )}
+                </div>
+
+                <div className="payout-detail">
+                    {!selectedDriver ? (
+                        <p className="empty">Select a driver.</p>
+                    ) : (
+                        <>
+                            <div className="card">
+                                <div className="card-header">
+                                    <div>
+                                        <strong>{selectedDriver.name}</strong>
+                                        <div className="muted">
+                                            {selectedDriver.bankName && selectedDriver.accountNumber
+                                                ? `${selectedDriver.bankName} — ${selectedDriver.accountNumber} (${selectedDriver.accountName || 'name not on file'})`
+                                                : '⚠️ No bank details on file'}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="stat-row">
+                                    <div className="stat-tile">
+                                        <div className="stat-label">To Be Paid</div>
+                                        <div className="stat-value stat-owed">{naira(selectedDriver.toBePaid)}</div>
+                                    </div>
+                                    <div className="stat-tile">
+                                        <div className="stat-label">Paid Total</div>
+                                        <div className="stat-value stat-paid">{naira(selectedDriver.paidTotal)}</div>
+                                    </div>
+                                </div>
+
+                                <div className="card-actions">
+                                    <button
+                                        disabled={busy || selectedDriver.rides.length === 0}
+                                        onClick={markAllPaid}
+                                    >
+                                        {busy ? 'Marking…' : 'Mark All As Paid'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="ride-list">
+                                {selectedDriver.rides.length === 0 ? (
+                                    <p className="empty">Nothing currently owed.</p>
+                                ) : (
+                                    selectedDriver.rides.map((r) => (
+                                        <div key={r.rideId} className="card">
+                                            <div className="ride-row-main">
+                                                <span className="mono">{r.rideId}</span>
+                                                <span className="amount">{naira(r.amount)}</span>
+                                            </div>
+                                            <div className="ride-row-line muted">
+                                                {r.customerName || 'Unknown customer'}
+                                                {r.numberOfPassengers ? ` · ${r.numberOfPassengers} passenger${r.numberOfPassengers > 1 ? 's' : ''}` : ''}
+                                            </div>
+                                            {(r.pickupLocation || r.destination) && (
+                                                <div className="ride-row-line muted">
+                                                    {r.pickupLocation || 'Unknown pickup'} → {r.destination || 'Unknown destination'}
+                                                </div>
+                                            )}
+                                            <div className="ride-row-line muted">
+                                                {paymentLabel(r.paymentMethod)}
+                                                {r.transactionId && <> · txn <span className="mono">{r.transactionId}</span></>}
+                                                {' · '}{r.completedAt ? new Date(r.completedAt).toLocaleDateString('en-NG') : 'unknown date'}
+                                                {' · '}{r.status}
+                                            </div>
+                                            {r.payoutError && <div className="ride-row-error">⚠️ {r.payoutError}</div>}
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </>
+                    )}
+                </div>
+            </div>
         </div>
     );
 }
