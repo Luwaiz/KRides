@@ -160,6 +160,15 @@ service cloud.firestore {
       allow read, update, delete: if false;
     }
 
+    // ── Orphaned top-ups (reconciliation) ───────────────────────────────────
+    // A wallet top-up webhook that verified but failed to credit (see the
+    // catch block in POST /api/wallet/webhook). Written and read entirely
+    // server-side (Admin SDK for the write, /admin-api/orphaned-topups for
+    // review) — no client involvement at any point, unlike orphanedCharges.
+    match /orphanedTopups/{topupId} {
+      allow read, write: if false;
+    }
+
     // ── Catch-all: deny everything not listed above ───────────────────────────
     match /{document=**} {
       allow read, write: if false;

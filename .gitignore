@@ -93,3 +93,6 @@ google-services-admin*.json
 # Provide these locally and to EAS via file env vars / EAS file secrets.
 google-services.json
 GoogleService-Info.plist
+
+# Windows: guards against a literal "nul" file from a stray > /dev/null redirect
+nul

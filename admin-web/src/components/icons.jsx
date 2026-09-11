@@ -70,6 +70,17 @@ export function OrphanedIcon(props) {
     );
 }
 
+export function OrphanedTopupIcon(props) {
+    return (
+        <svg {...base} {...props}>
+            <rect x="2.5" y="6" width="19" height="13" rx="2.5" />
+            <path d="M2.5 10.5h19" />
+            <path d="M17 14.2v2.6" />
+            <path d="M17 18.3v.1" />
+        </svg>
+    );
+}
+
 export function LogoutIcon(props) {
     return (
         <svg {...base} {...props}>

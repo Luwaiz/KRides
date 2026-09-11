@@ -4,11 +4,12 @@ import Login from './pages/Login';
 import Payouts from './pages/Payouts';
 import RefundReview from './pages/RefundReview';
 import OrphanedCharges from './pages/OrphanedCharges';
+import OrphanedTopups from './pages/OrphanedTopups';
 import Reports from './pages/Reports';
 import Drivers from './pages/Drivers';
 import Pricing from './pages/Pricing';
 import Logo from './components/Logo';
-import { PayoutsIcon, RefundIcon, OrphanedIcon, ReportIcon, DriversIcon, PricingIcon, LogoutIcon } from './components/icons';
+import { PayoutsIcon, RefundIcon, OrphanedIcon, OrphanedTopupIcon, ReportIcon, DriversIcon, PricingIcon, LogoutIcon } from './components/icons';
 
 function RequireAuth({ children }) {
     if (!api.getKey()) return <Navigate to="/login" replace />;
@@ -22,6 +23,7 @@ const NAV_ITEMS = [
     { to: '/refunds', label: 'Refund Review', icon: RefundIcon },
     { to: '/reports', label: 'Report Complaints', icon: ReportIcon },
     { to: '/orphaned-charges', label: 'Orphaned Charges', icon: OrphanedIcon },
+    { to: '/orphaned-topups', label: 'Orphaned Top-ups', icon: OrphanedTopupIcon },
 ];
 
 function Layout({ children }) {
@@ -105,6 +107,14 @@ export default function App() {
                     element={
                         <RequireAuth>
                             <Layout><OrphanedCharges /></Layout>
+                        </RequireAuth>
+                    }
+                />
+                <Route
+                    path="/orphaned-topups"
+                    element={
+                        <RequireAuth>
+                            <Layout><OrphanedTopups /></Layout>
                         </RequireAuth>
                     }
                 />

@@ -68,6 +68,17 @@ export const api = {
             method: 'POST',
             body: JSON.stringify({ chargeId, note }),
         }),
+    getOrphanedTopups: () => request('/admin-api/orphaned-topups'),
+    creditOrphanedTopup: (topupId) =>
+        request('/admin-api/orphaned-topups/credit', {
+            method: 'POST',
+            body: JSON.stringify({ topupId }),
+        }),
+    resolveOrphanedTopup: (topupId, note) =>
+        request('/admin-api/orphaned-topups/resolve', {
+            method: 'POST',
+            body: JSON.stringify({ topupId, note }),
+        }),
     getReports: () => request('/admin-api/reports'),
     resolveReport: (reportId, note) =>
         request('/admin-api/reports/resolve', {
