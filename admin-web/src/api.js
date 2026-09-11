@@ -50,7 +50,7 @@ export const api = {
     getKey,
     setKey,
     clearKey,
-    getPendingPayouts: () => request('/admin-api/payouts/pending'),
+    getPayoutsOverview: () => request('/admin-api/payouts/overview'),
     markPaid: (rideIds) =>
         request('/admin-api/payouts/mark-paid', {
             method: 'POST',

@@ -1273,6 +1273,123 @@ app.post('/api/wallet/webhook', async (req, res) => {
 });
 
 /**
+ * POST /api/wallet/verify-topup
+ * Backs the Wallet screen's "I've Sent The Money" button — lets the
+ * customer actively ask "did this land yet?" instead of just waiting on the
+ * webhook. Verifies the ID token, confirms the tx_ref is actually this
+ * user's own top-up, then asks Flutterwave directly whether that reference
+ * succeeded. If it did, credits the wallet through the exact same
+ * flwTxId-keyed idempotent path the webhook uses — so this is safe to call
+ * any number of times, and safe even if the webhook fires around the same
+ * moment (whichever gets there first wins, the other is a no-op).
+ *
+ * This is also the manual-recovery path for a webhook that never arrives at
+ * all (dropped, secret misconfigured at the time, etc) — the orphanedTopups
+ * queue only catches a webhook that arrived and then failed to process, not
+ * one that never showed up. A customer tapping this button after a delay
+ * covers that gap without needing a polling job.
+ *
+ * Body: { idToken, txRef }
+ */
+app.post('/api/wallet/verify-topup', async (req, res) => {
+    const { idToken, txRef } = req.body || {};
+    if (!idToken || !txRef) {
+        return res.status(400).json({ error: 'idToken and txRef are required' });
+    }
+
+    let userId;
+    try {
+        const decoded = await admin.auth().verifyIdToken(idToken);
+        userId = decoded.uid;
+    } catch (err) {
+        return res.status(401).json({ error: 'Invalid or expired session. Please log in again.' });
+    }
+
+    // tx_ref format: krides_topup_{userId}_{timestamp} — refuse to let a user
+    // probe or credit a top-up reference that isn't their own.
+    if (!txRef.startsWith(`krides_topup_${userId}_`)) {
+        return res.status(403).json({ error: 'This reference does not belong to you' });
+    }
+
+    const secretKey = process.env.FLUTTERWAVE_SECRET_KEY;
+    if (!secretKey) {
+        return res.status(500).json({ error: 'Payment service not configured' });
+    }
+
+    try {
+        const verifyResponse = await fetch(
+            `https://api.flutterwave.com/v3/transactions/verify_by_reference?tx_ref=${encodeURIComponent(txRef)}`,
+            { headers: { Authorization: `Bearer ${secretKey}` } }
+        );
+        const verifyResult = await verifyResponse.json();
+
+        if (verifyResult.status !== 'success' || !verifyResult.data) {
+            // Flutterwave has no completed transaction against this reference
+            // yet — most likely the transfer just hasn't been made (or hasn't
+            // cleared) rather than anything broken.
+            return res.json({ success: true, credited: false, status: 'not_found' });
+        }
+
+        const data = verifyResult.data;
+
+        if (data.status !== 'successful') {
+            return res.json({ success: true, credited: false, status: data.status });
+        }
+        if (data.currency !== 'NGN') {
+            console.error(`❌ verify-topup: unexpected currency ${data.currency} for ${txRef}`);
+            return res.status(400).json({ error: 'Unexpected currency on this transaction' });
+        }
+
+        const amount = Number(data.amount);
+        const flwTxId = String(data.id);
+        if (!amount || amount <= 0) {
+            console.error(`❌ verify-topup: invalid amount on ${txRef}`);
+            return res.status(400).json({ error: 'Invalid amount on transaction' });
+        }
+
+        const userRef = db.collection('users').doc(userId);
+        const txnRef = userRef.collection('walletTransactions').doc(flwTxId);
+        let alreadyCredited = false;
+
+        await db.runTransaction(async (txn) => {
+            const txnSnap = await txn.get(txnRef);
+            if (txnSnap.exists) {
+                alreadyCredited = true;
+                return; // webhook (or an earlier click) already handled this
+            }
+
+            const userSnap = await txn.get(userRef);
+            if (!userSnap.exists) {
+                throw new Error(`User not found: ${userId}`);
+            }
+
+            txn.update(userRef, { walletBalance: admin.firestore.FieldValue.increment(amount) });
+            txn.set(txnRef, {
+                userId,
+                type: 'topup',
+                amount,
+                rideId: null,
+                flwTxRef: txRef,
+                flwTxId,
+                status: 'completed',
+                note: 'Credited via manual "I\'ve sent the money" check',
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+        });
+
+        console.log(`✅ verify-topup credited userId=${userId} +₦${amount} (flwTxId=${flwTxId}, alreadyCredited=${alreadyCredited})`);
+
+        // Clear any orphan record now that it's resolved one way or another.
+        db.collection('orphanedTopups').doc(flwTxId).delete().catch(() => {});
+
+        return res.json({ success: true, credited: true, amount });
+    } catch (error) {
+        console.error('❌ verify-topup error:', error);
+        return res.status(500).json({ error: 'Could not verify payment. Please try again.' });
+    }
+});
+
+/**
  * POST /api/wallet/pay-ride
  * Atomically deducts the fare from the student's wallet and creates the ride
  * document in a single Firestore transaction. The Firebase ID token in the
@@ -2177,13 +2294,20 @@ app.post('/admin-api/login', (req, res) => {
     res.json({ success: true });
 });
 
-// GET /admin-api/payouts/pending
-// Same data as scripts/list-pending-payouts.js, grouped by driver.
-app.get('/admin-api/payouts/pending', async (req, res) => {
+// GET /admin-api/payouts/overview
+// Every driver — not just ones currently owed money — each with what's
+// pending now ("To Be Paid") and their all-time paid total ("Paid Total"),
+// so the admin panel can give each driver their own persistent tab instead
+// of one flat list that only shows whoever happens to have something
+// pending right now.
+app.get('/admin-api/payouts/overview', async (req, res) => {
     try {
-        const snap = await db.collection('rides')
-            .where('payoutStatus', 'in', ['pending_manual', 'failed', 'awaiting_bank_details'])
-            .get();
+        const [ridesSnap, driversSnap] = await Promise.all([
+            db.collection('rides')
+                .where('payoutStatus', 'in', ['pending_manual', 'failed', 'awaiting_bank_details'])
+                .get(),
+            db.collection('drivers').limit(1000).get(),
+        ]);
 
         // pickupLocation/destination are strings on older rides, {name,
         // address,...} objects on newer ones (see the same normalization
@@ -2191,14 +2315,14 @@ app.get('/admin-api/payouts/pending', async (req, res) => {
         const placeName = (place) =>
             typeof place === 'object' && place ? (place.name || place.address || null) : (place || null);
 
-        const byDriver = new Map();
-        for (const doc of snap.docs) {
+        const ridesByDriver = new Map();
+        for (const doc of ridesSnap.docs) {
             const ride = doc.data();
             const driverId = ride.driverId;
             if (!driverId) continue;
 
-            if (!byDriver.has(driverId)) byDriver.set(driverId, []);
-            byDriver.get(driverId).push({
+            if (!ridesByDriver.has(driverId)) ridesByDriver.set(driverId, []);
+            ridesByDriver.get(driverId).push({
                 rideId: doc.id,
                 amount: Number(ride.payoutAmount) || 0,
                 completedAt: ride.completedAt?.toDate?.()?.toISOString() || null,
@@ -2214,30 +2338,55 @@ app.get('/admin-api/payouts/pending', async (req, res) => {
             });
         }
 
-        const drivers = [];
-        for (const [driverId, rides] of byDriver) {
-            const driverSnap = await db.collection('drivers').doc(driverId).get();
-            const driver = driverSnap.exists ? driverSnap.data() : null;
+        const sortByRecency = (rides) =>
+            rides.sort((a, b) => (b.completedAt || '').localeCompare(a.completedAt || ''));
+
+        const drivers = driversSnap.docs.map((doc) => {
+            const driver = doc.data();
+            const rides = sortByRecency(ridesByDriver.get(doc.id) || []);
+            return {
+                driverId: doc.id,
+                name: driver.fullname || driver.name || '(unknown name)',
+                bankName: driver.bankName || null,
+                accountNumber: driver.accountNumber || null,
+                accountName: driver.accountName || null,
+                toBePaid: rides.reduce((sum, r) => sum + r.amount, 0),
+                paidTotal: Number(driver.totalPaidOut) || 0,
+                rides,
+            };
+        });
+
+        // A driver with rides owed but no drivers/{id} doc (shouldn't
+        // happen, but the old endpoint tolerated it) still needs to show up.
+        for (const [driverId, rides] of ridesByDriver) {
+            if (drivers.some((d) => d.driverId === driverId)) continue;
             drivers.push({
                 driverId,
-                name: driver?.fullname || driver?.name || '(unknown name)',
-                bankName: driver?.bankName || null,
-                accountNumber: driver?.accountNumber || null,
-                accountName: driver?.accountName || null,
-                total: rides.reduce((sum, r) => sum + r.amount, 0),
-                rides: rides.sort((a, b) => (b.completedAt || '').localeCompare(a.completedAt || '')),
+                name: '(unknown name)',
+                bankName: null,
+                accountNumber: null,
+                accountName: null,
+                toBePaid: rides.reduce((sum, r) => sum + r.amount, 0),
+                paidTotal: 0,
+                rides: sortByRecency(rides),
             });
         }
-        drivers.sort((a, b) => b.total - a.total);
+
+        // Drivers owing money first (most owed first), then everyone else.
+        drivers.sort((a, b) => b.toBePaid - a.toBePaid);
 
         res.json({ success: true, drivers });
     } catch (error) {
-        console.error('❌ admin payouts/pending error:', error);
-        res.status(500).json({ error: 'Could not load pending payouts' });
+        console.error('❌ admin payouts/overview error:', error);
+        res.status(500).json({ error: 'Could not load payouts overview' });
     }
 });
 
 // POST /admin-api/payouts/mark-paid — body: { rideIds: string[] }
+// Marks each ride paid, then rolls its amount into that driver's running
+// totalPaidOut — the number "Paid Total" reads from. A ride that's already
+// paid_manually is skipped rather than re-counted, so a stale click or a
+// retried request never inflates totalPaidOut twice for the same ride.
 app.post('/admin-api/payouts/mark-paid', async (req, res) => {
     const { rideIds } = req.body || {};
     if (!Array.isArray(rideIds) || rideIds.length === 0) {
@@ -2245,6 +2394,8 @@ app.post('/admin-api/payouts/mark-paid', async (req, res) => {
     }
 
     const results = [];
+    const paidByDriver = new Map();
+
     for (const rideId of rideIds) {
         try {
             const rideRef = db.collection('rides').doc(rideId);
@@ -2253,16 +2404,39 @@ app.post('/admin-api/payouts/mark-paid', async (req, res) => {
                 results.push({ rideId, ok: false, error: 'not found' });
                 continue;
             }
+
+            const ride = rideSnap.data();
+            if (ride.payoutStatus === 'paid_manually') {
+                results.push({ rideId, ok: true, alreadyPaid: true });
+                continue;
+            }
+
             await rideRef.update({
                 payoutStatus: 'paid_manually',
                 payoutPaidAt: admin.firestore.FieldValue.serverTimestamp(),
                 payoutError: admin.firestore.FieldValue.delete(),
             });
+
+            if (ride.driverId) {
+                const amount = Number(ride.payoutAmount) || 0;
+                paidByDriver.set(ride.driverId, (paidByDriver.get(ride.driverId) || 0) + amount);
+            }
             results.push({ rideId, ok: true });
         } catch (error) {
             results.push({ rideId, ok: false, error: error.message });
         }
     }
+
+    await Promise.all(
+        Array.from(paidByDriver.entries())
+            .filter(([, amount]) => amount > 0)
+            .map(([driverId, amount]) =>
+                db.collection('drivers').doc(driverId)
+                    .update({ totalPaidOut: admin.firestore.FieldValue.increment(amount) })
+                    .catch((err) => console.error(`❌ Could not update totalPaidOut for driver ${driverId}:`, err.message))
+            )
+    );
+
     res.json({ success: true, results });
 });
 

@@ -15,6 +15,12 @@
     "assetBundlePatterns": [
       "**/*"
     ],
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/61bd7aca-e58d-4cf2-840c-28773922c9d1"
+    },
     "web": {
       "favicon": "./assets/favicon.png"
     },

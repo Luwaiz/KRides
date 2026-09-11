@@ -11,6 +11,7 @@ import Toast from "react-native-toast-message";
 import ToastConfig from "./components/ToastConfig";
 import ErrorBoundary from "./components/ErrorBoundary";
 import NetworkBanner from "./components/NetworkBanner";
+import UpdateBanner from "./components/UpdateBanner";
 import { installGlobalErrorHandlers } from "./helpers/globalErrorHandler";
 import { startPricingConfigListener } from "./constants/pricingConfig";
 
@@ -79,6 +80,7 @@ function App() {
 						<PaperProvider>
 							<Navigation />
 							<NetworkBanner />
+							<UpdateBanner />
 							<StatusBar style="auto" />
 							<AppToast />
 						</PaperProvider>

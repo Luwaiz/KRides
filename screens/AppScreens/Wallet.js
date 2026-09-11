@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
     View,
     Text,
@@ -21,7 +22,7 @@ import { colors } from '../../constants/styling';
 import { sp, fs, br } from '../../constants/responsive';
 import { FIREBASE_AUTH, FIREBASE_DB } from '../../firebaseConfig';
 import { useUserDetails } from '../../constants/Store';
-import { createTopupAccount } from '../../helpers/walletHelpers';
+import { createTopupAccount, verifyTopup } from '../../helpers/walletHelpers';
 
 const MIN_TOPUP = 100;
 const TOPUP_ACCOUNT_KEY_PREFIX = 'pending_topup_account_';
@@ -33,8 +34,9 @@ const Wallet = () => {
     // Top-up flow state
     const [topupAmount, setTopupAmount] = useState('');
     const [creating, setCreating] = useState(false);
-    const [topupAccount, setTopupAccount] = useState(null); // { accountNumber, bankName, accountName, amount, expiryDate }
+    const [topupAccount, setTopupAccount] = useState(null); // { accountNumber, bankName, accountName, amount, expiryDate, txRef }
     const [error, setError] = useState(null);
+    const [checkingPayment, setCheckingPayment] = useState(false);
 
     const user = FIREBASE_AUTH.currentUser;
     const firstName = useUserDetails((s) => s.firstName);
@@ -65,6 +67,48 @@ const Wallet = () => {
         return () => unsub();
     }, [user?.uid]);
 
+    // The balance/history listeners above already update the instant the
+    // webhook credits Firestore — this doesn't "pull" the balance itself, it
+    // asks the server to actively check Flutterwave and credit right now if
+    // the transfer already succeeded there, instead of only ever waiting on
+    // the webhook. Shared by the manual button (silent: false — shows a
+    // result either way) and the automatic checks on restore/focus below
+    // (silent: true — only speaks up when it actually finds a payment, so
+    // reopening the page doesn't nag with "not received yet" every time).
+    const checkTopupStatus = async (account, { silent = false } = {}) => {
+        if (!account?.txRef) return;
+        try {
+            const result = await verifyTopup(account.txRef);
+            if (result.credited) {
+                Toast.show({
+                    type: 'tomatoToast',
+                    text1: 'Payment Received',
+                    text2: `₦${(result.amount ?? account.amount).toLocaleString('en-NG')} has been added to your wallet.`,
+                    position: 'top',
+                });
+                setTopupAccount(null);
+                if (user) AsyncStorage.removeItem(TOPUP_ACCOUNT_KEY_PREFIX + user.uid).catch(() => {});
+            } else if (!silent) {
+                Toast.show({
+                    type: 'tomatoToast',
+                    text1: 'Not Received Yet',
+                    text2: 'We haven\'t gotten your transfer yet — this can take a few minutes. Try again shortly.',
+                    position: 'top',
+                });
+            }
+        } catch (err) {
+            console.error('❌ Check payment error:', err);
+            if (!silent) {
+                Toast.show({
+                    type: 'tomatoToast',
+                    text1: 'Could Not Check',
+                    text2: 'Please try again in a moment.',
+                    position: 'top',
+                });
+            }
+        }
+    };
+
     // Restore a still-pending top-up account if the rider navigated away
     // (e.g. to their banking app) and came back — previously this was plain
     // component state, so leaving the screen lost the account details with
@@ -80,9 +124,24 @@ const Wallet = () => {
                     return;
                 }
                 setTopupAccount(saved);
+                // They may well have already paid while away — check right
+                // away instead of leaving a stale "pending" card on screen
+                // until they notice and tap the button themselves.
+                checkTopupStatus(saved, { silent: true });
             })
             .catch(() => {});
     }, [user?.uid]);
+
+    // Re-check every time the screen regains focus (coming back from the
+    // banking app, switching tabs and back, reopening after backgrounding) —
+    // this is what actually clears a stale "pending" card and refreshes the
+    // balance without the rider having to tap anything.
+    useFocusEffect(
+        useCallback(() => {
+            if (topupAccount) checkTopupStatus(topupAccount, { silent: true });
+            // eslint-disable-next-line react-hooks/exhaustive-deps
+        }, [topupAccount?.txRef])
+    );
 
     const handleGenerateAccount = async () => {
         const amount = Number(topupAmount);
@@ -105,6 +164,13 @@ const Wallet = () => {
         } finally {
             setCreating(false);
         }
+    };
+
+    const handleCheckPayment = async () => {
+        if (!topupAccount) return;
+        setCheckingPayment(true);
+        await checkTopupStatus(topupAccount, { silent: false });
+        setCheckingPayment(false);
     };
 
     const handleShare = async () => {
@@ -213,6 +279,17 @@ const Wallet = () => {
                                     </>
                                 )}
 
+                                <TouchableOpacity
+                                    style={[styles.moneySentButton, checkingPayment && styles.generateBtnDisabled]}
+                                    onPress={handleCheckPayment}
+                                    disabled={checkingPayment}
+                                >
+                                    {checkingPayment
+                                        ? <ActivityIndicator size="small" color="white" />
+                                        : <Text style={styles.generateBtnText}>I've Sent The Money</Text>
+                                    }
+                                </TouchableOpacity>
+
                                 <View style={styles.accountActions}>
                                     <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
                                         <Ionicons name="share-outline" size={18} color={colors.primaryBlue} />
@@ -231,7 +308,9 @@ const Wallet = () => {
                         <View style={styles.noteBox}>
                             <Ionicons name="information-circle-outline" size={18} color={colors.primaryBlue} />
                             <Text style={styles.noteText}>
-                                The account number is valid for one transfer of the exact amount shown. Your balance updates automatically within seconds of the transfer.
+                                The account number is valid for one transfer of the exact amount shown. Your balance
+                                usually updates within seconds of the transfer — if it's been a few minutes and nothing's
+                                changed, tap "I've Sent The Money" above to check directly.
                             </Text>
                         </View>
                     </View>
@@ -446,6 +525,14 @@ const styles = StyleSheet.create({
     divider: {
         height: 1,
         backgroundColor: colors.lightGrey2,
+    },
+    moneySentButton: {
+        height: sp(48),
+        backgroundColor: colors.primaryBlue,
+        borderRadius: br(10),
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: sp(12),
     },
     accountActions: {
         flexDirection: 'row',

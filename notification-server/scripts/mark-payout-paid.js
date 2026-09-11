@@ -36,6 +36,8 @@ admin.initializeApp({
 const db = admin.firestore();
 
 async function main() {
+    const paidByDriver = new Map();
+
     for (const rideId of rideIds) {
         const rideRef = db.collection('rides').doc(rideId);
         const rideSnap = await rideRef.get();
@@ -57,6 +59,21 @@ async function main() {
             payoutError: admin.firestore.FieldValue.delete(),
         });
         console.log(`✅ ${rideId}: marked paid (₦${Number(ride.payoutAmount) || 0})`);
+
+        // Keep drivers/{id}.totalPaidOut (the admin panel's "Paid Total")
+        // accurate even when payouts are settled from this script instead
+        // of the admin UI's "Mark Paid" button.
+        if (ride.driverId) {
+            const amount = Number(ride.payoutAmount) || 0;
+            paidByDriver.set(ride.driverId, (paidByDriver.get(ride.driverId) || 0) + amount);
+        }
+    }
+
+    for (const [driverId, amount] of paidByDriver) {
+        if (amount <= 0) continue;
+        await db.collection('drivers').doc(driverId).update({
+            totalPaidOut: admin.firestore.FieldValue.increment(amount),
+        });
     }
 
     process.exit(0);
