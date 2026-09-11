@@ -96,24 +96,30 @@ describe('Ride Calculations', () => {
     });
 
     describe('calculateFare', () => {
+        // These expectations must match PRICING_DEFAULTS in
+        // constants/pricingState.js (base fare 200/passenger, platform fee
+        // 100 under the group threshold, 150 at/above it — 3 passengers).
+        // calculateFare() now reads from that config; the values themselves
+        // are editable from admin-web's Pricing page, but the *default*
+        // stays what this test checks.
         it('should calculate fare for 1 passenger', () => {
             const fare = calculateFare(5, 1);
-            expect(fare).toBe(250); // 200 + 50
+            expect(fare).toBe(300); // 200 + 100
         });
 
         it('should calculate fare for 2 passengers', () => {
             const fare = calculateFare(5, 2);
-            expect(fare).toBe(450); // 400 + 50
+            expect(fare).toBe(500); // 400 + 100
         });
 
         it('should calculate fare for 3+ passengers', () => {
             const fare = calculateFare(5, 3);
-            expect(fare).toBe(700); // 600 + 100
+            expect(fare).toBe(750); // 600 + 150
         });
 
         it('should calculate fare for 4 passengers', () => {
             const fare = calculateFare(5, 4);
-            expect(fare).toBe(900); // 800 + 100
+            expect(fare).toBe(950); // 800 + 150
         });
     });
 });

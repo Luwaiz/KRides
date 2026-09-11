@@ -3,11 +3,19 @@ import React from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../../constants/styling';
 import BackButton from '../../components/buttons/BackButton';
+import { getPricingConfig } from '../../constants/pricingState';
 
 const Support = () => {
   const handleEmailPress = () => {
     Linking.openURL('mailto:kampusrides24@gmail.com');
   };
+
+  // Read once at render rather than subscribing — this is FAQ copy, not a
+  // live price quote, so it doesn't need to update mid-visit if an admin
+  // happens to change pricing while this screen is open. It's still always
+  // correct on every mount, which is what matters: hardcoding the numbers
+  // here is exactly the kind of drift the Pricing dashboard is meant to end.
+  const { baseFarePerPassenger, platformFeeStandard, platformFeeGroup, groupThreshold } = getPricingConfig();
 
   return (
     <SafeAreaView style={styles.container}>
@@ -97,7 +105,8 @@ const Support = () => {
           <View style={styles.faqItem}>
             <Text style={styles.question}>5. How much is a ride?</Text>
             <Text style={styles.answer}>
-              Each ride costs ₦200 per passenger plus a ₦50 KRIDES service fee.
+              Each ride costs ₦{baseFarePerPassenger} per passenger, plus a KRIDES service fee of ₦{platformFeeStandard}
+              {' '}(or ₦{platformFeeGroup} for {groupThreshold}+ passengers).
             </Text>
           </View>
 

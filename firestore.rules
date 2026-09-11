@@ -141,6 +141,15 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ── App config (admin-managed) ────────────────────────────────────────────
+    // Pricing (config/pricing) is read by the app to compute fares and driver
+    // earnings, and written only via the Admin SDK from admin-web's Pricing
+    // page — never directly by a client.
+    match /config/{configId} {
+      allow read:  if isAuth();
+      allow write: if false;
+    }
+
     // ── Orphaned charges (reconciliation) ───────────────────────────────────────
     // Written by the client when a card charge succeeds but ride creation and
     // the automatic refund both fail. Only the charged customer may create one;
@@ -149,6 +158,15 @@ service cloud.firestore {
     match /orphanedCharges/{chargeId} {
       allow create: if isAuth() && request.resource.data.customerId == request.auth.uid;
       allow read, update, delete: if false;
+    }
+
+    // ── Orphaned top-ups (reconciliation) ───────────────────────────────────
+    // A wallet top-up webhook that verified but failed to credit (see the
+    // catch block in POST /api/wallet/webhook). Written and read entirely
+    // server-side (Admin SDK for the write, /admin-api/orphaned-topups for
+    // review) — no client involvement at any point, unlike orphanedCharges.
+    match /orphanedTopups/{topupId} {
+      allow read, write: if false;
     }
 
     // ── Catch-all: deny everything not listed above ───────────────────────────

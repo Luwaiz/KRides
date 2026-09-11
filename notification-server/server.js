@@ -869,6 +869,27 @@ function normalizeNigerianPhone(phone) {
     return null;
 }
 
+// Mirrors constants/pricingConfig.js's PRICING_DEFAULTS on the mobile app —
+// kept in sync manually since this is a separate codebase/runtime, not a
+// shared package. Both sides fall back to these if config/pricing hasn't
+// been touched yet, so nothing breaks before an admin ever visits Pricing.
+const PRICING_DEFAULTS = {
+    baseFarePerPassenger: 200,
+    platformFeeStandard: 100,
+    platformFeeGroup: 150,
+    groupThreshold: 3,
+};
+
+async function getPricingConfig() {
+    try {
+        const snap = await db.collection('config').doc('pricing').get();
+        if (snap.exists) return { ...PRICING_DEFAULTS, ...snap.data() };
+    } catch (error) {
+        console.error('❌ getPricingConfig error, using defaults:', error.message);
+    }
+    return PRICING_DEFAULTS;
+}
+
 // In-memory rate limiter for /api/auth/driver-email
 // Tracks { attempts, resetAt } per normalized phone number.
 // Simple Map is sufficient for a single-instance Render deployment.
@@ -1101,31 +1122,35 @@ app.post('/api/wallet/create-topup-account', async (req, res) => {
  *     (a second delivery of the same webhook finds the doc already exists and exits)
  */
 app.post('/api/wallet/webhook', async (req, res) => {
-    // Always respond 200 quickly so Flutterwave stops retrying
-    res.sendStatus(200);
-
+    // Respond only once we know whether this delivery needs a retry — acking
+    // 200 up front (the previous behavior) told Flutterwave "delivered" even
+    // when verification or the credit itself then failed, which meant their
+    // own retry mechanism never got a chance to recover from anything but a
+    // dropped connection. Events that can never succeed no matter how many
+    // times they're retried (bad signature, malformed/unrelated payload)
+    // still get a fast ack; only a transient failure gets a non-2xx.
     const webhookSecret = process.env.FLUTTERWAVE_WEBHOOK_SECRET;
     if (!webhookSecret) {
         console.error('❌ FLUTTERWAVE_WEBHOOK_SECRET is not set — rejecting webhook');
-        return;
+        return res.sendStatus(500); // may be fixable before Flutterwave gives up retrying
     }
 
     const signature = req.headers['verif-hash'];
     if (!signature || signature !== webhookSecret) {
         console.warn('🚫 Webhook rejected: invalid verif-hash');
-        return;
+        return res.sendStatus(401);
     }
 
     const { event, data } = req.body || {};
 
     if (event !== 'charge.completed' || data?.status !== 'successful') {
         console.log(`ℹ️ Ignoring webhook: event=${event} status=${data?.status}`);
-        return;
+        return res.sendStatus(200);
     }
 
     if (data.currency !== 'NGN') {
         console.log(`ℹ️ Ignoring non-NGN webhook: ${data.currency}`);
-        return;
+        return res.sendStatus(200);
     }
 
     const txRef = data.tx_ref || '';
@@ -1134,13 +1159,13 @@ app.post('/api/wallet/webhook', async (req, res) => {
 
     if (!amount || amount <= 0 || isNaN(amount)) {
         console.error(`❌ Webhook has invalid amount: ${data.amount}`);
-        return;
+        return res.sendStatus(200);
     }
 
     // tx_ref format: krides_topup_{userId}_{timestamp}
     if (!txRef.startsWith('krides_topup_')) {
         console.log(`ℹ️ Ignoring unrelated tx_ref: ${txRef}`);
-        return;
+        return res.sendStatus(200);
     }
 
     // Strip prefix and suffix timestamp: krides_topup_{userId}_{ts}
@@ -1149,7 +1174,7 @@ app.post('/api/wallet/webhook', async (req, res) => {
     const userId = lastUnder > 0 ? withoutPrefix.slice(0, lastUnder) : withoutPrefix;
     if (!userId) {
         console.error('❌ Could not parse userId from tx_ref:', txRef);
-        return;
+        return res.sendStatus(200);
     }
 
     console.log(`💰 Wallet top-up: userId=${userId} amount=₦${amount} flwTxId=${flwTxId}`);
@@ -1192,6 +1217,14 @@ app.post('/api/wallet/webhook', async (req, res) => {
 
         console.log(`✅ Wallet credited: userId=${userId} +₦${amount}`);
 
+        // Ack now that the credit is durably written — nothing after this
+        // point should block Flutterwave's view of whether delivery succeeded.
+        res.sendStatus(200);
+
+        // Best-effort: clear any orphanedTopups record a previous failed
+        // attempt for this same flwTxId left behind, now that it's resolved.
+        db.collection('orphanedTopups').doc(flwTxId).delete().catch(() => {});
+
         // Non-critical: notify the student their balance updated
         try {
             const userSnap = await userRef.get();
@@ -1210,6 +1243,32 @@ app.post('/api/wallet/webhook', async (req, res) => {
 
     } catch (error) {
         console.error('❌ Webhook processing error:', error.message);
+        // Non-2xx so Flutterwave retries — the flwTxId idempotency lock makes
+        // a retry safe even if the earlier attempt partially succeeded.
+        res.sendStatus(500);
+
+        // Record it for manual review in case retries never recover it (e.g.
+        // Flutterwave gives up before whatever broke gets fixed). Only
+        // reachable after verif-hash already checked out above, so userId/
+        // amount here came from a signed Flutterwave payload — safe for the
+        // admin panel to auto-credit from later (see /admin-api/orphaned-topups).
+        try {
+            const orphanRef = db.collection('orphanedTopups').doc(flwTxId);
+            const orphanSnap = await orphanRef.get();
+            await orphanRef.set({
+                flwTxId,
+                txRef,
+                userId: userId || null,
+                amount,
+                error: error.message,
+                status: 'unresolved',
+                attempts: admin.firestore.FieldValue.increment(1),
+                lastAttemptAt: admin.firestore.FieldValue.serverTimestamp(),
+                ...(orphanSnap.exists ? {} : { createdAt: admin.firestore.FieldValue.serverTimestamp() }),
+            }, { merge: true });
+        } catch (logErr) {
+            console.error('❌ Could not record orphaned top-up:', logErr.message);
+        }
     }
 });
 
@@ -1320,7 +1379,9 @@ app.post('/api/wallet/pay-ride', async (req, res) => {
 /**
  * POST /api/payments/complete-ride
  * Marks a ride as completed and transfers the driver's earnings to their bank account.
- * Platform keeps ₦50 (1–2 passengers) or ₦100 (3+ passengers) per ride.
+ * Platform keeps a flat fee on top of the driver's base-fare earnings —
+ * amount set via admin-web's Pricing page (config/pricing), see
+ * getPricingConfig(). No longer a fixed ₦ figure in code.
  *
  * Body: { idToken, rideId }
  */
@@ -1375,10 +1436,12 @@ app.post('/api/payments/complete-ride', async (req, res) => {
 
         console.log(`✅ Ride ${rideId} marked as completed by driver ${driverId}`);
 
-        // Calculate driver earnings (platform takes ₦50 for <3 passengers, ₦100 for 3+)
+        // Platform fee (the cut on top of the driver's base-fare earnings)
+        // is set from admin-web's Pricing page — see getPricingConfig().
         const totalAmount = Number(ride.amount) || 0;
         const passengers = Number(ride.numberOfPassengers) || 1;
-        const platformFee = passengers >= 3 ? 150 : 100;
+        const pricing = await getPricingConfig();
+        const platformFee = passengers >= pricing.groupThreshold ? pricing.platformFeeGroup : pricing.platformFeeStandard;
         const driverEarnings = Math.max(totalAmount - platformFee, 0);
 
         // Only transfer if ride was paid digitally and driver has bank details
@@ -2315,6 +2378,118 @@ app.post('/admin-api/orphaned-charges/resolve', async (req, res) => {
     }
 });
 
+// GET /admin-api/orphaned-topups — unresolved orphanedTopups docs (a wallet
+// top-up webhook that verified but failed to credit — see the catch block
+// in POST /api/wallet/webhook)
+app.get('/admin-api/orphaned-topups', async (req, res) => {
+    try {
+        const snap = await db.collection('orphanedTopups')
+            .where('status', '==', 'unresolved')
+            .get();
+
+        const topups = snap.docs.map((doc) => {
+            const t = doc.data();
+            return {
+                topupId: doc.id,
+                flwTxId: t.flwTxId || doc.id,
+                txRef: t.txRef || null,
+                userId: t.userId || null,
+                amount: Number(t.amount) || 0,
+                error: t.error || null,
+                attempts: t.attempts || 1,
+                createdAt: t.createdAt?.toDate?.()?.toISOString() || null,
+                lastAttemptAt: t.lastAttemptAt?.toDate?.()?.toISOString() || null,
+            };
+        });
+
+        res.json({ success: true, topups });
+    } catch (error) {
+        console.error('❌ admin orphaned-topups error:', error);
+        res.status(500).json({ error: 'Could not load orphaned top-ups' });
+    }
+});
+
+// POST /admin-api/orphaned-topups/credit — body: { topupId }
+// Runs the same credit the webhook would have and marks the record
+// resolved. Safe to click more than once: it reuses the flwTxId-keyed
+// idempotency lock in walletTransactions, so a retry (webhook or admin)
+// that already landed is a no-op instead of a double credit.
+app.post('/admin-api/orphaned-topups/credit', async (req, res) => {
+    const { topupId } = req.body || {};
+    if (!topupId) return res.status(400).json({ error: 'topupId is required' });
+
+    try {
+        const orphanRef = db.collection('orphanedTopups').doc(topupId);
+        const orphanSnap = await orphanRef.get();
+        if (!orphanSnap.exists) return res.status(404).json({ error: 'Not found' });
+
+        const orphan = orphanSnap.data();
+        if (!orphan.userId) {
+            return res.status(400).json({ error: 'No userId on record — could not be parsed from tx_ref. Resolve manually.' });
+        }
+        if (!(Number(orphan.amount) > 0)) {
+            return res.status(400).json({ error: 'No valid amount on record. Resolve manually.' });
+        }
+
+        const userRef = db.collection('users').doc(orphan.userId);
+        const txnRef = userRef.collection('walletTransactions').doc(orphan.flwTxId || topupId);
+
+        await db.runTransaction(async (txn) => {
+            const txnSnap = await txn.get(txnRef);
+            if (txnSnap.exists) return; // already credited (e.g. a delayed webhook retry beat this click) — no-op
+
+            const userSnap = await txn.get(userRef);
+            if (!userSnap.exists) throw new Error(`User not found: ${orphan.userId}`);
+
+            txn.update(userRef, { walletBalance: admin.firestore.FieldValue.increment(orphan.amount) });
+            txn.set(txnRef, {
+                userId: orphan.userId,
+                type: 'topup',
+                amount: orphan.amount,
+                rideId: null,
+                flwTxRef: orphan.txRef || null,
+                flwTxId: orphan.flwTxId || topupId,
+                status: 'completed',
+                note: 'Manually credited from Orphaned Top-ups review',
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+        });
+
+        await orphanRef.update({
+            status: 'resolved',
+            resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
+            resolvedNote: 'Auto-credited from admin panel',
+        });
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('❌ admin orphaned-topups/credit error:', error);
+        res.status(500).json({ error: error.message || 'Could not credit' });
+    }
+});
+
+// POST /admin-api/orphaned-topups/resolve — body: { topupId, note }
+// Marks resolved without crediting — for records with no parseable userId,
+// or ones the admin has already fixed some other way (e.g. directly via
+// scripts/test-fund-wallet.js after confirming the transfer in Flutterwave's
+// dashboard).
+app.post('/admin-api/orphaned-topups/resolve', async (req, res) => {
+    const { topupId, note } = req.body || {};
+    if (!topupId) return res.status(400).json({ error: 'topupId is required' });
+
+    try {
+        await db.collection('orphanedTopups').doc(topupId).update({
+            status: 'resolved',
+            resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
+            resolvedNote: note || null,
+        });
+        res.json({ success: true });
+    } catch (error) {
+        console.error('❌ admin orphaned-topups/resolve error:', error);
+        res.status(500).json({ error: 'Could not resolve orphaned top-up' });
+    }
+});
+
 // GET /admin-api/reports — driver complaints from POST /api/reports/driver
 // (see driverReports collection there for the exact schema being read here).
 // Reports predating the resolved/open workflow have no `status` field at
@@ -2404,6 +2579,55 @@ async function sendDriverSetPasswordEmail(driverName, driverEmail) {
     const resetLink = await admin.auth().generatePasswordResetLink(driverEmail);
     return sendDriverWelcomeEmail({ driverName, driverEmail, resetLink });
 }
+
+// GET /admin-api/pricing — current pricing config (or defaults, if
+// config/pricing has never been written).
+app.get('/admin-api/pricing', async (req, res) => {
+    try {
+        const pricing = await getPricingConfig();
+        res.json({ success: true, pricing });
+    } catch (error) {
+        console.error('❌ admin pricing error:', error);
+        res.status(500).json({ error: 'Could not load pricing' });
+    }
+});
+
+// POST /admin-api/pricing/update — body: { baseFarePerPassenger,
+// platformFeeStandard, platformFeeGroup, groupThreshold }
+// Takes effect immediately for every ride booked/completed after this —
+// the mobile app has a live listener on config/pricing (see
+// constants/pricingConfig.js) and complete-ride reads it fresh on every call.
+app.post('/admin-api/pricing/update', async (req, res) => {
+    const { baseFarePerPassenger, platformFeeStandard, platformFeeGroup, groupThreshold } = req.body || {};
+
+    const fields = { baseFarePerPassenger, platformFeeStandard, platformFeeGroup, groupThreshold };
+    for (const [key, value] of Object.entries(fields)) {
+        if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+            return res.status(400).json({ error: `${key} must be a non-negative number` });
+        }
+    }
+    if (baseFarePerPassenger <= 0) {
+        return res.status(400).json({ error: 'baseFarePerPassenger must be greater than 0' });
+    }
+    if (!Number.isInteger(groupThreshold) || groupThreshold < 1) {
+        return res.status(400).json({ error: 'groupThreshold must be a whole number of at least 1' });
+    }
+
+    try {
+        await db.collection('config').doc('pricing').set({
+            baseFarePerPassenger,
+            platformFeeStandard,
+            platformFeeGroup,
+            groupThreshold,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        console.log(`💰 Pricing updated: base=₦${baseFarePerPassenger}/passenger, fee=₦${platformFeeStandard}(<${groupThreshold})/₦${platformFeeGroup}(>=${groupThreshold})`);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('❌ admin pricing/update error:', error);
+        res.status(500).json({ error: 'Could not update pricing' });
+    }
+});
 
 // GET /admin-api/drivers — every driver, self-registered or admin-created.
 app.get('/admin-api/drivers', async (req, res) => {

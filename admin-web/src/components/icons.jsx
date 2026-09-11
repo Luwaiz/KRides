@@ -31,6 +31,15 @@ export function RefundIcon(props) {
     );
 }
 
+export function PricingIcon(props) {
+    return (
+        <svg {...base} {...props}>
+            <path d="M12 2v20" />
+            <path d="M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+        </svg>
+    );
+}
+
 export function DriversIcon(props) {
     return (
         <svg {...base} {...props}>
@@ -57,6 +66,17 @@ export function OrphanedIcon(props) {
             <path d="M12 3 2 20h20L12 3Z" />
             <path d="M12 10v4.5" />
             <path d="M12 17.2v.1" />
+        </svg>
+    );
+}
+
+export function OrphanedTopupIcon(props) {
+    return (
+        <svg {...base} {...props}>
+            <rect x="2.5" y="6" width="19" height="13" rx="2.5" />
+            <path d="M2.5 10.5h19" />
+            <path d="M17 14.2v2.6" />
+            <path d="M17 18.3v.1" />
         </svg>
     );
 }

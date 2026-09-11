@@ -1,3 +1,5 @@
+import { getPricingConfig } from "../constants/pricingState";
+
 /**
  * Calculate distance between two coordinates using Haversine formula
  * @param {Object} coord1 - {latitude, longitude}
@@ -87,19 +89,17 @@ export const formatTime = (minutes) => {
 };
 
 /**
- * Calculate ride fare based on distance and number of passengers
- * Base fare: ₦200 per passenger
- * @param {number} distanceKm - Distance in kilometers
+ * Calculate ride fare based on number of passengers. distanceKm is accepted
+ * for API compatibility with existing callers but isn't part of the
+ * formula — fares are flat-rate-per-passenger, not distance-based.
+ * Base fare and the platform fee are both set from the admin dashboard
+ * (config/pricing in Firestore) — see constants/pricingConfig.js.
+ * @param {number} distanceKm - Distance in kilometers (unused)
  * @param {number} passengers - Number of passengers
  * @returns {number} Fare in Naira
  */
 export const calculateFare = (distanceKm, passengers) => {
-	const baseFare = 200;
-	let fare;
-	if (passengers >= 3) {
-		fare = baseFare * passengers + 150;
-	} else {
-		fare = baseFare * passengers + 100;
-	}
-	return fare;
+	const { baseFarePerPassenger, platformFeeStandard, platformFeeGroup, groupThreshold } = getPricingConfig();
+	const fee = passengers >= groupThreshold ? platformFeeGroup : platformFeeStandard;
+	return baseFarePerPassenger * passengers + fee;
 };
