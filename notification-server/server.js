@@ -2,12 +2,35 @@ const express = require('express');
 const admin = require('firebase-admin');
 const cors = require('cors');
 const crypto = require('crypto');
+const axios = require('axios');
+const { HttpsProxyAgent } = require('https-proxy-agent');
 const { sendDriverReportEmail, sendDriverWelcomeEmail } = require('./emailservice');
 require('dotenv').config();
 
 const app = express();
 
 const PORT = process.env.PORT || 3001;
+const FLUTTERWAVE_PROXY_URL = process.env.QUOTAGUARDSTATIC_URL || process.env.QUOTAGUARD_URL || null;
+const flutterwaveProxyAgent = FLUTTERWAVE_PROXY_URL ? new HttpsProxyAgent(FLUTTERWAVE_PROXY_URL) : null;
+
+async function flutterwaveRequest(url, config = {}) {
+    const axiosConfig = {
+        url,
+        ...config,
+    };
+
+    if (flutterwaveProxyAgent) {
+        axiosConfig.httpsAgent = flutterwaveProxyAgent;
+        axiosConfig.httpAgent = flutterwaveProxyAgent;
+    }
+
+    const response = await axios(axiosConfig);
+    return response.data;
+}
+
+if (FLUTTERWAVE_PROXY_URL) {
+    console.log('🔒 Flutterwave outbound requests are routed through QuotaGuard');
+}
 
 // Middleware
 // The mobile app calls this over React Native's fetch, which doesn't enforce
@@ -696,19 +719,14 @@ app.post('/api/payments/refund', async (req, res) => {
         const payload = { comments: comments || 'Ride cancelled by customer' };
         if (amount) payload.amount = amount;
 
-        const response = await fetch(
-            `https://api.flutterwave.com/v3/transactions/${transactionId}/refund`,
-            {
-                method: 'POST',
-                headers: {
-                    Authorization: `Bearer ${secretKey}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(payload),
-            }
-        );
-
-        const result = await response.json();
+        const result = await flutterwaveRequest(`https://api.flutterwave.com/v3/transactions/${transactionId}/refund`, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${secretKey}`,
+                'Content-Type': 'application/json',
+            },
+            data: payload,
+        });
 
         if (result.status === 'success') {
             res.json({
@@ -740,14 +758,12 @@ app.get('/api/payments/refund/:refundId', async (req, res) => {
     }
 
     try {
-        const response = await fetch(`https://api.flutterwave.com/v3/refunds/${refundId}`, {
+        const result = await flutterwaveRequest(`https://api.flutterwave.com/v3/refunds/${refundId}`, {
             headers: {
                 Authorization: `Bearer ${secretKey}`,
                 'Content-Type': 'application/json',
             },
         });
-
-        const result = await response.json();
 
         if (result.status === 'success') {
             res.json({ success: true, status: result.data.status, data: result.data });
@@ -780,18 +796,17 @@ app.post('/api/payments/create-subaccount', async (req, res) => {
         // Resolve the account number against the bank before creating a payout
         // subaccount for it — catches a mistyped account number up front instead
         // of silently routing future ride earnings to the wrong account.
-        const resolveResponse = await fetch('https://api.flutterwave.com/v3/accounts/resolve', {
+        const resolveResult = await flutterwaveRequest('https://api.flutterwave.com/v3/accounts/resolve', {
             method: 'POST',
             headers: {
                 Authorization: `Bearer ${secretKey}`,
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
+            data: {
                 account_number: accountNumber,
                 account_bank: bankCode,
-            }),
+            },
         });
-        const resolveResult = await resolveResponse.json();
 
         if (resolveResult.status !== 'success' || !resolveResult.data?.account_name) {
             return res.status(400).json({
@@ -810,27 +825,27 @@ app.post('/api/payments/create-subaccount', async (req, res) => {
         const existing = driverSnap.exists ? driverSnap.data() : null;
         const isUpdate = !!(existing?.subaccountId && existing?.bankCode === bankCode);
 
-        const response = isUpdate
-            ? await fetch(`https://api.flutterwave.com/v3/subaccounts/${existing.subaccountId}`, {
+        const result = isUpdate
+            ? await flutterwaveRequest(`https://api.flutterwave.com/v3/subaccounts/${existing.subaccountId}`, {
                 method: 'PUT',
                 headers: {
                     Authorization: `Bearer ${secretKey}`,
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
+                data: {
                     account_number: accountNumber,
                     business_name: businessName || verifiedAccountName,
                     split_type: 'flat',
                     split_value: 50,
-                }),
+                },
             })
-            : await fetch('https://api.flutterwave.com/v3/subaccounts', {
+            : await flutterwaveRequest('https://api.flutterwave.com/v3/subaccounts', {
                 method: 'POST',
                 headers: {
                     Authorization: `Bearer ${secretKey}`,
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
+                data: {
                     account_bank: bankCode,
                     account_number: accountNumber,
                     business_name: businessName || verifiedAccountName,
@@ -839,10 +854,8 @@ app.post('/api/payments/create-subaccount', async (req, res) => {
                     country: 'NG',
                     split_type: 'flat',
                     split_value: 50,
-                }),
+                },
             });
-
-        const result = await response.json();
 
         if (result.status === 'success') {
             // The update endpoint's response doesn't echo subaccount_id back —
@@ -1060,13 +1073,13 @@ app.post('/api/wallet/create-topup-account', async (req, res) => {
 
         console.log(`🏦 Creating top-up account for user ${userId} (${email}) amount=₦${parsedAmount}`);
 
-        const response = await fetch('https://api.flutterwave.com/v3/virtual-account-numbers', {
+        const result = await flutterwaveRequest('https://api.flutterwave.com/v3/virtual-account-numbers', {
             method: 'POST',
             headers: {
                 Authorization: `Bearer ${secretKey}`,
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
+            data: {
                 email,
                 is_permanent: false,
                 amount: parsedAmount,
@@ -1074,10 +1087,8 @@ app.post('/api/wallet/create-topup-account', async (req, res) => {
                 firstname: firstName,
                 lastname: lastName,
                 narration: `KRides Wallet Top-up - ₦${parsedAmount}`,
-            }),
+            },
         });
-
-        const result = await response.json();
 
         if (result.status !== 'success') {
             console.error('❌ Flutterwave VA creation failed:', result.message);
@@ -1317,11 +1328,10 @@ app.post('/api/wallet/verify-topup', async (req, res) => {
     }
 
     try {
-        const verifyResponse = await fetch(
+        const verifyResult = await flutterwaveRequest(
             `https://api.flutterwave.com/v3/transactions/verify_by_reference?tx_ref=${encodeURIComponent(txRef)}`,
             { headers: { Authorization: `Bearer ${secretKey}` } }
         );
-        const verifyResult = await verifyResponse.json();
 
         if (verifyResult.status !== 'success' || !verifyResult.data) {
             // Flutterwave has no completed transaction against this reference
@@ -1649,23 +1659,21 @@ app.post('/api/payments/complete-ride', async (req, res) => {
  */
 async function transferToDriver(driver, amount, reference, narration) {
     const secretKey = process.env.FLUTTERWAVE_SECRET_KEY;
-    const transferResponse = await fetch('https://api.flutterwave.com/v3/transfers', {
+    const result = await flutterwaveRequest('https://api.flutterwave.com/v3/transfers', {
         method: 'POST',
         headers: {
             Authorization: `Bearer ${secretKey}`,
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
+        data: {
             account_bank: driver.bankCode,
             account_number: driver.accountNumber,
             amount,
             narration,
             currency: 'NGN',
             reference,
-        }),
+        },
     });
-
-    const result = await transferResponse.json();
     if (result.status !== 'success' && result.status !== 'NEW') {
         throw new Error(result.message || 'Transfer failed');
     }
@@ -1900,7 +1908,7 @@ async function refundFlutterwaveTransaction(transactionId, amount, comments) {
     const payload = { comments: comments || 'Ride cancelled' };
     if (amount) payload.amount = amount;
 
-    const response = await fetch(
+    const result = await flutterwaveRequest(
         `https://api.flutterwave.com/v3/transactions/${transactionId}/refund`,
         {
             method: 'POST',
@@ -1908,10 +1916,9 @@ async function refundFlutterwaveTransaction(transactionId, amount, comments) {
                 Authorization: `Bearer ${secretKey}`,
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(payload),
+            data: payload,
         }
     );
-    const result = await response.json();
     if (result.status !== 'success') {
         throw new Error(result.message || 'Refund failed');
     }
@@ -2093,12 +2100,21 @@ async function retryFlutterwaveRefund(rideDoc) {
     }
 
     if (attempts >= REFUND_RETRY_MAX_ATTEMPTS) {
-        if (!ride.needsManualRefundReview) {
-            await rideRef.update({
-                needsManualRefundReview: true,
-                refundReviewReason: `Refund retry failed ${attempts} times — needs manual review`,
-            }).catch(() => {});
-        }
+        // Move off refundStatus:'failed' once given up on, or this same ride
+        // matches the sweep's query and gets "found" again on every future
+        // run forever, even though nothing further happens to it. Not
+        // gated on `!ride.needsManualRefundReview` — a ride already flagged
+        // from before this fix existed still has refundStatus:'failed' and
+        // needs this write to actually happen at least once to escape the
+        // loop; repeating it after that is harmless (idempotent), and it
+        // won't be fetched again either way once refundStatus changes. The
+        // admin review queue keys off needsManualRefundReview, not
+        // refundStatus, so this doesn't affect its visibility there.
+        await rideRef.update({
+            refundStatus: 'needs_review',
+            needsManualRefundReview: true,
+            refundReviewReason: `Refund retry failed ${attempts} times — needs manual review`,
+        }).catch(() => {});
         return;
     }
 
@@ -2126,12 +2142,15 @@ async function retryWalletRefund(rideDoc) {
     const attempts = ride.walletRefundRetryCount || 0;
 
     if (attempts >= REFUND_RETRY_MAX_ATTEMPTS) {
-        if (!ride.needsManualRefundReview) {
-            await rideRef.update({
-                needsManualRefundReview: true,
-                refundReviewReason: `Wallet refund retry failed ${attempts} times — needs manual review`,
-            }).catch(() => {});
-        }
+        // Same reasoning as the card-refund branch above: move off
+        // walletRefundStatus:'failed' once given up on (unconditionally —
+        // see that comment for why it's not gated on needsManualRefundReview),
+        // so this ride stops matching the sweep's query forever.
+        await rideRef.update({
+            walletRefundStatus: 'needs_review',
+            needsManualRefundReview: true,
+            refundReviewReason: `Wallet refund retry failed ${attempts} times — needs manual review`,
+        }).catch(() => {});
         return;
     }
 
@@ -2207,12 +2226,16 @@ async function retryFailedPayout(rideDoc) {
     const attempts = ride.payoutRetryCount || 0;
 
     if (attempts >= PAYOUT_RETRY_MAX_ATTEMPTS) {
-        if (!ride.needsManualPayoutReview) {
-            await rideRef.update({
-                needsManualPayoutReview: true,
-                payoutReviewReason: `Payout retry failed ${attempts} times — needs manual review`,
-            }).catch(() => {});
-        }
+        // Same class of bug as the refund sweeps above (see the comment
+        // there): move off payoutStatus:'failed' once given up on, or this
+        // ride matches this query forever. Unconditional (not gated on
+        // needsManualPayoutReview) so a ride already flagged from before
+        // this fix still escapes the loop on its next sweep.
+        await rideRef.update({
+            payoutStatus: 'needs_review',
+            needsManualPayoutReview: true,
+            payoutReviewReason: `Payout retry failed ${attempts} times — needs manual review`,
+        }).catch(() => {});
         return;
     }
 
@@ -2294,17 +2317,36 @@ app.post('/admin-api/login', (req, res) => {
     res.json({ success: true });
 });
 
+// A ride marked paid stays visible on the payouts page (just badged/dimmed
+// on the frontend) instead of disappearing the instant it's settled — but
+// showing literally every paid ride a driver has ever had would make this
+// query grow unbounded forever. Cap "recently paid" to this window; older
+// settled rides still count in paidTotal (that's a running counter on the
+// driver doc, not derived from this list), they just drop off the visible
+// history after a month.
+const PAYOUTS_PAID_HISTORY_WINDOW_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
 // GET /admin-api/payouts/overview
 // Every driver — not just ones currently owed money — each with what's
-// pending now ("To Be Paid") and their all-time paid total ("Paid Total"),
-// so the admin panel can give each driver their own persistent tab instead
-// of one flat list that only shows whoever happens to have something
-// pending right now.
+// pending now ("To Be Paid"), their all-time paid total ("Paid Total"), and
+// a combined recent ride list (owed + recently-settled) so the admin panel
+// can give each driver their own persistent tab instead of one flat list
+// that only shows whoever happens to have something pending right now.
 app.get('/admin-api/payouts/overview', async (req, res) => {
     try {
-        const [ridesSnap, driversSnap] = await Promise.all([
+        const paidSince = admin.firestore.Timestamp.fromMillis(Date.now() - PAYOUTS_PAID_HISTORY_WINDOW_MS);
+
+        const [owedSnap, paidSnap, driversSnap] = await Promise.all([
             db.collection('rides')
-                .where('payoutStatus', 'in', ['pending_manual', 'failed', 'awaiting_bank_details'])
+                // 'needs_review' = the automatic-retry sweep gave up after
+                // PAYOUT_RETRY_MAX_ATTEMPTS — still owed, still needs a human
+                // to pay it, same as 'failed'; it just stops the sweep from
+                // rediscovering it every 10 minutes forever (see retryFailedPayout).
+                .where('payoutStatus', 'in', ['pending_manual', 'failed', 'awaiting_bank_details', 'needs_review'])
+                .get(),
+            db.collection('rides')
+                .where('payoutStatus', '==', 'paid_manually')
+                .where('payoutPaidAt', '>=', paidSince)
                 .get(),
             db.collection('drivers').limit(1000).get(),
         ]);
@@ -2315,18 +2357,15 @@ app.get('/admin-api/payouts/overview', async (req, res) => {
         const placeName = (place) =>
             typeof place === 'object' && place ? (place.name || place.address || null) : (place || null);
 
-        const ridesByDriver = new Map();
-        for (const doc of ridesSnap.docs) {
+        const toRideRow = (doc) => {
             const ride = doc.data();
-            const driverId = ride.driverId;
-            if (!driverId) continue;
-
-            if (!ridesByDriver.has(driverId)) ridesByDriver.set(driverId, []);
-            ridesByDriver.get(driverId).push({
+            return {
                 rideId: doc.id,
+                driverId: ride.driverId || null,
                 amount: Number(ride.payoutAmount) || 0,
                 completedAt: ride.completedAt?.toDate?.()?.toISOString() || null,
                 status: ride.payoutStatus,
+                paidAt: ride.payoutPaidAt?.toDate?.()?.toISOString() || null,
                 customerName: ride.customerName || null,
                 pickupLocation: placeName(ride.pickupLocation),
                 destination: placeName(ride.destination),
@@ -2335,7 +2374,25 @@ app.get('/admin-api/payouts/overview', async (req, res) => {
                 transactionId: ride.transactionId || null,
                 payoutReference: ride.payoutReference || null,
                 payoutError: ride.payoutError || null,
-            });
+            };
+        };
+
+        const owedByDriver = new Map();
+        for (const doc of owedSnap.docs) {
+            const row = toRideRow(doc);
+            if (!row.driverId) continue;
+            if (!owedByDriver.has(row.driverId)) owedByDriver.set(row.driverId, []);
+            owedByDriver.get(row.driverId).push(row);
+        }
+
+        const ridesByDriver = new Map(
+            Array.from(owedByDriver.entries()).map(([driverId, rows]) => [driverId, [...rows]])
+        );
+        for (const doc of paidSnap.docs) {
+            const row = toRideRow(doc);
+            if (!row.driverId) continue;
+            if (!ridesByDriver.has(row.driverId)) ridesByDriver.set(row.driverId, []);
+            ridesByDriver.get(row.driverId).push(row);
         }
 
         const sortByRecency = (rides) =>
@@ -2343,6 +2400,7 @@ app.get('/admin-api/payouts/overview', async (req, res) => {
 
         const drivers = driversSnap.docs.map((doc) => {
             const driver = doc.data();
+            const owedRides = owedByDriver.get(doc.id) || [];
             const rides = sortByRecency(ridesByDriver.get(doc.id) || []);
             return {
                 driverId: doc.id,
@@ -2350,7 +2408,7 @@ app.get('/admin-api/payouts/overview', async (req, res) => {
                 bankName: driver.bankName || null,
                 accountNumber: driver.accountNumber || null,
                 accountName: driver.accountName || null,
-                toBePaid: rides.reduce((sum, r) => sum + r.amount, 0),
+                toBePaid: owedRides.reduce((sum, r) => sum + r.amount, 0),
                 paidTotal: Number(driver.totalPaidOut) || 0,
                 rides,
             };
@@ -2360,13 +2418,14 @@ app.get('/admin-api/payouts/overview', async (req, res) => {
         // happen, but the old endpoint tolerated it) still needs to show up.
         for (const [driverId, rides] of ridesByDriver) {
             if (drivers.some((d) => d.driverId === driverId)) continue;
+            const owedRides = owedByDriver.get(driverId) || [];
             drivers.push({
                 driverId,
                 name: '(unknown name)',
                 bankName: null,
                 accountNumber: null,
                 accountName: null,
-                toBePaid: rides.reduce((sum, r) => sum + r.amount, 0),
+                toBePaid: owedRides.reduce((sum, r) => sum + r.amount, 0),
                 paidTotal: 0,
                 rides: sortByRecency(rides),
             });
@@ -2495,7 +2554,7 @@ app.post('/admin-api/refunds/resolve', async (req, res) => {
         if (['failed', 'needs_review'].includes(ride.refundStatus)) {
             updates.refundStatus = 'resolved_manually';
         }
-        if (ride.walletRefundStatus === 'failed') {
+        if (['failed', 'needs_review'].includes(ride.walletRefundStatus)) {
             updates.walletRefundStatus = 'resolved_manually';
         }
 
