@@ -12,6 +12,19 @@ const PAYMENT_LABELS = { flutterwave: 'Card', wallet: 'Wallet', cash: 'Cash' };
 const paymentLabel = (method) => PAYMENT_LABELS[method] || method || 'Unknown method';
 const naira = (n) => `₦${Number(n || 0).toLocaleString('en-NG')}`;
 
+// A ride stays on screen once paid instead of disappearing — this is what
+// tells the two states apart. 'needs_review' covers both the automatic-retry
+// sweep giving up and a couple of other stuck states, so it's worth its own
+// label rather than showing the raw status string.
+const STATUS_BADGES = {
+    paid_manually: { label: 'Paid', className: 'badge-resolved' },
+    pending_manual: { label: 'Pending', className: 'badge-pending' },
+    awaiting_bank_details: { label: 'Awaiting Bank Details', className: 'badge-open' },
+    failed: { label: 'Failed', className: 'badge-open' },
+    needs_review: { label: 'Needs Review', className: 'badge-open' },
+};
+const statusBadge = (status) => STATUS_BADGES[status] || { label: status || 'Unknown', className: 'badge-pending' };
+
 // Each driver gets their own tab (the list on the left selects it) instead
 // of one long scroll of every driver's card — "To Be Paid" and "Paid Total"
 // sit at the top of whichever driver is selected. "Mark All As Paid" settles
@@ -164,13 +177,18 @@ export default function Payouts() {
 
                             <div className="ride-list">
                                 {selectedDriver.rides.length === 0 ? (
-                                    <p className="empty">Nothing currently owed.</p>
+                                    <p className="empty">Nothing owed, and no payouts in the last 30 days.</p>
                                 ) : (
                                     selectedDriver.rides.map((r) => (
-                                        <div key={r.rideId} className="card">
+                                        <div key={r.rideId} className={`card${r.status === 'paid_manually' ? ' card-paid' : ''}`}>
                                             <div className="ride-row-main">
                                                 <span className="mono">{r.rideId}</span>
-                                                <span className="amount">{naira(r.amount)}</span>
+                                                <div className="card-actions">
+                                                    <span className={`badge ${statusBadge(r.status).className}`}>
+                                                        {statusBadge(r.status).label}
+                                                    </span>
+                                                    <span className="amount">{naira(r.amount)}</span>
+                                                </div>
                                             </div>
                                             <div className="ride-row-line muted">
                                                 {r.customerName || 'Unknown customer'}
@@ -185,7 +203,7 @@ export default function Payouts() {
                                                 {paymentLabel(r.paymentMethod)}
                                                 {r.transactionId && <> · txn <span className="mono">{r.transactionId}</span></>}
                                                 {' · '}{r.completedAt ? new Date(r.completedAt).toLocaleDateString('en-NG') : 'unknown date'}
-                                                {' · '}{r.status}
+                                                {r.status === 'paid_manually' && r.paidAt && <> · paid {new Date(r.paidAt).toLocaleDateString('en-NG')}</>}
                                             </div>
                                             {r.payoutError && <div className="ride-row-error">⚠️ {r.payoutError}</div>}
                                         </div>

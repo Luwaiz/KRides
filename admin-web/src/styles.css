@@ -405,6 +405,17 @@ table td {
     background: rgba(46, 125, 50, 0.08);
 }
 
+.badge-pending {
+    color: var(--muted);
+    background: rgba(107, 114, 128, 0.1);
+}
+
+/* A paid ride stays in the list instead of disappearing — dimmed rather
+   than removed, so it's clearly settled without losing the history. */
+.card-paid {
+    opacity: 0.6;
+}
+
 /* Payouts: driver list + selected-driver detail ("tab") */
 .payout-layout {
     display: flex;
