@@ -110,7 +110,7 @@ const ReportDriverModal = ({ visible, onClose, history }) => {
 		<Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
 			<View style={styles.overlay}>
 				<View style={styles.container}>
-					{/* Header */}
+					{}
 					<View style={styles.header}>
 						<Text style={styles.title}>Report Driver</Text>
 						<TouchableOpacity onPress={handleClose} disabled={loading} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
@@ -120,7 +120,7 @@ const ReportDriverModal = ({ visible, onClose, history }) => {
 
 					<Text style={styles.subtitle}>What went wrong with this ride?</Text>
 
-					{/* Ride summary */}
+					{}
 					<View style={styles.rideSummary}>
 						<Text style={styles.driverName}>{history.driverName || "Driver"}</Text>
 						<Text style={styles.rideRoute} numberOfLines={2}>
@@ -128,7 +128,7 @@ const ReportDriverModal = ({ visible, onClose, history }) => {
 						</Text>
 					</View>
 
-					{/* Reason chips */}
+					{}
 					<View style={styles.reasons}>
 						{REPORT_REASONS.map((reason) => (
 							<TouchableOpacity
@@ -156,7 +156,7 @@ const ReportDriverModal = ({ visible, onClose, history }) => {
 						))}
 					</View>
 
-					{/* Optional description */}
+					{}
 					<TextInput
 						style={styles.input}
 						placeholder="Additional details (optional)"
@@ -171,7 +171,7 @@ const ReportDriverModal = ({ visible, onClose, history }) => {
 					/>
 					<Text style={styles.charCount}>{description.length}/300</Text>
 
-					{/* Buttons */}
+					{}
 					<View style={styles.buttons}>
 						<TouchableOpacity style={styles.cancelButton} onPress={handleClose} disabled={loading}>
 							<Text style={styles.cancelText}>Cancel</Text>

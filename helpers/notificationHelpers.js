@@ -2,18 +2,13 @@ import axios from 'axios';
 import { NOTIFICATION_API_KEY } from '@env';
 import { FIREBASE_AUTH } from '../firebaseConfig';
 
-// Production server (Render.com)
 const NOTIFICATION_SERVER_URL = 'https://krides.onrender.com/api/notifications';
 
-// Axios instance with the shared API key and a 10-second timeout on every request.
 const api = axios.create({
     headers: { 'x-api-key': NOTIFICATION_API_KEY || '' },
     timeout: 10000,
 });
 
-// Attach a fresh Firebase ID token to every outgoing request so the server
-// can verify the caller is a real authenticated user. Once the server fully
-// migrates to token-only auth, the x-api-key header above can be removed.
 api.interceptors.request.use(async (config) => {
     const user = FIREBASE_AUTH.currentUser;
     if (user) {
@@ -21,19 +16,12 @@ api.interceptors.request.use(async (config) => {
             const token = await user.getIdToken();
             config.headers['Authorization'] = `Bearer ${token}`;
         } catch {
-            // Non-fatal — request still goes out with the API key
         }
     }
     return config;
 });
 
 
-/**
- * Retry a function with exponential backoff
- * @param {Function} fn - Async function to retry
- * @param {Object} options - Retry options
- * @returns {Promise} Result of the function
- */
 async function retryWithBackoff(fn, options = {}) {
     const {
         maxRetries = 3,
@@ -52,28 +40,23 @@ async function retryWithBackoff(fn, options = {}) {
         } catch (error) {
             lastError = error;
 
-            // Check if we should retry this error
             if (!shouldRetry(error)) {
                 console.log('🚫 Error is not retryable, failing immediately');
                 throw error;
             }
 
-            // If this was the last attempt, throw the error
             if (attempt === maxRetries) {
                 console.log(`❌ Max retries (${maxRetries}) reached, giving up`);
                 throw error;
             }
 
-            // Calculate delay with exponential backoff
             const delay = Math.min(
                 initialDelay * Math.pow(backoffMultiplier, attempt),
                 maxDelay
             );
 
-            // Call the retry callback
             onRetry(attempt + 1, delay, error);
 
-            // Wait before retrying
             await new Promise(resolve => setTimeout(resolve, delay));
         }
     }
@@ -81,32 +64,17 @@ async function retryWithBackoff(fn, options = {}) {
     throw lastError;
 }
 
-/**
- * Determine if an error should be retried
- * @param {Error} error - The error to check
- * @returns {boolean} True if should retry
- */
 function shouldRetryError(error) {
-    // Don't retry if it's a client error (4xx)
     if (error.response && error.response.status >= 400 && error.response.status < 500) {
-        // Except for 429 (rate limit) and 408 (timeout)
         if (error.response.status === 429 || error.response.status === 408) {
             return true;
         }
         return false;
     }
 
-    // Retry network errors and server errors (5xx)
     return true;
 }
 
-/**
- * Send notification when a new ride is created
- * @param {string} rideId - Ride ID
- * @param {string} customerName - Customer name
- * @param {string} pickupLocation - Pickup location address
- * @param {string} destination - Destination address
- */
 export async function notifyDriversAboutNewRide(rideId, customerName, pickupLocation, destination) {
     try {
         return await retryWithBackoff(
@@ -136,12 +104,6 @@ export async function notifyDriversAboutNewRide(rideId, customerName, pickupLoca
     }
 }
 
-/**
- * Send notification when a ride is accepted
- * @param {string} customerId - Customer ID
- * @param {string} rideId - Ride ID
- * @param {string} driverName - Driver name
- */
 export async function notifyCustomerRideAccepted(customerId, rideId, driverName) {
     try {
         return await retryWithBackoff(
@@ -170,11 +132,6 @@ export async function notifyCustomerRideAccepted(customerId, rideId, driverName)
     }
 }
 
-/**
- * Send notification when a ride is completed
- * @param {string} customerId - Customer ID
- * @param {string} rideId - Ride ID
- */
 export async function notifyCustomerRideCompleted(customerId, rideId) {
     try {
         return await retryWithBackoff(
@@ -202,12 +159,6 @@ export async function notifyCustomerRideCompleted(customerId, rideId) {
     }
 }
 
-/**
- * Send notification when customer cancels a ride
- * @param {string} driverId - Driver ID
- * @param {string} rideId - Ride ID
- * @param {string} customerName - Customer name
- */
 export async function notifyDriverRideCancelled(driverId, rideId, customerName) {
     try {
         return await retryWithBackoff(
@@ -241,14 +192,6 @@ export async function notifyDriverRideCancelled(driverId, rideId, customerName) 
     }
 }
 
-/**
- * Send custom notification to a user
- * @param {string} userId - User ID
- * @param {string} role - User role ('customer' or 'driver')
- * @param {string} title - Notification title
- * @param {string} body - Notification body
- * @param {object} data - Optional data payload
- */
 export async function sendNotificationToUser(userId, role, title, body, data = {}) {
     try {
         return await retryWithBackoff(
@@ -279,12 +222,6 @@ export async function sendNotificationToUser(userId, role, title, body, data = {
     }
 }
 
-/**
- * Notify customer that driver has arrived at pickup location
- * @param {string} customerId - Customer's user ID
- * @param {string} driverName - Driver's name
- * @returns {Promise} Response from notification server
- */
 export const notifyCustomerDriverArrived = async (customerId, driverName) => {
     console.log('📍 Notifying customer of driver arrival:', { customerId, driverName });
 

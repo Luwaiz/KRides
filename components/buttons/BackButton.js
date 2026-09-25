@@ -9,7 +9,6 @@ const BackButton = ({ text }) => {
 	const goBack = () => {
 		navigation.goBack();
 	};
-	//back button component
 	return (
 		<View style={styles.headCont}>
 			<TouchableOpacity activeOpacity={0.8} onPress={goBack}>

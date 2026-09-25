@@ -10,13 +10,12 @@ import Toast from "react-native-toast-message";
 import useAuthStore, {
 	useUserDetails,
 	useDriverDetails,
-} from "../constants/Store"; // Import stores
+} from "../constants/Store";
 
-// Screens and Navigators
 import OnBoarding from "../screens/OnBoarding";
 import AuthStack from "./AuthStack";
-import AppStackNavigator from "./AppStack"; // for customers
-import DriverDrawer from "./DriverDrawer"; // for drivers (with drawer)
+import AppStackNavigator from "./AppStack";
+import DriverDrawer from "./DriverDrawer";
 
 const Stack = createNativeStackNavigator();
 
@@ -31,11 +30,9 @@ const Navigation = () => {
 		});
 	}, []);
 
-	// Get role from Zustand store instead of local state
 	const storeRole = useAuthStore((state) => state.role);
 	const setAuthData = useAuthStore((state) => state.setAuthData);
 
-	// Get setters from useUserDetails store
 	const { setFirstName, setLastName, setEmail, setPhone, setUserId } =
 		useUserDetails((state) => ({
 			setFirstName: state.setFirstName,
@@ -45,7 +42,6 @@ const Navigation = () => {
 			setUserId: state.setUserId,
 		}));
 
-	// Get setter from useDriverDetails store
 	const { setDriverProfile } = useDriverDetails((state) => ({
 		setDriverProfile: state.setDriverProfile,
 	}));
@@ -60,14 +56,11 @@ const Navigation = () => {
 
 				setUser(currentUser);
 
-				// Read role directly from store to avoid stale closure when customer
-				// signs out and driver signs in back-to-back in the same effect cycle.
 				const currentRole = useAuthStore.getState().role;
 				if (currentUser && !currentRole) {
 					try {
 						console.log("🔍 Fetching user profile for:", currentUser.uid);
 
-						// First check if user exists in "users" collection
 						const userRef = doc(FIREBASE_DB, "users", currentUser.uid);
 						const userSnap = await getDoc(userRef);
 
@@ -92,11 +85,9 @@ const Navigation = () => {
 								setLastName(profile.lastName || "");
 							}
 						} else {
-							// Check pending_role set before auth state fired
 							const pendingRoleRaw = await AsyncStorage.getItem('pending_role');
 							await AsyncStorage.removeItem('pending_role');
 
-							// Parse — support both legacy string format and new { role, expiresAt } format
 							let pendingRole = null;
 							if (pendingRoleRaw) {
 								try {
@@ -104,18 +95,12 @@ const Navigation = () => {
 									if (parsed?.expiresAt && Date.now() < parsed.expiresAt) {
 										pendingRole = parsed.role;
 									}
-									// Expired — discard silently
 								} catch {
-									// Legacy plain-string value — honour it once, then it's gone
 									pendingRole = pendingRoleRaw;
 								}
 							}
 
 							if (pendingRole === 'customer') {
-								// Google sign-in explicitly requested customer — but don't
-								// honour that if this account is already registered as a
-								// driver (e.g. the same Google account used for driver
-								// signup, tapped from the customer Login/Signup screen).
 								const driverRef = doc(FIREBASE_DB, "drivers", currentUser.uid);
 								const driverSnap = await getDoc(driverRef);
 
@@ -123,14 +108,6 @@ const Navigation = () => {
 
 								if (driverSnap.exists()) {
 									const profile = driverSnap.data();
-									// Populate the full driver profile (bankDetailsVerified
-									// included) BEFORE flipping role to "driver" — DriverStack
-									// reads bankDetailsVerified for its initialRouteName the
-									// instant it mounts (triggered by this role change), and
-									// initialRouteName is only ever evaluated once, not
-									// reactively. Doing this in the wrong order let an
-									// already-verified driver get sent through bank-details
-									// onboarding again on cold start/reload.
 									setDriverProfile({ ...profile, uid: currentUser.uid });
 									setAuthData(currentUser, profile, "driver");
 									AsyncStorage.setItem(`role_${currentUser.uid}`, "driver").catch(() => {});
@@ -146,7 +123,6 @@ const Navigation = () => {
 									setLastName(nameParts.slice(1).join(" ") || "");
 								}
 							} else {
-								// pending_role='driver' (DriverLogin) OR unknown — check drivers first
 								const driverRef = doc(FIREBASE_DB, "drivers", currentUser.uid);
 								const driverSnap = await getDoc(driverRef);
 
@@ -155,12 +131,10 @@ const Navigation = () => {
 								if (driverSnap.exists()) {
 									const profile = driverSnap.data();
 									const role = "driver";
-									// Same ordering fix as above — see comment there.
 									setDriverProfile({ ...profile, uid: currentUser.uid });
 									setAuthData(currentUser, profile, role);
 									AsyncStorage.setItem(`role_${currentUser.uid}`, role).catch(() => {});
 								} else if (pendingRole !== 'driver') {
-									// Only fall back to customer if we weren't explicitly told it's a driver
 									setAuthData(currentUser, {
 										email: currentUser.email,
 										name: currentUser.displayName || "User"
@@ -172,7 +146,6 @@ const Navigation = () => {
 						console.error("❌ Error fetching user role:", error.message);
 
 						if (error.code === "permission-denied") {
-							// Use Toast instead of Alert to avoid native presentation crashes during navigation transitions
 							Toast.show({
 								type: 'tomatoToast',
 								text1: 'Setup Required',
@@ -184,7 +157,6 @@ const Navigation = () => {
 
 						if (!mounted) return;
 
-						// Use cached role so drivers don't get misrouted on transient network errors
 						const cachedRole = await AsyncStorage.getItem(`role_${currentUser.uid}`);
 						const fallbackRole = cachedRole || "customer";
 
@@ -209,8 +181,6 @@ const Navigation = () => {
 					if (mounted) {
 						setAuthData(null, null, null);
 					}
-					// Clear all cached role keys on logout so a shared device
-					// starts fresh for the next user.
 					AsyncStorage.getAllKeys()
 						.then(keys => {
 							const roleKeys = keys.filter(k => k.startsWith('role_'));
@@ -229,30 +199,27 @@ const Navigation = () => {
 			mounted = false;
 			unsubscribe();
 		};
-	}, []); // No deps — onAuthStateChanged is persistent; role is read via getState() not closure
+	}, []);
 
-	// Determine if we should show the global loading overlay
 	const showLoading = initializing || (user && !storeRole) || hasSeenOnboarding === null;
 
 	return (
 		<View style={{ flex: 1 }}>
 			<NavigationContainer>
 				<Stack.Navigator screenOptions={{ headerShown: false }}>
-					{/* If user not logged in */}
+					{}
 					{!user ? (
 						<>
 							{hasSeenOnboarding === false && <Stack.Screen name="OnBoarding" component={OnBoarding} />}
 							<Stack.Screen name="AuthStack" component={AuthStack} />
 						</>
 					) : storeRole === "driver" ? (
-						// Driver logged in - use key to force remount when role changes
 						<Stack.Screen
 							key="driver-drawer"
 							name="DriverDrawer"
 							component={DriverDrawer}
 						/>
 					) : (
-						// Customer logged in - use key to force remount when role changes
 						<Stack.Screen
 							key="customer-stack"
 							name="AppStack"
@@ -262,7 +229,7 @@ const Navigation = () => {
 				</Stack.Navigator>
 			</NavigationContainer>
 
-			{/* Global Loading Overlay — avoids unmounting NavigationContainer */}
+			{}
 			{showLoading && (
 				<View style={[StyleSheet.absoluteFill, { justifyContent: "center", alignItems: "center", backgroundColor: 'white' }]}>
 					<ActivityIndicator size="large" color="#007bff" />

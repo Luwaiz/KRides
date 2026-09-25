@@ -17,11 +17,9 @@ const HomeHeader = () => {
 	const [earnedToday, setEarnedToday] = useState(0);
 	const [togglingOnline, setTogglingOnline] = useState(false);
 
-	// Get driver ID from store
 	const uid = useDriverDetails((state) => state.uid);
 	const driverId = uid;
 
-	// Online/Offline status
 	const isOnline = useDriverAvailability((state) => state.isOnline);
 	const toggleAvailability = useDriverAvailability((state) => state.toggleAvailability);
 
@@ -32,7 +30,7 @@ const HomeHeader = () => {
 	const handleToggle = async (newValue) => {
 		if (togglingOnline) return;
 		setTogglingOnline(true);
-		toggleAvailability(); // optimistic update
+		toggleAvailability();
 		try {
 			if (uid) {
 				await updateDoc(doc(FIREBASE_DB, "drivers", uid), {
@@ -42,7 +40,7 @@ const HomeHeader = () => {
 			}
 		} catch (error) {
 			console.error("Error updating availability:", error);
-			toggleAvailability(); // rollback
+			toggleAvailability();
 			Alert.alert(
 				"Connection Error",
 				"Could not update your availability status. Check your connection and try again.",
@@ -76,7 +74,7 @@ const HomeHeader = () => {
 	}, [driverId]);
 	return (
 		<View style={styles.container}>
-			{/* First Row: Menu and Toggle */}
+			{}
 			<View style={styles.topRow}>
 				<TouchableOpacity
 					style={styles.drawerNav}
@@ -88,7 +86,7 @@ const HomeHeader = () => {
 					</View>
 				</TouchableOpacity>
 
-				{/* Online/Offline Toggle */}
+				{}
 				<View style={styles.statusBox}>
 					<Text style={styles.statusText}>
 						{togglingOnline ? '⏳ Updating...' : isOnline ? '🟢 Online' : '🔴 Offline'}
@@ -103,7 +101,7 @@ const HomeHeader = () => {
 				</View>
 			</View>
 
-			{/* Second Row: Stats */}
+			{}
 			<View style={styles.statsRow}>
 				<View style={styles.box}>
 					<Calendar height={24} width={24} />

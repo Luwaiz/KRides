@@ -76,7 +76,6 @@ const Confirmation1 = ({ modal, setModal, title }) => {
 			const { role } = useAuthStore.getState();
 			const collectionName = role === "driver" ? "drivers" : "users";
 
-			// Step 1: Delete Firebase Auth user (may need reauthentication)
 			try {
 				await firebaseDeleteUser(currentUser);
 			} catch (authError) {
@@ -98,14 +97,11 @@ const Confirmation1 = ({ modal, setModal, title }) => {
 				}
 			}
 
-			// Step 2: Delete Firestore document (only after Auth deletion succeeds)
 			try {
 				await deleteDoc(doc(FIREBASE_DB, collectionName, currentUser.uid));
 			} catch (e) {
-				// Non-fatal — auth account is already gone
 			}
 
-			// Step 3: Clear stores and navigate
 			useUserDetails.getState().clearUser();
 			useDriverDetails.getState().clearDriver();
 			useAuthStore.getState().clearAuth();
@@ -133,24 +129,18 @@ const Confirmation1 = ({ modal, setModal, title }) => {
 		try {
 			setLoading(true);
 
-			// Clear this device's push token from Firestore while still
-			// authenticated — otherwise the next person to log into this
-			// device could receive push notifications meant for this account.
 			const currentUser = FIREBASE_AUTH.currentUser;
 			if (currentUser) {
 				const { role } = useAuthStore.getState();
 				await notificationManager.cleanup(currentUser.uid, role);
 			}
 
-			// Sign out from Firebase
 			await signOut(FIREBASE_AUTH);
 
-			// Clear all stores
 			useUserDetails.getState().clearUser();
 			useDriverDetails.getState().clearDriver();
 			useAuthStore.getState().clearAuth();
 
-			// onAuthStateChanged in Navigation.js handles routing automatically
 			setLoading(false);
 		} catch (error) {
 			setLoading(false);
@@ -190,7 +180,7 @@ const Confirmation1 = ({ modal, setModal, title }) => {
 				</View>
 			</Modal>
 
-			{/* Password re-entry for email users */}
+			{}
 			{passwordPrompt && (
 				<Modal visible transparent statusBarTranslucent animationType="fade">
 					<View style={styles.modal}>
@@ -213,7 +203,7 @@ const Confirmation1 = ({ modal, setModal, title }) => {
 				</Modal>
 			)}
 
-			{/* Loading Overlay */}
+			{}
 			{loading && (
 				<Modal
 					visible={loading}

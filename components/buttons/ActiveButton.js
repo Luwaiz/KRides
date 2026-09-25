@@ -8,7 +8,6 @@ import {
 import React from "react";
 import { colors } from "../../constants/styling";
 
-//active button component
 const ActiveButton = ({ title, onPress, disabled, loading }) => {
 	return (
 		<TouchableOpacity disabled={disabled || loading} onPress={onPress} activeOpacity={0.5}>

@@ -32,10 +32,6 @@ const Settings = ({ navigation }) => {
 		setModalTitle(title);
 		setModal(true);
 	};
-	// A plain synchronous function — wrapping this in `async` made `return
-	// unsub` resolve inside a Promise instead of handing the unsubscribe
-	// function to React, so the listener was never torn down on unmount
-	// (same bug already fixed in DriverSetting.js's equivalent effect).
 	const fetchUserProfile = () => {
 		try {
 			setLoading(true);
@@ -54,7 +50,6 @@ const Settings = ({ navigation }) => {
 						setLoading(false);
 					},
 					(error) => {
-						// Silently handle permission-denied errors (happens during logout)
 						if (error.code === "permission-denied") {
 							console.log(
 								"🔒 Permission denied in Settings - user likely logged out"
@@ -269,7 +264,6 @@ const styles = StyleSheet.create({
 	},
 	name: {
 		fontSize: 35,
-		// fontWeight:"bold",
 		fontFamily: "Albert-SemiBold",
 		maxWidth: "70%",
 	},

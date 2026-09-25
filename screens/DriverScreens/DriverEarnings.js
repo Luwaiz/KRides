@@ -37,16 +37,12 @@ const DriverEarnings = () => {
         averagePerRide: 0,
     });
 
-    // Re-fetch on focus (not just mount) so a ride completed while this
-    // screen stayed mounted further down the stack shows up without needing
-    // an unrelated remount.
     useFocusEffect(
         useCallback(() => {
             fetchEarnings();
         }, [uid, selectedYear, selectedMonth])
     );
 
-    // Reset day selection when month or year changes
     useEffect(() => {
         setSelectedDay(null);
     }, [selectedMonth, selectedYear]);
@@ -56,7 +52,6 @@ const DriverEarnings = () => {
         [selectedYear, selectedMonth]
     );
 
-    // Derive per-day stats from the already-fetched month data (no extra Firestore reads)
     const displayData = useMemo(() => {
         if (selectedDay === null) return earningsData;
         const dayRides = earningsData.rides.filter((ride) => {
@@ -79,7 +74,6 @@ const DriverEarnings = () => {
     const fetchEarnings = async () => {
         if (!uid) return;
         if (initialLoading) {
-            // first load — show full-screen spinner
         } else {
             setFetching(true);
         }
@@ -129,7 +123,7 @@ const DriverEarnings = () => {
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}
             >
-                {/* Year selector */}
+                {}
                 <View style={styles.yearRow}>
                     <TouchableOpacity onPress={() => setSelectedYear((y) => y - 1)} style={styles.arrowBtn}>
                         <Ionicons name="chevron-back" size={22} color={colors.primaryBlue} />
@@ -148,7 +142,7 @@ const DriverEarnings = () => {
                     </TouchableOpacity>
                 </View>
 
-                {/* Month pills */}
+                {}
                 <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
@@ -173,7 +167,7 @@ const DriverEarnings = () => {
                     })}
                 </ScrollView>
 
-                {/* Day picker */}
+                {}
                 <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
@@ -208,7 +202,7 @@ const DriverEarnings = () => {
                     })}
                 </ScrollView>
 
-                {/* Earnings Summary Card */}
+                {}
                 <View style={styles.summaryCard}>
                     <Text style={styles.periodLabel}>{getPeriodLabel()}</Text>
                     {fetching ? (
@@ -243,7 +237,7 @@ const DriverEarnings = () => {
                     )}
                 </View>
 
-                {/* Earnings Breakdown + Transactions — hidden while re-fetching */}
+                {}
                 {!fetching && (
                 <>
                 <View style={styles.breakdownCard}>
@@ -260,7 +254,7 @@ const DriverEarnings = () => {
                     </View>
                 </View>
 
-                {/* Transaction List */}
+                {}
                 <View style={styles.transactionsSection}>
                     <Text style={styles.sectionTitle}>Recent Transactions</Text>
                     {displayData.rides.length === 0 ? (

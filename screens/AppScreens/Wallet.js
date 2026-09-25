@@ -38,10 +38,9 @@ const Wallet = () => {
   const [balance, setBalance] = useState(0);
   const [transactions, setTransactions] = useState([]);
 
-  // Top-up flow state
   const [topupAmount, setTopupAmount] = useState("");
   const [creating, setCreating] = useState(false);
-  const [topupAccount, setTopupAccount] = useState(null); // { accountNumber, bankName, accountName, amount, expiryDate, txRef }
+  const [topupAccount, setTopupAccount] = useState(null);
   const [error, setError] = useState(null);
   const [checkingPayment, setCheckingPayment] = useState(false);
   const [polling, setPolling] = useState(false);
@@ -50,7 +49,6 @@ const Wallet = () => {
   const firstName = useUserDetails((s) => s.firstName);
   const lastName = useUserDetails((s) => s.lastName);
 
-  // Real-time balance listener
   useEffect(() => {
     if (!user) return;
     const unsub = onSnapshot(
@@ -63,7 +61,6 @@ const Wallet = () => {
     return () => unsub();
   }, [user?.uid]);
 
-  // Real-time transaction history
   useEffect(() => {
     if (!user) return;
     const q = query(
@@ -81,14 +78,6 @@ const Wallet = () => {
     return () => unsub();
   }, [user?.uid]);
 
-  // The balance/history listeners above already update the instant the
-  // webhook credits Firestore — this doesn't "pull" the balance itself, it
-  // asks the server to actively check Flutterwave and credit right now if
-  // the transfer already succeeded there, instead of only ever waiting on
-  // the webhook. Shared by the manual button (silent: false — shows a
-  // result either way) and the automatic checks on restore/focus below
-  // (silent: true — only speaks up when it actually finds a payment, so
-  // reopening the page doesn't nag with "not received yet" every time).
   const checkTopupStatus = async (account, { silent = false } = {}) => {
     if (!account?.txRef) return;
     try {
@@ -127,10 +116,6 @@ const Wallet = () => {
     }
   };
 
-  // Restore a still-pending top-up account if the rider navigated away
-  // (e.g. to their banking app) and came back — previously this was plain
-  // component state, so leaving the screen lost the account details with
-  // no way to see them again short of generating a brand new one.
   useEffect(() => {
     if (!user) return;
     AsyncStorage.getItem(TOPUP_ACCOUNT_KEY_PREFIX + user.uid)
@@ -144,24 +129,13 @@ const Wallet = () => {
           return;
         }
         setTopupAccount(saved);
-        // They may well have already paid while away — check right
-        // away instead of leaving a stale "pending" card on screen
-        // until they notice and tap the button themselves.
         checkTopupStatus(saved, { silent: true });
       })
       .catch(() => {});
   }, [user?.uid]);
 
-  // Actively poll while a top-up is pending and this screen is visible —
-  // every 5s for up to 2 minutes — instead of just waiting on the webhook
-  // in silence (which is what "I've Sent The Money" existed to work around
-  // in the first place). This is what makes the balance refresh on its
-  // own; the button becomes the fallback for whatever's left over after
-  // polling gives up, not the only way to ever resolve a pending top-up.
-  // Restarts fresh on every focus (coming back from the banking app,
-  // switching tabs and back) and on every new/restored topupAccount.
   const POLL_INTERVAL_MS = 5000;
-  const POLL_MAX_ATTEMPTS = 24; // ~2 minutes
+  const POLL_MAX_ATTEMPTS = 24;
 
   useFocusEffect(
     useCallback(() => {
@@ -184,7 +158,6 @@ const Wallet = () => {
         clearInterval(interval);
         setPolling(false);
       };
-      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [topupAccount?.txRef]),
   );
 
@@ -260,7 +233,7 @@ const Wallet = () => {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Balance card */}
+          {}
           <View style={styles.balanceCard}>
             <MaterialCommunityIcons
               name="wallet-outline"
@@ -271,7 +244,7 @@ const Wallet = () => {
             <Text style={styles.balanceAmount}>{formatBalance(balance)}</Text>
           </View>
 
-          {/* Top-up section */}
+          {}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Add Money</Text>
             <Text style={styles.sectionSubtitle}>
@@ -279,7 +252,7 @@ const Wallet = () => {
               amount to the generated account number.
             </Text>
 
-            {/* Amount input */}
+            {}
             {!topupAccount && (
               <View style={styles.inputCard}>
                 <Text style={styles.inputLabel}>Amount (₦)</Text>
@@ -317,7 +290,7 @@ const Wallet = () => {
               </View>
             )}
 
-            {/* Generated account details */}
+            {}
             {topupAccount && (
               <View style={styles.accountCard}>
                 <View style={styles.amountBadge}>
@@ -432,7 +405,7 @@ const Wallet = () => {
             </View>
           </View>
 
-          {/* Transaction history */}
+          {}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Recent Transactions</Text>
             {transactions.length === 0 ? (

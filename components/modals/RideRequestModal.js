@@ -14,7 +14,6 @@ const RideRequestModal = ({ visible, ride, onAccept, onDecline, onTimeout }) => 
     const [slideAnim] = useState(new Animated.Value(-200));
     const timerRef = React.useRef(null);
 
-    // Slide in/out animation
     useEffect(() => {
         if (visible) {
             Animated.spring(slideAnim, {
@@ -32,7 +31,6 @@ const RideRequestModal = ({ visible, ride, onAccept, onDecline, onTimeout }) => 
         }
     }, [visible]);
 
-    // Countdown timer
     useEffect(() => {
         if (!visible) {
             setCountdown(TIMEOUT_SECONDS);
@@ -63,7 +61,6 @@ const RideRequestModal = ({ visible, ride, onAccept, onDecline, onTimeout }) => 
         };
     }, [visible, ride?.rideId]);
 
-    // Pulse animation + haptic for last 5 seconds
     useEffect(() => {
         if (visible && countdown <= 5 && countdown > 0) {
             Animated.sequence([
@@ -74,7 +71,6 @@ const RideRequestModal = ({ visible, ride, onAccept, onDecline, onTimeout }) => 
         }
     }, [countdown, visible]);
 
-    // Haptic on appear
     useEffect(() => {
         if (visible) {
             Vibration.vibrate([0, 200, 100, 200]);
@@ -112,7 +108,7 @@ const RideRequestModal = ({ visible, ride, onAccept, onDecline, onTimeout }) => 
 
     return (
         <Animated.View style={[styles.card, { transform: [{ translateY: slideAnim }] }]}>
-            {/* Top row: icon + title + timer */}
+            {}
             <View style={styles.topRow}>
                 <View style={styles.titleRow}>
                     <Ionicons name="notifications" size={18} color={colors.primaryBlue} />
@@ -128,7 +124,7 @@ const RideRequestModal = ({ visible, ride, onAccept, onDecline, onTimeout }) => 
                 </Animated.Text>
             </View>
 
-            {/* Route */}
+            {}
             <View style={styles.routeRow}>
                 <View style={styles.routeStop}>
                     <Ionicons name="location" size={14} color="#4caf50" />
@@ -141,7 +137,7 @@ const RideRequestModal = ({ visible, ride, onAccept, onDecline, onTimeout }) => 
                 </View>
             </View>
 
-            {/* Earnings + buttons */}
+            {}
             <View style={styles.bottomRow}>
                 <View style={styles.earningsBlock}>
                     <Text style={styles.earningsLabel}>Your earnings</Text>

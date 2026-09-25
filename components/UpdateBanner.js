@@ -4,12 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { colors } from "../constants/styling";
 import { checkAndFetchUpdate, applyFetchedUpdate } from "../helpers/otaUpdates";
 
-// expo-updates checks for and downloads a new update on every cold start on
-// its own — this banner is only about the case where the app is already
-// open and a fix is fetched mid-session, so it doesn't just sit applied-but-
-// invisible until whenever the user next force-closes the app. Mirrors
-// NetworkBanner's always-mounted, renders-nothing-until-relevant pattern.
-const RECHECK_INTERVAL_MS = 30 * 60 * 1000; // don't hammer the update server every foreground
+const RECHECK_INTERVAL_MS = 30 * 60 * 1000;
 
 const UpdateBanner = () => {
 	const [updateReady, setUpdateReady] = useState(false);

@@ -11,7 +11,7 @@ import {
 
 configureReanimatedLogger({
 	level: ReanimatedLogLevel.warn,
-	strict: true, // Reanimated runs in strict mode by default
+	strict: true,
 });
 
 const { width, height } = Dimensions.get('window');
@@ -19,13 +19,10 @@ const { width, height } = Dimensions.get('window');
 const OnBoarding = ({ navigation }) => {
 	const [currentIndex, setCurrentIndex] = useState(0);
 	const slideRef = useRef(null);
-	// function for detecting the current page and updating indicator Bar
 	const scrollFunction = (e) => {
-		// console.log(e.nativeEvent.contentOffset.x);
 		const contentOffsetX = e.nativeEvent.contentOffset.x;
 		setCurrentIndex(Math.round(contentOffsetX / width));
 	};
-	//Next button function
 	const NextPage = () => {
 		const nextSlide = currentIndex + 1;
 		if (nextSlide < OnBoard.length) {

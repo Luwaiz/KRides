@@ -1,6 +1,5 @@
 import React from "react";
 import { createDrawerNavigator } from "@react-navigation/drawer";
-// use the driver-specific drawer component we added
 import DriverStack from "./DriverStack";
 import DriverDrawerComponent from "../components/DriverDrawerComponent";
 

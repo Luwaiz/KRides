@@ -7,7 +7,6 @@ import Indicator from "./Indicator";
 import { OnBoard } from "../constants/OnBoardData";
 
 const Footer = ({ currentIndex, NextPage, SkipPage, navigateToHome,setCurrentIndex }) => {
-	// footer of the on boarding page
 	return (
 		<View style={styles.container}>
 			<ActiveButton

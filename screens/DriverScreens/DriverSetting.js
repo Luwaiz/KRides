@@ -22,11 +22,6 @@ const DriverSettings = ({ navigation }) => {
 	}));
 	const [modalTitle, setModalTitle] = useState("");
 
-	// A plain synchronous subscription — the previous version wrapped this in
-	// an async function and called it without forwarding its return value, so
-	// React never saw the unsubscribe as a cleanup function and the listener
-	// was never torn down (leaking on unmount, and never re-pointing at a new
-	// driver's doc if a different account logged in without a full remount).
 	useEffect(() => {
 		if (!uid) return;
 
@@ -140,7 +135,6 @@ const styles = StyleSheet.create({
 	},
 	name: {
 		fontSize: 35,
-		// fontWeight:"bold",
 		fontFamily: "Albert-SemiBold",
 		maxWidth: "70%",
 	},

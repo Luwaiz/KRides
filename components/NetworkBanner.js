@@ -3,16 +3,9 @@ import { View, Text, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Network from "expo-network";
 
-// The app previously had no way to distinguish "offline" from a generic
-// error — a dropped connection surfaced as a raw fetch/Firestore error with
-// no actionable guidance. This renders a persistent banner whenever the
-// device has no usable connection, across every screen.
 const NetworkBanner = () => {
 	const networkState = Network.useNetworkState();
 
-	// isInternetReachable can be undefined briefly while the OS is still
-	// determining state — only show the banner once we're confident there's
-	// no connection, not during that initial undefined window.
 	const isOffline =
 		networkState.isConnected === false ||
 		networkState.isInternetReachable === false;

@@ -1,15 +1,3 @@
-/**
- * Marks one or more rides as manually paid out, after you've actually sent
- * the driver their money (Flutterwave dashboard, bank app, etc). This is
- * what keeps a settled ride off scripts/list-pending-payouts.js and out of
- * the automatic retry sweep for good — skipping this step for a ride you've
- * already paid risks it being paid again once PAYOUT_MODE=automatic.
- *
- * Run from the notification-server directory, where FIREBASE_ADMIN_SDK is
- * already available as an environment variable (e.g. Render's Shell tab):
- *
- *   node scripts/mark-payout-paid.js <rideId> [rideId2 ...]
- */
 const admin = require('firebase-admin');
 
 const rideIds = process.argv.slice(2);
@@ -60,9 +48,6 @@ async function main() {
         });
         console.log(`✅ ${rideId}: marked paid (₦${Number(ride.payoutAmount) || 0})`);
 
-        // Keep drivers/{id}.totalPaidOut (the admin panel's "Paid Total")
-        // accurate even when payouts are settled from this script instead
-        // of the admin UI's "Mark Paid" button.
         if (ride.driverId) {
             const amount = Number(ride.payoutAmount) || 0;
             paidByDriver.set(ride.driverId, (paidByDriver.get(ride.driverId) || 0) + amount);

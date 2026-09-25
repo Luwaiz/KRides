@@ -20,7 +20,6 @@ class ErrorBoundary extends React.Component {
       errorInfo: errorInfo
     });
 
-    // Show alert in production
     if (!__DEV__) {
       Alert.alert(
         'App Error',
