@@ -2,7 +2,6 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import React from "react";
 import { colors } from "../../constants/styling";
 
-// Inactive button component
 const InActiveButton = ({title,onPress}) => {
 	return (
 		<TouchableOpacity onPress={onPress} activeOpacity={0.5}>

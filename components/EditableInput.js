@@ -40,7 +40,6 @@ const EditableInput = ({
 	const togglePasswordVisibility = () => {
 		setPasswordVisible(!passwordVisible);
 	};
-	// text input component
 
 	return (
 		<View style={styles.container}>

@@ -1,7 +1,3 @@
-// Inline copy of assets/svg/Logos.svg from the main app (the blue wordmark
-// variant — WhiteLogo.svg's fill only shows up on a dark background, which
-// the sidebar isn't). Inlined rather than imported as a file so it scales
-// crisply with no extra network request.
 export default function Logo({ className }) {
     return (
         <svg className={className} viewBox="0 0 301 100" fill="none" xmlns="http://www.w3.org/2000/svg">

@@ -85,7 +85,7 @@ const WhereTo = ({ disabled = false }) => {
 				</View>
 			</View>
 
-			{/* Pickup Location Picker */}
+			{}
 			<LocationPicker
 				visible={showPickupPicker}
 				onClose={() => setShowPickupPicker(false)}
@@ -94,7 +94,7 @@ const WhereTo = ({ disabled = false }) => {
 				showPopularOnly={false}
 			/>
 
-			{/* Destination Picker */}
+			{}
 			<LocationPicker
 				visible={showDestinationPicker}
 				onClose={() => setShowDestinationPicker(false)}

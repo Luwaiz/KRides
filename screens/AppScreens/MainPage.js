@@ -30,7 +30,6 @@ const MainPage = () => {
 	const [completedRideData, setCompletedRideData] = useState(null);
 	const mapRef = useRef(null);
 
-	// Consolidated store subscriptions — one subscription per store
 	const { isPassengers, confirm, setConfirmPage, setHomePage } = useBottomTabStore(
 		useShallow((state) => ({
 			isPassengers: state.passengerPage,
@@ -60,7 +59,6 @@ const MainPage = () => {
 		useShallow((state) => ({ pickup: state.pickupLocation, destination: state.destination }))
 	);
 
-	// Stable coordinate objects — prevent MapViewDirections from re-fetching on unrelated renders
 	const pickupCoords = useMemo(() => {
 		if (!pickup) return null;
 		const p = pickup.coord || pickup;
@@ -87,8 +85,8 @@ const MainPage = () => {
 			longitudeDelta: 0.01,
 		}
 		: {
-			latitude: 6.8935, // Babcock's central latitude
-			longitude: 3.723, // Babcock's central longitude
+			latitude: 6.8935,
+			longitude: 3.723,
 			latitudeDelta: 0.01,
 			longitudeDelta: 0.01,
 		};
@@ -151,9 +149,6 @@ const MainPage = () => {
 		getLocationN();
 	}, []);
 
-	// Register for push notifications. notificationManager also clears any
-	// stale token left behind by a previous account on this device before
-	// writing this user's token — see helpers/notificationManager.js.
 	useEffect(() => {
 		if (!UserId) return;
 		notificationManager.initialize(UserId, 'customer').catch((error) => {
@@ -168,14 +163,11 @@ const MainPage = () => {
 		});
 	}, [UserId]);
 
-	// Track whether we've already shown the notification-failure warning for
-	// the current ride (ref so it doesn't trigger re-renders)
 	const notificationWarningShown = useRef(false);
 	const arrivalToastShown = useRef(false);
 	const directionsErrorShown = useRef(false);
 	const [pendingRatingData, setPendingRatingData] = useState(null);
 
-	// On mount, check if the customer deferred a rating from a previous session
 	useEffect(() => {
 		getNextPendingRating().then((data) => {
 			if (data?.rideId && data?.driverId) {
@@ -185,25 +177,21 @@ const MainPage = () => {
 		});
 	}, []);
 
-	// On mount, retry any refunds that previously failed or are still pending
 	useEffect(() => {
 		if (!UserId) return;
 		checkPendingRefunds(UserId).catch(() => {});
 	}, [UserId]);
 
-	// Reset per-ride flags whenever the active ride changes
 	useEffect(() => {
 		notificationWarningShown.current = false;
 		arrivalToastShown.current = false;
 	}, [activeRide?.rideId]);
 
-	// Listen for ride updates when there's an active ride
 	useEffect(() => {
 		if (!activeRide?.rideId) return;
 
 		const unsubscribe = listenToRide(activeRide.rideId, (rideData) => {
 			if (rideData) {
-				// Surface a warning if the driver notification failed on booking
 				if (
 					rideData.status === 'pending' &&
 					rideData.notificationFailed &&
@@ -219,10 +207,8 @@ const MainPage = () => {
 					});
 				}
 
-				// Update active ride store status
 				useActiveRideStore.getState().updateRideStatus(rideData.status);
 
-				// If driver accepts ride
 				if (rideData.status === "accepted" && rideData.driverName) {
 					useActiveRideStore.getState().updateDriverInfo(
 						rideData.driverName,
@@ -232,7 +218,6 @@ const MainPage = () => {
 					);
 				}
 
-				// Check if driver has arrived
 				if (rideData.hasArrived !== undefined) {
 					useActiveRideStore.getState().updateArrivalStatus(rideData.hasArrived);
 					if (rideData.hasArrived && !arrivalToastShown.current) {
@@ -247,7 +232,6 @@ const MainPage = () => {
 					}
 				}
 
-				// If ride is completed - show rating modal
 				if (rideData.status === "completed" && !rideData.customerRating) {
 					setHomePage();
 					setCompletedRideData({
@@ -265,7 +249,6 @@ const MainPage = () => {
 					useRideDetailsStore.getState().resetRideDetails();
 				}
 
-				// If ride is cancelled
 				if (rideData.status === "cancelled") {
 					setHomePage();
 					clearActiveRide();
@@ -288,10 +271,6 @@ const MainPage = () => {
 		return () => unsubscribe();
 	}, [activeRide?.rideId]);
 
-	// Track the assigned driver's live position once a ride is accepted. The
-	// driver app only grants read access on driver_locations while this rider
-	// is the one it's currently tracking for (see firestore.rules), so this
-	// listener naturally stops receiving updates once the ride ends.
 	const [driverLocation, setDriverLocation] = useState(null);
 	useEffect(() => {
 		const driverId = activeRide?.driverId;
@@ -316,8 +295,6 @@ const MainPage = () => {
 				}
 			},
 			(error) => {
-				// permission-denied is expected right after the ride ends, once the
-				// driver clears activeRideCustomerId — not worth logging loudly.
 				if (error.code !== 'permission-denied') {
 					console.warn('⚠️ Driver location listener error:', error.message);
 				}
@@ -328,14 +305,11 @@ const MainPage = () => {
 		return unsubscribe;
 	}, [activeRide?.driverId, rideStatus]);
 
-	// Stale beyond ~2 minutes — the driver may have lost connectivity. Hide the
-	// marker rather than leave a frozen pin that looks like it's up to date.
 	const DRIVER_LOCATION_STALE_MS = 2 * 60 * 1000;
 	const driverLocationIsFresh = driverLocation?.updatedAt
 		? (Date.now() - driverLocation.updatedAt) < DRIVER_LOCATION_STALE_MS
 		: false;
 
-	// Fit map once the map is ready and coordinates are available
 	useEffect(() => {
 		if (mapReady && pickupCoords && destCoords && mapRef.current) {
 			mapRef.current.fitToCoordinates(
@@ -345,7 +319,6 @@ const MainPage = () => {
 		}
 	}, [mapReady, pickupCoords, destCoords]);
 
-	// Handle cancel ride from status bar
 	const handleCancelRide = async () => {
 		if (!activeRide) return;
 
@@ -362,9 +335,6 @@ const MainPage = () => {
 					onPress: async () => {
 						setCancelling(true);
 						try {
-							// Re-fetch live ride state instead of trusting rideStatus/
-							// activeRide from the closure — a driver may have accepted
-							// while this confirmation dialog was open.
 							const rideSnapshot = await getRide(activeRide.rideId);
 
 							const result = await cancelRideWithRefund(
@@ -373,7 +343,6 @@ const MainPage = () => {
 								'Customer cancelled the ride'
 							);
 
-							// Notify driver if ride was accepted
 							if (rideSnapshot?.driverId) {
 								await notifyDriverRideCancelled(
 									rideSnapshot.driverId,
@@ -433,7 +402,6 @@ const MainPage = () => {
 		);
 	};
 
-	// Handle view details from status bar
 	const handleViewDetails = () => {
 		setConfirmPage();
 	};
@@ -520,7 +488,7 @@ const MainPage = () => {
 				)}
 			</MapView>
 
-			{/* Ride Status Bar - shown when ride is active */}
+			{}
 			{activeRide && (
 				<RideStatusBar
 					status={rideStatus}
@@ -533,10 +501,10 @@ const MainPage = () => {
 				/>
 			)}
 
-			{/* Bottom Sheet */}
+			{}
 			{BottomSheetComponents}
 
-			{/* Rating Modal — shown after ride completion or on re-open for deferred ratings */}
+			{}
 			{showRatingModal && (completedRideData || pendingRatingData) && (() => {
 				const data = completedRideData || pendingRatingData;
 				const isReminder = !completedRideData && !!pendingRatingData;
@@ -551,8 +519,6 @@ const MainPage = () => {
 							setPendingRatingData(null);
 							if (!isReminder) setHomePage();
 
-							// Chain to the next deferred rating, if any — skip the one
-							// just shown in case it was re-deferred rather than resolved.
 							getNextPendingRating().then((next) => {
 								if (next && next.rideId !== justShownRideId) {
 									setPendingRatingData(next);

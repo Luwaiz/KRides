@@ -69,13 +69,10 @@ const Login = ({ navigation }) => {
 			if (result && result.user) {
 				console.log('✅ Google Sign-In successful:', result.user.email);
 
-				// Handle user creation in Firestore
 				const { data: profile } = await Firebase.handleGoogleSignIn(result.user, result.googleUser, 'customer');
 
-				// Manually update store to ensure Navigation sees us as a customer immediately
 				setAuthData(result.user, profile, 'customer');
 
-				// Navigation handled automatically by Navigation.js
 				Toast.show({
 					type: "tomatoToast",
 					text1: "Welcome!",

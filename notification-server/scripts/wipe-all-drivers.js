@@ -1,24 +1,3 @@
-/**
- * DESTRUCTIVE — for resetting to a clean slate before real driver signups
- * begin. Deletes every driver's Firebase Auth account (permanent, cannot
- * be undone), their drivers/{uid} Firestore doc, and their
- * driver_locations/{uid} doc.
- *
- * Does NOT touch rides, payouts, refunds, or driverReports — those already
- * have driver name/phone/email copied onto them, so they stay readable as
- * historical record even after the driver account is gone, and wiping
- * financial/business history is a separate decision this script won't make
- * as a side effect.
- *
- * Dry-run by default — lists every driver that would be deleted without
- * touching anything. Pass --confirm to actually delete.
- *
- * Run from the notification-server directory, where FIREBASE_ADMIN_SDK is
- * already available as an environment variable (e.g. Render's Shell tab):
- *
- *   node scripts/wipe-all-drivers.js            # dry run — just lists
- *   node scripts/wipe-all-drivers.js --confirm  # actually deletes
- */
 const admin = require('firebase-admin');
 
 const confirmed = process.argv.includes('--confirm');
@@ -67,7 +46,6 @@ async function main() {
 
     const uids = snap.docs.map((doc) => doc.id);
 
-    // Firebase Auth allows up to 1000 UIDs per deleteUsers() call.
     const chunks = [];
     for (let i = 0; i < uids.length; i += 1000) chunks.push(uids.slice(i, i + 1000));
 
@@ -82,8 +60,6 @@ async function main() {
         }
     }
 
-    // bulkWriter().delete() on a doc that doesn't exist (e.g. a driver with
-    // no driver_locations doc yet) is a silent no-op, not an error.
     const bulkWriter = db.bulkWriter();
     for (const uid of uids) {
         bulkWriter.delete(db.collection('drivers').doc(uid));

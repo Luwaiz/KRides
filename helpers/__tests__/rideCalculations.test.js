@@ -34,7 +34,7 @@ describe('Ride Calculations', () => {
 
     describe('calculateEstimatedTime', () => {
         it('should calculate time for given distance', () => {
-            const distance = 10; // km
+            const distance = 10;
 
             const time = calculateEstimatedTime(distance);
 
@@ -43,7 +43,7 @@ describe('Ride Calculations', () => {
         });
 
         it('should return minimum 2 minutes for short distances', () => {
-            const distance = 0.1; // km
+            const distance = 0.1;
 
             const time = calculateEstimatedTime(distance);
 
@@ -96,30 +96,24 @@ describe('Ride Calculations', () => {
     });
 
     describe('calculateFare', () => {
-        // These expectations must match PRICING_DEFAULTS in
-        // constants/pricingState.js (base fare 200/passenger, platform fee
-        // 100 under the group threshold, 150 at/above it — 3 passengers).
-        // calculateFare() now reads from that config; the values themselves
-        // are editable from admin-web's Pricing page, but the *default*
-        // stays what this test checks.
         it('should calculate fare for 1 passenger', () => {
             const fare = calculateFare(5, 1);
-            expect(fare).toBe(300); // 200 + 100
+            expect(fare).toBe(300);
         });
 
         it('should calculate fare for 2 passengers', () => {
             const fare = calculateFare(5, 2);
-            expect(fare).toBe(500); // 400 + 100
+            expect(fare).toBe(500);
         });
 
         it('should calculate fare for 3+ passengers', () => {
             const fare = calculateFare(5, 3);
-            expect(fare).toBe(750); // 600 + 150
+            expect(fare).toBe(750);
         });
 
         it('should calculate fare for 4 passengers', () => {
             const fare = calculateFare(5, 4);
-            expect(fare).toBe(950); // 800 + 150
+            expect(fare).toBe(950);
         });
     });
 });

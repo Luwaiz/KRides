@@ -1,7 +1,3 @@
-/**
- * hooks/Firebase.js
- * Firebase helpers compatible with firebaseConfig.js setup (Web SDK + React Native)
- */
 
 import {
 	getAuth,
@@ -29,9 +25,7 @@ import { NOTIFICATION_API_KEY } from "@env";
 
 const NOTIFICATION_SERVER = 'https://krides.onrender.com';
 
-/** ---------- AUTH ---------- **/
 
-// Sign in with email/password
 export async function signInWithEmail(email, password) {
 	const credential = await signInWithEmailAndPassword(
 		FIREBASE_AUTH,
@@ -41,7 +35,6 @@ export async function signInWithEmail(email, password) {
 	return credential.user;
 }
 
-// Sign up (for both users and drivers)
 export async function signUpWithEmail({
 	email,
 	password,
@@ -69,7 +62,6 @@ export async function signUpWithEmail({
 	const collectionName = role === "driver" ? "drivers" : "users";
 	const userRef = doc(FIREBASE_DB, collectionName, uid);
 
-	// Use 'fullname' for drivers, 'name' for customers
 	const nameField = role === "driver" ? "fullname" : "name";
 
 	const userData = {
@@ -95,15 +87,8 @@ export async function signUpWithEmail({
 		console.error("Error code:", firestoreError.code);
 		console.error("Error message:", firestoreError.message);
 
-		// The Auth account now exists but has no profile doc. Sign it back out
-		// so onAuthStateChanged (Navigation.js) doesn't pick up this session on
-		// the next check and silently fall back to a default "customer" role
-		// with a placeholder profile — leaving the user (possibly a driver
-		// applicant) stuck in the wrong app with no profile.
 		await firebaseSignOut(FIREBASE_AUTH).catch(() => {});
 
-		// Always throw so the signup screen shows an error instead of silently
-		// leaving the user in a broken state (Auth account exists, no profile).
 		if (firestoreError.code === "permission-denied") {
 			console.error("🚨 Firestore permission denied on profile creation — check security rules.");
 			throw new Error(
@@ -118,7 +103,6 @@ export async function signUpWithEmail({
 	return credential.user;
 }
 
-// Sign up driver specifically
 export async function signUpDriver({ email, phone, password, fullname, vehicle_id }) {
 	return signUpWithEmail({
 		email,
@@ -130,7 +114,6 @@ export async function signUpDriver({ email, phone, password, fullname, vehicle_i
 	});
 }
 
-/** ---------- USER DOCS ---------- **/
 
 export async function createUserDocIfMissing(uid, profile = {}) {
 	if (!uid) throw new Error("uid required");
@@ -153,7 +136,6 @@ export async function createUserDocIfMissing(uid, profile = {}) {
 	return { created: false };
 }
 
-/** ---------- FCM TOKEN MANAGEMENT ---------- **/
 
 export async function registerFcmToken(uid) {
 	if (!uid) throw new Error("uid required");
@@ -161,7 +143,6 @@ export async function registerFcmToken(uid) {
 	console.log(
 		"FCM token registration skipped - Web SDK messaging not supported in React Native"
 	);
-	// To implement: use @react-native-firebase/messaging or Expo notifications
 	return null;
 }
 
@@ -173,17 +154,14 @@ export async function unregisterFcmToken(uid) {
 	return null;
 }
 
-/** ---------- NOTIFICATION HANDLERS ---------- **/
 
 export function setupNotificationHandlers(onNotification) {
 	console.log(
 		"Notification handlers skipped - Web SDK messaging not supported in React Native"
 	);
-	// To implement: use @react-native-firebase/messaging or Expo notifications
-	return () => { }; // Return empty cleanup function
+	return () => { };
 }
 
-/** ---------- LOGOUT / AUTH CHANGE ---------- **/
 
 export async function signOut() {
 	try {
@@ -197,7 +175,6 @@ export function onAuthStateChanged(cb) {
 	return firebaseOnAuthStateChanged(FIREBASE_AUTH, cb);
 }
 
-/** ---------- PASSWORD RESET ---------- **/
 
 export async function resetPassword(email) {
 	if (!email) throw new Error("Email is required");
@@ -210,28 +187,16 @@ export async function resetPassword(email) {
 	}
 }
 
-/** ---------- DRIVER EMAIL LOOKUP ---------- **/
 
-/**
- * Get driver's email address by phone number
- * Used for driver login flow where drivers use phone numbers
- * @param {string} phone - Driver's phone number
- * @returns {Promise<string>} Driver's email address
- */
-/**
- * Normalize a Nigerian phone number to the 11-digit local format (08XXXXXXXXX).
- * Accepts: 08123456789 · +2348123456789 · 2348123456789
- */
 export function normalizeNigerianPhone(raw) {
 	const digits = String(raw).replace(/\D/g, "");
 	if (digits.startsWith("234") && digits.length === 13) {
 		return "0" + digits.slice(3);
 	}
-	// 11-digit local format (08XXXXXXXXX or 09XXXXXXXXX)
 	if (/^0[789]\d{9}$/.test(digits)) {
 		return digits;
 	}
-	return null; // unparseable — caller must handle
+	return null;
 }
 
 export async function getDriverEmailByPhone(phone) {
@@ -239,7 +204,6 @@ export async function getDriverEmailByPhone(phone) {
 
 	let response;
 	try {
-		// Include Firebase ID token so the server can rate-limit by authenticated identity.
 		const currentUser = FIREBASE_AUTH.currentUser;
 		const idToken = currentUser ? await currentUser.getIdToken().catch(() => null) : null;
 
@@ -272,16 +236,6 @@ export async function getDriverEmailByPhone(phone) {
 	return data.email;
 }
 
-/**
- * Check whether a phone number is already registered (as a customer or
- * driver) before creating a Firebase Auth account for it. Runs server-side
- * with the Admin SDK since Firestore rules can't be queried pre-auth.
- * Fails open (returns true) on network/server errors — this is a data
- * integrity nicety, not a security gate, so a flaky check shouldn't block
- * signup entirely.
- * @param {string} phone
- * @returns {Promise<boolean>} true if available (or the check itself failed)
- */
 export async function checkPhoneAvailable(phone) {
 	if (!phone) return true;
 
@@ -306,7 +260,6 @@ export async function checkPhoneAvailable(phone) {
 	}
 }
 
-/** ---------- USER DOC FETCH ---------- **/
 
 export async function getUserDoc(uid) {
 	if (!uid) {
@@ -331,16 +284,7 @@ export async function getUserDoc(uid) {
 	}
 }
 
-/** ---------- GOOGLE SIGN-IN ---------- **/
 
-/**
- * Handle Google Sign-In user creation/update
- * Creates or updates user document in Firestore after successful Google Sign-In
- * @param {object} firebaseUser - Firebase user object from signInWithCredential
- * @param {object} googleUser - Google user data from GoogleSignin
- * @param {string} role - User role ('customer' or 'driver')
- * @returns {Promise<{data: object}>} User profile data
- */
 export async function handleGoogleSignIn(firebaseUser, googleUser, role = 'customer') {
 	if (!firebaseUser || !firebaseUser.uid) {
 		throw new Error("Firebase user is required");
@@ -351,9 +295,6 @@ export async function handleGoogleSignIn(firebaseUser, googleUser, role = 'custo
 	const otherCollectionName = role === "driver" ? "users" : "drivers";
 	const userRef = doc(FIREBASE_DB, collectionName, uid);
 
-	// This Google account may already be registered under the other role
-	// (e.g. a driver tapping "Continue with Google" on the customer screen).
-	// Don't silently create a second profile in the requested role.
 	const otherRoleSnap = await getDoc(doc(FIREBASE_DB, otherCollectionName, uid));
 	if (otherRoleSnap.exists()) {
 		const err = new Error(
@@ -365,7 +306,6 @@ export async function handleGoogleSignIn(firebaseUser, googleUser, role = 'custo
 		throw err;
 	}
 
-	// Extract user data from Google profile
 	const userData = {
 		uid,
 		email: firebaseUser.email || googleUser?.email || null,
@@ -378,11 +318,9 @@ export async function handleGoogleSignIn(firebaseUser, googleUser, role = 'custo
 	};
 
 	try {
-		// Check if user document exists
 		const userSnap = await getDoc(userRef);
 
 		if (userSnap.exists()) {
-			// Update existing user
 			await updateDoc(userRef, {
 				...userData,
 				updatedAt: serverTimestamp(),
@@ -390,7 +328,6 @@ export async function handleGoogleSignIn(firebaseUser, googleUser, role = 'custo
 			console.log(`✅ Updated existing ${role} profile for ${uid}`);
 			return { data: { ...userSnap.data(), ...userData } };
 		} else {
-			// Create new user document
 			await setDoc(userRef, {
 				...userData,
 				createdAt: serverTimestamp(),

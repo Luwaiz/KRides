@@ -2,7 +2,6 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ── Helpers ──────────────────────────────────────────────────────────────
     function isAuth() {
       return request.auth != null;
     }
@@ -17,7 +16,6 @@ service cloud.firestore {
                .hasOnly(['ratings', 'totalRatings', 'ratingSum']);
     }
 
-    // Guard against oversized string fields written to ride documents.
     function rideFieldLengthsOk() {
       let d = request.resource.data;
       return (!('customerName'   in d) || (d.customerName   is string && d.customerName.size()   <= 100)) &&
@@ -26,61 +24,35 @@ service cloud.firestore {
              (!('destination'    in d) || (d.destination    is string && d.destination.size()    <= 200));
     }
 
-    // The app already hides pending rides from an unverified driver client-side,
-    // but that's just UI — this is the actual enforcement, since a client can't
-    // be trusted to police itself. Missing field reads as null, not true, so a
-    // driver doc predating this field fails safe (denied) rather than erroring.
     function hasVerifiedBankDetails() {
       return get(/databases/$(database)/documents/drivers/$(request.auth.uid))
                .data.bankDetailsVerified == true;
     }
 
-    // ── Users (customers) ─────────────────────────────────────────────────────
     match /users/{userId} {
-      // Users read and write only their own document.
-      // Push-token lookup for customers happens server-side (Admin SDK) so
-      // cross-user reads are no longer needed here.
-      // Wallet balance and virtual account fields are written server-side only
-      // (Admin SDK bypasses these rules), so no special client write rule needed.
       allow read:   if isOwner(userId);
       allow create: if isOwner(userId);
       allow update: if isOwner(userId);
       allow delete: if false;
     }
 
-    // ── Wallet transactions (customers) ──────────────────────────────────────
     match /users/{userId}/walletTransactions/{txnId} {
-      // Customer reads their own transaction history.
-      // All writes are performed server-side via Admin SDK (webhook handler).
       allow read:  if isOwner(userId);
       allow write: if false;
     }
 
-    // ── Drivers ───────────────────────────────────────────────────────────────
     match /drivers/{driverId} {
-      // Only the driver reads their own document.
-      // Phone-to-email lookup for login now runs server-side via Admin SDK
-      // (POST /api/auth/driver-email on the notification server), so the
-      // public read that was previously required here is no longer needed.
       allow read:   if isOwner(driverId);
       allow create: if isOwner(driverId);
-      // Driver updates own profile; authenticated customers write rating fields only.
       allow update: if isOwner(driverId) || (isAuth() && isRatingUpdate());
       allow delete: if false;
     }
 
-    // ── Rides ─────────────────────────────────────────────────────────────────
     match /rides/{rideId} {
-      // Create: only the customer who will own the ride, with sane field lengths.
       allow create: if isAuth()
                     && request.resource.data.customerId == request.auth.uid
                     && rideFieldLengthsOk();
 
-      // Read:
-      //   • The customer who booked the ride.
-      //   • The assigned driver.
-      //   • Any registered driver may read a pending ride to decide whether
-      //     to accept it — existence check prevents non-drivers from polling.
       allow read: if isAuth() && (
         resource.data.customerId == request.auth.uid ||
         resource.data.driverId   == request.auth.uid ||
@@ -90,13 +62,6 @@ service cloud.firestore {
         )
       );
 
-      // Update:
-      //   • Customer cancels their own ride.
-      //   • Assigned driver updates ride progress.
-      //   • Any authenticated driver with verified bank details may accept an
-      //     unassigned pending ride (sets driverId = themselves, status =
-      //     'accepted') — a driver who hasn't set up payouts can't accept.
-      //   • Any authenticated driver may add themselves to declined_by.
       allow update: if isAuth() && (
         resource.data.customerId == request.auth.uid ||
         resource.data.driverId   == request.auth.uid ||
@@ -118,58 +83,35 @@ service cloud.firestore {
         )
       );
 
-      // Only the booking customer may delete a ride.
       allow delete: if isAuth()
                     && resource.data.customerId == request.auth.uid;
     }
 
-    // ── Driver locations ──────────────────────────────────────────────────────
-    // The driver always reads/writes their own doc. A customer may also read
-    // it, but only while `activeRideCustomerId` on the doc names them — the
-    // driver app sets that field to match their accepted ride's customer and
-    // clears it when the ride ends, so a rider can never read another rider's
-    // driver-tracking data.
     match /driver_locations/{driverId} {
       allow read:  if isOwner(driverId) ||
                       (isAuth() && resource.data.activeRideCustomerId == request.auth.uid);
       allow write: if isOwner(driverId);
     }
 
-    // ── Pickup / dropoff suggestions (admin-managed) ──────────────────────────
     match /locations/{locationId} {
       allow read:  if isAuth();
       allow write: if false;
     }
 
-    // ── App config (admin-managed) ────────────────────────────────────────────
-    // Pricing (config/pricing) is read by the app to compute fares and driver
-    // earnings, and written only via the Admin SDK from admin-web's Pricing
-    // page — never directly by a client.
     match /config/{configId} {
       allow read:  if isAuth();
       allow write: if false;
     }
 
-    // ── Orphaned charges (reconciliation) ───────────────────────────────────────
-    // Written by the client when a card charge succeeds but ride creation and
-    // the automatic refund both fail. Only the charged customer may create one;
-    // reviewing/resolving these happens via the Firebase console (Admin SDK),
-    // so no client read/update/delete is allowed.
     match /orphanedCharges/{chargeId} {
       allow create: if isAuth() && request.resource.data.customerId == request.auth.uid;
       allow read, update, delete: if false;
     }
 
-    // ── Orphaned top-ups (reconciliation) ───────────────────────────────────
-    // A wallet top-up webhook that verified but failed to credit (see the
-    // catch block in POST /api/wallet/webhook). Written and read entirely
-    // server-side (Admin SDK for the write, /admin-api/orphaned-topups for
-    // review) — no client involvement at any point, unlike orphanedCharges.
     match /orphanedTopups/{topupId} {
       allow read, write: if false;
     }
 
-    // ── Catch-all: deny everything not listed above ───────────────────────────
     match /{document=**} {
       allow read, write: if false;
     }

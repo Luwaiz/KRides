@@ -1,4 +1,3 @@
-// components/DriverDrawerComponent.jsx
 import React, { useEffect, useState } from "react";
 import { StyleSheet, Text, View, TouchableOpacity, Alert } from "react-native";
 import { DrawerContentScrollView, DrawerItem } from "@react-navigation/drawer";
@@ -18,7 +17,6 @@ import { FIREBASE_AUTH, FIREBASE_DB } from "../firebaseConfig";
 import { doc, onSnapshot } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 
-// --- Drawer items list for driver (unique name) ---
 const driverDetails = [
 	{
 		icon: <AntDesign name="clockcircle" size={25} color={colors.IconGrey} />,
@@ -79,7 +77,6 @@ const DriverDrawerItem = ({ icon, title, navigateTo }) => {
 		}
 	};
 
-	// handle the confirmation modal result using Confirmation1 (assumed it calls callbacks via props or similar)
 	return (
 		<>
 			<DrawerItem
@@ -105,7 +102,6 @@ const DriverDrawerItem = ({ icon, title, navigateTo }) => {
 							Alert.alert("Logout Failed", "Failed to logout. Please try again.");
 						}
 					}
-					// Delete Account is now handled directly in Confirmation1.js
 				}}
 			/>
 		</>
@@ -113,7 +109,6 @@ const DriverDrawerItem = ({ icon, title, navigateTo }) => {
 };
 
 const DriverDrawerComponent = (props) => {
-	// DriverDrawerComponent
 
 	const navigation = useNavigation();
 	const { fullName, vehicle_id, rating } =
@@ -124,7 +119,6 @@ const DriverDrawerComponent = (props) => {
 		}));
 	const { profile } = useAuthStore();
 
-	// Keep the drawer in sync with the drivers/{uid} doc
 	useEffect(() => {
 		let uid;
 		try {
@@ -140,12 +134,10 @@ const DriverDrawerComponent = (props) => {
 			(snap) => {
 				if (!snap.exists()) return;
 				const data = snap.data();
-				// update Zustand store directly
 				const setDriverProfile = useDriverDetails.getState().setDriverProfile;
 				if (setDriverProfile) setDriverProfile(data);
 			},
 			(error) => {
-				// Silently handle permission-denied errors (happens during logout)
 				if (error.code === "permission-denied") {
 					console.log(
 						"🔒 Permission denied in DriverDrawer - user likely logged out"
@@ -211,7 +203,6 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 	},
 	avatarContainer: {
-		/* optional style */
 	},
 	name: { fontFamily: "Albert-SemiBold", fontSize: 18, marginBottom: 4 },
 	vehicleId: {

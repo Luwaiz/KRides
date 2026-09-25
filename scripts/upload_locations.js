@@ -1,8 +1,3 @@
-/**
- * Script to upload locations to Firestore
- * Run with: node scripts/upload_locations.js
- * Requires .env in the project root with FIREBASE_API_KEY and FIREBASE_APP_ID set.
- */
 
 require("dotenv").config({ path: require("path").resolve(__dirname, "../.env") });
 
@@ -24,11 +19,9 @@ const firebaseConfig = {
 	measurementId: process.env.FIREBASE_MEASUREMENT_ID || "G-GJK6Q51CPP",
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// Sample locations data
 const locations = [
 	{
 		id: "sat-building",
@@ -451,30 +444,25 @@ async function uploadLocations() {
 	}
 }
 
-// Generate search keywords for better search functionality
 function generateSearchKeywords(name) {
 	const words = name.toLowerCase().split(" ");
 	const keywords = [];
 
-	// Add full name
 	keywords.push(name.toLowerCase());
 
-	// Add individual words
 	words.forEach((word) => {
 		if (word.length > 2) {
 			keywords.push(word);
 		}
 	});
 
-	// Add partial matches (first 3+ characters)
 	words.forEach((word) => {
 		for (let i = 3; i <= word.length; i++) {
 			keywords.push(word.substring(0, i));
 		}
 	});
 
-	return [...new Set(keywords)]; // Remove duplicates
+	return [...new Set(keywords)];
 }
 
-// Run the upload
 uploadLocations();

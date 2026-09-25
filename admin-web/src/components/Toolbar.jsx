@@ -1,7 +1,5 @@
 import { SearchIcon } from './icons';
 
-// Shared search + filter row, used identically across all three pages.
-// `filter` is optional — pages without a natural filter dimension just omit it.
 export default function Toolbar({ search, onSearchChange, searchPlaceholder, filter }) {
     return (
         <div className="toolbar">

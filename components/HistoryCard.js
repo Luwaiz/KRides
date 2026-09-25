@@ -21,14 +21,12 @@ const HistoryCard = ({ history }) => {
 	const UserId = useUserDetails((state) => state?.UserId);
 	const driverUid = useDriverDetails((state) => state?.uid);
 
-	// Determine if current user is a driver
 	const isDriver = !!driverUid && !UserId;
 
 	if (!history) {
 		return null;
 	}
 
-	// Get the timestamp (completedAt or cancelledAt or createdAt as fallback)
 	const timestamp =
 		history?.completedAt || history?.cancelledAt || history?.createdAt;
 
@@ -39,7 +37,6 @@ const HistoryCard = ({ history }) => {
 		console.error("Error parsing date:", error);
 	}
 
-	// Format date and time — use explicit fallback so stale rides never show "today"
 	let dateFormat = "Unknown date";
 	let time = "—";
 
@@ -52,7 +49,6 @@ const HistoryCard = ({ history }) => {
 		}
 	}
 
-	// Determine if ride was completed or cancelled
 	const isCompleted = history?.status === "completed";
 
 	const onhold = (id) => {

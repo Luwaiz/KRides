@@ -1,5 +1,3 @@
-// Minimal stroke-style icons, no icon library — keeps the bundle small and
-// every icon the same visual weight (1.6 stroke, rounded caps/joins).
 const base = {
     width: 18,
     height: 18,

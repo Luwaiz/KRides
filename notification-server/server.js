@@ -16,17 +16,6 @@ const flutterwaveProxyAgent = FLUTTERWAVE_PROXY_URL ? new HttpsProxyAgent(FLUTTE
 async function flutterwaveRequest(url, config = {}) {
     const axiosConfig = {
         url,
-        // Every call site below inspects Flutterwave's own status/message in
-        // the response body (a carryover from when these were plain fetch()
-        // calls, which never throws on an HTTP error status) — axios's
-        // default is the opposite: it throws on any non-2xx before that body
-        // is ever reachable. Flutterwave routinely returns non-2xx for
-        // perfectly ordinary outcomes (verify_by_reference 404s until a
-        // transfer clears, a rejected transfer, an unresolvable account
-        // number), so left at axios's default this silently replaced every
-        // one of those specific, useful error messages with a generic
-        // "Request failed with status code 4xx". Accept every status here so
-        // response.data is always what the caller actually checks.
         validateStatus: () => true,
         ...config,
     };
@@ -44,27 +33,11 @@ if (FLUTTERWAVE_PROXY_URL) {
     console.log('🔒 Flutterwave outbound requests are routed through QuotaGuard');
 }
 
-// Middleware
-// The mobile app calls this over React Native's fetch, which doesn't enforce
-// browser CORS, so this permissive policy is harmless for /api. Scoped to
-// /api specifically (not global) — the cors package treats `origin: false`
-// as falsy and actually answers every preflight with Allow-Origin: *, and if
-// this ran unscoped it would run first for every /admin-api request too
-// (cors() ends OPTIONS requests itself without calling next()), pre-empting
-// the origin-allowlisted policy registered further down for /admin-api.
 app.use('/api', cors({ origin: false }));
 app.use(express.json());
 
-// API key authentication — all /api/* routes require a valid key.
-// The key is shared with the mobile app via an environment variable so it
-// never appears in source control. Set NOTIFICATION_API_KEY in your .env
-// and as an EAS Secret for production builds.
 const API_KEY = process.env.NOTIFICATION_API_KEY;
 
-// Admin web app — separate key from the mobile app's (extracting one
-// shouldn't hand out the other), separate route prefix (so it's exempt from
-// the /api middleware below), and an explicit CORS origin allowlist since,
-// unlike the mobile app, this one's a real browser.
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY;
 const ADMIN_ALLOWED_ORIGINS = (process.env.ADMIN_ALLOWED_ORIGINS || '')
     .split(',')
@@ -73,16 +46,7 @@ const ADMIN_ALLOWED_ORIGINS = (process.env.ADMIN_ALLOWED_ORIGINS || '')
 
 app.use('/admin-api', cors({
     origin: (origin, callback) => {
-        // No Origin header = non-browser caller (curl, server-to-server) — allow.
         if (!origin || ADMIN_ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
-        // Passing an Error here (rather than `callback(null, false)`) makes the
-        // cors package call next(err) instead of next() — Express then skips
-        // straight to its default error handler and returns a raw stack trace
-        // (confirmed by actually sending a disallowed-origin request). Failing
-        // "quietly" instead just omits Access-Control-Allow-Origin, which is
-        // what actually blocks a real browser — the request still reaches the
-        // real access gate below (the x-admin-key check), same as it would for
-        // any non-browser caller.
         callback(null, false);
     },
 }));
@@ -100,14 +64,10 @@ app.use('/admin-api', (req, res, next) => {
     next();
 });
 
-// 'manual' (default): driver payouts are queued for manual transfer instead
-// of calling Flutterwave's Transfers API — see the comment on it in
-// complete-ride. Set PAYOUT_MODE=automatic once IP whitelisting is sorted.
 const PAYOUT_MODE = process.env.PAYOUT_MODE || 'manual';
 console.log(`💳 Payout mode: ${PAYOUT_MODE}`);
 
 app.use('/api', (req, res, next) => {
-    // Flutterwave webhook uses its own signature verification — exempt from API key check
     if (req.path === '/wallet/webhook') return next();
 
     if (!API_KEY) {
@@ -122,15 +82,10 @@ app.use('/api', (req, res, next) => {
     next();
 });
 
-// Initialize Firebase Admin SDK
-// Load credentials from env var (JSON string) to avoid committing service account keys.
-// Set FIREBASE_ADMIN_SDK in your .env file and as a Render environment secret.
 if (!process.env.FIREBASE_ADMIN_SDK) {
     console.error('❌ FIREBASE_ADMIN_SDK environment variable is not set');
     process.exit(1);
 }
-// The value is stored as base64 to survive env var escaping issues with the
-// private key's newlines. Decode it before parsing.
 const serviceAccount = JSON.parse(
     Buffer.from(process.env.FIREBASE_ADMIN_SDK, 'base64').toString('utf8')
 );
@@ -142,24 +97,14 @@ admin.initializeApp({
 
 const db = admin.firestore();
 
-// Using Firebase Cloud Messaging (FCM) for push notifications
 console.log('✅ Firebase Admin SDK initialized for FCM notifications');
 
-/**
- * Helper function to send FCM Push Notification with retry logic
- * Uses Firebase Admin SDK instead of Expo's push service
- * @param {string} fcmToken - The FCM push token
- * @param {string} title - Notification title
- * @param {string} body - Notification body
- * @param {object} data - Optional data payload
- */
 async function sendFCMNotification(fcmToken, title, body, data = {}) {
     if (!fcmToken) {
         console.warn('No push token provided');
         return { success: false, error: 'No push token' };
     }
 
-    // Build FCM message
     const message = {
         token: fcmToken,
         notification: {
@@ -168,7 +113,6 @@ async function sendFCMNotification(fcmToken, title, body, data = {}) {
         },
         data: {
             ...data,
-            // Convert all data values to strings (FCM requirement)
             title: title,
             body: body,
         },
@@ -189,13 +133,10 @@ async function sendFCMNotification(fcmToken, title, body, data = {}) {
         },
     };
 
-    // Retry configuration
     const maxRetries = 2;
     const initialDelay = 500;
     const maxDelay = 4000;
     const backoffMultiplier = 2;
-    // If a send times out we cannot know whether FCM queued it already,
-    // so we treat timeouts as ambiguous and do NOT retry to avoid duplicates.
     const FCM_SEND_TIMEOUT_MS = 8000;
 
     const permanentErrors = [
@@ -211,8 +152,6 @@ async function sendFCMNotification(fcmToken, title, body, data = {}) {
         try {
             console.log(`📤 Sending FCM notification to ${fcmToken.substring(0, 20)}...: ${title} (attempt ${attempt + 1}/${maxRetries + 1})`);
 
-            // Race the send against a timeout. A timeout is treated as ambiguous —
-            // FCM may have already accepted the message, so we do NOT retry.
             const timeoutPromise = new Promise((_, reject) =>
                 setTimeout(() => reject(new Error('FCM_SEND_TIMEOUT')), FCM_SEND_TIMEOUT_MS)
             );
@@ -229,13 +168,11 @@ async function sendFCMNotification(fcmToken, title, body, data = {}) {
             lastError = error;
             console.log(`   ❌ FCM error:`, error.code || error.message);
 
-            // Timeout — ambiguous outcome, do not retry to prevent duplicate delivery
             if (error.message === 'FCM_SEND_TIMEOUT') {
                 console.warn('⚠️ FCM send timed out — not retrying to avoid duplicate delivery');
                 return { success: false, error: 'timeout', message: 'Send timed out; message may have been delivered' };
             }
 
-            // Permanent errors — retrying will never help
             if (permanentErrors.includes(error.code)) {
                 console.warn(`🚫 Permanent error (${error.code}), not retrying`);
                 return { success: false, error: error.code, message: error.message, permanent: true };
@@ -259,18 +196,6 @@ async function sendFCMNotification(fcmToken, title, body, data = {}) {
     };
 }
 
-/**
- * POST /api/notifications/send
- * Send a push notification to a specific user
- * 
- * Body: {
- *   userId: string,
- *   role: 'customer' | 'driver',
- *   title: string,
- *   body: string,
- *   data: object (optional)
- * }
- */
 app.post('/api/notifications/send', async (req, res) => {
     try {
         const { userId, role, title, body, data } = req.body;
@@ -282,7 +207,6 @@ app.post('/api/notifications/send', async (req, res) => {
             });
         }
 
-        // Get user's push token from Firestore
         const collectionName = role === 'driver' ? 'drivers' : 'users';
         const userDoc = await db.collection(collectionName).doc(userId).get();
 
@@ -300,7 +224,6 @@ app.post('/api/notifications/send', async (req, res) => {
             return res.json({ success: false, skipped: true, reason: 'no_push_token' });
         }
 
-        // Send notification
         const result = await sendFCMNotification(pushToken, title, body, data || {});
 
         res.json(result);
@@ -313,18 +236,6 @@ app.post('/api/notifications/send', async (req, res) => {
     }
 });
 
-/**
- * POST /api/notifications/send-bulk
- * Send notifications to multiple users
- * 
- * Body: {
- *   userIds: string[],
- *   role: 'customer' | 'driver',
- *   title: string,
- *   body: string,
- *   data: object (optional)
- * }
- */
 app.post('/api/notifications/send-bulk', async (req, res) => {
     try {
         const { userIds, role, title, body, data } = req.body;
@@ -339,7 +250,6 @@ app.post('/api/notifications/send-bulk', async (req, res) => {
         const collectionName = role === 'driver' ? 'drivers' : 'users';
         const results = [];
 
-        // Get all user tokens
         for (const userId of userIds) {
             const userDoc = await db.collection(collectionName).doc(userId).get();
 
@@ -375,17 +285,6 @@ app.post('/api/notifications/send-bulk', async (req, res) => {
     }
 });
 
-/**
- * POST /api/notifications/notify-drivers
- * Notify all drivers about a new ride
- * 
- * Body: {
- *   rideId: string,
- *   customerName: string,
- *   pickupLocation: string,
- *   destination: string
- * }
- */
 app.post('/api/notifications/notify-drivers', async (req, res) => {
     try {
         const { rideId, customerName, pickupLocation, destination } = req.body;
@@ -397,8 +296,6 @@ app.post('/api/notifications/notify-drivers', async (req, res) => {
             });
         }
 
-        // Only notify drivers who are currently online — avoids scanning the
-        // entire drivers collection on every booking.
         const driversSnapshot = await db.collection('drivers')
             .where('isOnline', '==', true)
             .limit(100)
@@ -446,16 +343,6 @@ app.post('/api/notifications/notify-drivers', async (req, res) => {
     }
 });
 
-/**
- * POST /api/notifications/ride-accepted
- * Notify customer that their ride was accepted
- * 
- * Body: {
- *   customerId: string,
- *   rideId: string,
- *   driverName: string
- * }
- */
 app.post('/api/notifications/ride-accepted', async (req, res) => {
     try {
         const { customerId, rideId, driverName } = req.body;
@@ -507,15 +394,6 @@ app.post('/api/notifications/ride-accepted', async (req, res) => {
     }
 });
 
-/**
- * POST /api/notifications/ride-completed
- * Notify customer that their ride was completed
- * 
- * Body: {
- *   customerId: string,
- *   rideId: string
- * }
- */
 app.post('/api/notifications/ride-completed', async (req, res) => {
     try {
         const { customerId, rideId } = req.body;
@@ -567,15 +445,6 @@ app.post('/api/notifications/ride-completed', async (req, res) => {
     }
 });
 
-/**
- * POST /api/notifications/notify-driver-arrived
- * Notify customer that driver has arrived at pickup location
- * 
- * Body: {
- *   customerId: string,
- *   driverName: string
- * }
- */
 app.post('/api/notifications/notify-driver-arrived', async (req, res) => {
     try {
         const { customerId, driverName } = req.body;
@@ -629,7 +498,6 @@ app.post('/api/notifications/notify-driver-arrived', async (req, res) => {
     }
 });
 
-// Submit a driver rating (customer → driver)
 app.post('/api/rides/rate', async (req, res) => {
     const decoded = await verifyFirebaseToken(req);
     if (!decoded) return res.status(401).json({ error: 'Unauthorized' });
@@ -648,10 +516,6 @@ app.post('/api/rides/rate', async (req, res) => {
         const driverRef = db.collection('drivers').doc(driverId);
         const now = new Date();
 
-        // A transaction (not a plain read + batch) so the "already rated"
-        // check and the write happen atomically — otherwise two near-
-        // simultaneous requests (double tap, client retry) can both pass the
-        // check and both commit, double-counting toward the driver's rating.
         await db.runTransaction(async (txn) => {
             const rideSnap = await txn.get(rideRef);
             if (!rideSnap.exists) {
@@ -675,8 +539,6 @@ app.post('/api/rides/rate', async (req, res) => {
                 createdAt: now,
             }];
 
-            // Cap stored history so a long-tenured driver's document can't
-            // approach Firestore's 1MB limit — keep the most recent entries.
             const RATINGS_CAP = 500;
             const cappedRatings = updatedRatings.length > RATINGS_CAP
                 ? updatedRatings.slice(updatedRatings.length - RATINGS_CAP)
@@ -700,7 +562,6 @@ app.post('/api/rides/rate', async (req, res) => {
     }
 });
 
-// Verify Firebase ID token — returns decoded token or null
 async function verifyFirebaseToken(req) {
     const auth = req.headers.authorization;
     if (!auth || !auth.startsWith('Bearer ')) return null;
@@ -711,7 +572,6 @@ async function verifyFirebaseToken(req) {
     }
 }
 
-// Process a refund via Flutterwave
 app.post('/api/payments/refund', async (req, res) => {
     const decoded = await verifyFirebaseToken(req);
     if (!decoded) return res.status(401).json({ error: 'Unauthorized' });
@@ -757,7 +617,6 @@ app.post('/api/payments/refund', async (req, res) => {
     }
 });
 
-// Check refund status
 app.get('/api/payments/refund/:refundId', async (req, res) => {
     const decoded = await verifyFirebaseToken(req);
     if (!decoded) return res.status(401).json({ error: 'Unauthorized' });
@@ -788,7 +647,6 @@ app.get('/api/payments/refund/:refundId', async (req, res) => {
     }
 });
 
-// Create Flutterwave subaccount for driver payouts
 app.post('/api/payments/create-subaccount', async (req, res) => {
     const decoded = await verifyFirebaseToken(req);
     if (!decoded) return res.status(401).json({ error: 'Unauthorized' });
@@ -805,9 +663,6 @@ app.post('/api/payments/create-subaccount', async (req, res) => {
     }
 
     try {
-        // Resolve the account number against the bank before creating a payout
-        // subaccount for it — catches a mistyped account number up front instead
-        // of silently routing future ride earnings to the wrong account.
         const resolveResult = await flutterwaveRequest('https://api.flutterwave.com/v3/accounts/resolve', {
             method: 'POST',
             headers: {
@@ -828,11 +683,6 @@ app.post('/api/payments/create-subaccount', async (req, res) => {
 
         const verifiedAccountName = resolveResult.data.account_name;
 
-        // A driver editing existing bank details should update that same
-        // Flutterwave subaccount in place rather than spawning a new one on
-        // every edit. Flutterwave's update endpoint can change account_number
-        // but not account_bank, so a genuine bank change still needs a fresh
-        // subaccount — only reuse the existing one when the bank is unchanged.
         const driverSnap = await db.collection('drivers').doc(decoded.uid).get();
         const existing = driverSnap.exists ? driverSnap.data() : null;
         const isUpdate = !!(existing?.subaccountId && existing?.bankCode === bankCode);
@@ -870,8 +720,6 @@ app.post('/api/payments/create-subaccount', async (req, res) => {
             });
 
         if (result.status === 'success') {
-            // The update endpoint's response doesn't echo subaccount_id back —
-            // fall back to the one already on file in that case.
             const subaccountId = result.data?.subaccount_id || (isUpdate ? existing.subaccountId : undefined);
             res.json({ success: true, data: { ...result.data, subaccount_id: subaccountId, verified_account_name: verifiedAccountName } });
         } else {
@@ -883,10 +731,6 @@ app.post('/api/payments/create-subaccount', async (req, res) => {
     }
 });
 
-// Accepts 08XXXXXXXXX, +234XXXXXXXXXX, 234XXXXXXXXXX — mirrors
-// hooks/Firebase.js's normalizeNigerianPhone on the mobile side. Shared by
-// every phone-keyed pre-auth endpoint (driver-email lookup, check-phone,
-// admin driver creation) so they can't drift out of sync with each other.
 function normalizeNigerianPhone(phone) {
     const digits = String(phone).replace(/\D/g, '');
     if (digits.startsWith('234') && digits.length === 13) return '0' + digits.slice(3);
@@ -894,10 +738,6 @@ function normalizeNigerianPhone(phone) {
     return null;
 }
 
-// Mirrors constants/pricingConfig.js's PRICING_DEFAULTS on the mobile app —
-// kept in sync manually since this is a separate codebase/runtime, not a
-// shared package. Both sides fall back to these if config/pricing hasn't
-// been touched yet, so nothing breaks before an admin ever visits Pricing.
 const PRICING_DEFAULTS = {
     baseFarePerPassenger: 200,
     platformFeeStandard: 100,
@@ -915,12 +755,9 @@ async function getPricingConfig() {
     return PRICING_DEFAULTS;
 }
 
-// In-memory rate limiter for /api/auth/driver-email
-// Tracks { attempts, resetAt } per normalized phone number.
-// Simple Map is sufficient for a single-instance Render deployment.
 const driverEmailRateLimit = new Map();
 const DRIVER_EMAIL_MAX_ATTEMPTS = 5;
-const DRIVER_EMAIL_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+const DRIVER_EMAIL_WINDOW_MS = 15 * 60 * 1000;
 
 function checkDriverEmailRateLimit(phone) {
     const now = Date.now();
@@ -935,12 +772,10 @@ function checkDriverEmailRateLimit(phone) {
         return { blocked: false };
     }
 
-    // New window
     driverEmailRateLimit.set(phone, { attempts: 1, resetAt: now + DRIVER_EMAIL_WINDOW_MS });
     return { blocked: false };
 }
 
-// Sweep stale entries every 30 minutes so the Map doesn't grow forever
 setInterval(() => {
     const now = Date.now();
     for (const [key, val] of driverEmailRateLimit) {
@@ -948,16 +783,6 @@ setInterval(() => {
     }
 }, 30 * 60 * 1000);
 
-/**
- * POST /api/auth/driver-email
- * Look up a driver's email by phone number.
- * Used by the driver login screen before Firebase Auth is called.
- * Runs with Admin SDK so the Firestore drivers collection can be locked to
- * owner-only reads on the client side.
- *
- * Body: { phone: string }
- * Response: { email: string }
- */
 app.post('/api/auth/driver-email', async (req, res) => {
     const { phone } = req.body;
     if (!phone || typeof phone !== 'string' || !phone.trim()) {
@@ -1002,16 +827,6 @@ app.post('/api/auth/driver-email', async (req, res) => {
     }
 });
 
-/**
- * POST /api/auth/check-phone
- * Checks whether a phone number is already registered (as a customer or
- * driver) before the client creates a Firebase Auth account for it.
- * Runs with Admin SDK so this can be checked pre-signup, before the caller
- * has any Firebase session the client-side Firestore rules could key off.
- *
- * Body: { phone: string }
- * Response: { available: boolean }
- */
 app.post('/api/auth/check-phone', async (req, res) => {
     const { phone } = req.body;
     if (!phone || typeof phone !== 'string' || !phone.trim()) {
@@ -1024,8 +839,6 @@ app.post('/api/auth/check-phone', async (req, res) => {
         return res.status(400).json({ error: 'Invalid Nigerian phone number format' });
     }
 
-    // Shares the driver-email lookup's rate limit bucket — both are
-    // phone-keyed pre-auth lookups exposed to the same abuse pattern.
     const rateCheck = checkDriverEmailRateLimit(normalized);
     if (rateCheck.blocked) {
         console.warn(`🚫 Rate limit hit for check-phone: ${normalized}`);
@@ -1048,16 +861,7 @@ app.post('/api/auth/check-phone', async (req, res) => {
     }
 });
 
-// ── Wallet ────────────────────────────────────────────────────────────────────
 
-/**
- * POST /api/wallet/create-topup-account
- * Creates a one-time Flutterwave virtual account for a specific top-up amount.
- * No BVN/NIN required (non-permanent accounts are exempt from that requirement).
- * The tx_ref encodes the userId so the webhook can credit the right wallet.
- *
- * Body: { userId, email, name, amount }
- */
 app.post('/api/wallet/create-topup-account', async (req, res) => {
     const { userId, email, name, amount } = req.body;
 
@@ -1076,7 +880,6 @@ app.post('/api/wallet/create-topup-account', async (req, res) => {
     }
 
     try {
-        // Unique ref per top-up so each transaction can be independently tracked
         const txRef = `krides_topup_${userId}_${Date.now()}`;
 
         const nameParts = (name || 'KRides User').trim().split(/\s+/);
@@ -1133,29 +936,11 @@ app.post('/api/wallet/create-topup-account', async (req, res) => {
     }
 });
 
-/**
- * POST /api/wallet/webhook
- * Receives Flutterwave transfer notifications. No API-key auth — Flutterwave
- * signs every request with a secret hash instead.
- *
- * Security model:
- *  1. Verify verif-hash header matches FLUTTERWAVE_WEBHOOK_SECRET
- *  2. Only process status==="successful" charge.completed events
- *  3. Use flwTxId as the walletTransaction doc ID — idempotent by design
- *     (a second delivery of the same webhook finds the doc already exists and exits)
- */
 app.post('/api/wallet/webhook', async (req, res) => {
-    // Respond only once we know whether this delivery needs a retry — acking
-    // 200 up front (the previous behavior) told Flutterwave "delivered" even
-    // when verification or the credit itself then failed, which meant their
-    // own retry mechanism never got a chance to recover from anything but a
-    // dropped connection. Events that can never succeed no matter how many
-    // times they're retried (bad signature, malformed/unrelated payload)
-    // still get a fast ack; only a transient failure gets a non-2xx.
     const webhookSecret = process.env.FLUTTERWAVE_WEBHOOK_SECRET;
     if (!webhookSecret) {
         console.error('❌ FLUTTERWAVE_WEBHOOK_SECRET is not set — rejecting webhook');
-        return res.sendStatus(500); // may be fixable before Flutterwave gives up retrying
+        return res.sendStatus(500);
     }
 
     const signature = req.headers['verif-hash'];
@@ -1185,13 +970,11 @@ app.post('/api/wallet/webhook', async (req, res) => {
         return res.sendStatus(200);
     }
 
-    // tx_ref format: krides_topup_{userId}_{timestamp}
     if (!txRef.startsWith('krides_topup_')) {
         console.log(`ℹ️ Ignoring unrelated tx_ref: ${txRef}`);
         return res.sendStatus(200);
     }
 
-    // Strip prefix and suffix timestamp: krides_topup_{userId}_{ts}
     const withoutPrefix = txRef.replace('krides_topup_', '');
     const lastUnder = withoutPrefix.lastIndexOf('_');
     const userId = lastUnder > 0 ? withoutPrefix.slice(0, lastUnder) : withoutPrefix;
@@ -1204,15 +987,13 @@ app.post('/api/wallet/webhook', async (req, res) => {
 
     try {
         const userRef = db.collection('users').doc(userId);
-        // Use flwTxId as doc ID — attempting to create it inside a transaction
-        // is the idempotency lock: if it already exists the transaction aborts.
         const txnRef = userRef.collection('walletTransactions').doc(flwTxId);
 
         await db.runTransaction(async (txn) => {
             const txnSnap = await txn.get(txnRef);
             if (txnSnap.exists) {
                 console.log(`ℹ️ Webhook already processed: flwTxId=${flwTxId}`);
-                return; // idempotent — do nothing
+                return;
             }
 
             const userSnap = await txn.get(userRef);
@@ -1220,12 +1001,10 @@ app.post('/api/wallet/webhook', async (req, res) => {
                 throw new Error(`User not found: ${userId}`);
             }
 
-            // Credit balance
             txn.update(userRef, {
                 walletBalance: admin.firestore.FieldValue.increment(amount),
             });
 
-            // Record the transaction
             txn.set(txnRef, {
                 userId,
                 type: 'topup',
@@ -1240,15 +1019,10 @@ app.post('/api/wallet/webhook', async (req, res) => {
 
         console.log(`✅ Wallet credited: userId=${userId} +₦${amount}`);
 
-        // Ack now that the credit is durably written — nothing after this
-        // point should block Flutterwave's view of whether delivery succeeded.
         res.sendStatus(200);
 
-        // Best-effort: clear any orphanedTopups record a previous failed
-        // attempt for this same flwTxId left behind, now that it's resolved.
         db.collection('orphanedTopups').doc(flwTxId).delete().catch(() => {});
 
-        // Non-critical: notify the student their balance updated
         try {
             const userSnap = await userRef.get();
             const fcmToken = userSnap.data()?.fcmToken;
@@ -1266,15 +1040,8 @@ app.post('/api/wallet/webhook', async (req, res) => {
 
     } catch (error) {
         console.error('❌ Webhook processing error:', error.message);
-        // Non-2xx so Flutterwave retries — the flwTxId idempotency lock makes
-        // a retry safe even if the earlier attempt partially succeeded.
         res.sendStatus(500);
 
-        // Record it for manual review in case retries never recover it (e.g.
-        // Flutterwave gives up before whatever broke gets fixed). Only
-        // reachable after verif-hash already checked out above, so userId/
-        // amount here came from a signed Flutterwave payload — safe for the
-        // admin panel to auto-credit from later (see /admin-api/orphaned-topups).
         try {
             const orphanRef = db.collection('orphanedTopups').doc(flwTxId);
             const orphanSnap = await orphanRef.get();
@@ -1295,25 +1062,6 @@ app.post('/api/wallet/webhook', async (req, res) => {
     }
 });
 
-/**
- * POST /api/wallet/verify-topup
- * Backs the Wallet screen's "I've Sent The Money" button — lets the
- * customer actively ask "did this land yet?" instead of just waiting on the
- * webhook. Verifies the ID token, confirms the tx_ref is actually this
- * user's own top-up, then asks Flutterwave directly whether that reference
- * succeeded. If it did, credits the wallet through the exact same
- * flwTxId-keyed idempotent path the webhook uses — so this is safe to call
- * any number of times, and safe even if the webhook fires around the same
- * moment (whichever gets there first wins, the other is a no-op).
- *
- * This is also the manual-recovery path for a webhook that never arrives at
- * all (dropped, secret misconfigured at the time, etc) — the orphanedTopups
- * queue only catches a webhook that arrived and then failed to process, not
- * one that never showed up. A customer tapping this button after a delay
- * covers that gap without needing a polling job.
- *
- * Body: { idToken, txRef }
- */
 app.post('/api/wallet/verify-topup', async (req, res) => {
     const { idToken, txRef } = req.body || {};
     if (!idToken || !txRef) {
@@ -1328,8 +1076,6 @@ app.post('/api/wallet/verify-topup', async (req, res) => {
         return res.status(401).json({ error: 'Invalid or expired session. Please log in again.' });
     }
 
-    // tx_ref format: krides_topup_{userId}_{timestamp} — refuse to let a user
-    // probe or credit a top-up reference that isn't their own.
     if (!txRef.startsWith(`krides_topup_${userId}_`)) {
         return res.status(403).json({ error: 'This reference does not belong to you' });
     }
@@ -1346,9 +1092,6 @@ app.post('/api/wallet/verify-topup', async (req, res) => {
         );
 
         if (verifyResult.status !== 'success' || !verifyResult.data) {
-            // Flutterwave has no completed transaction against this reference
-            // yet — most likely the transfer just hasn't been made (or hasn't
-            // cleared) rather than anything broken.
             return res.json({ success: true, credited: false, status: 'not_found' });
         }
 
@@ -1377,7 +1120,7 @@ app.post('/api/wallet/verify-topup', async (req, res) => {
             const txnSnap = await txn.get(txnRef);
             if (txnSnap.exists) {
                 alreadyCredited = true;
-                return; // webhook (or an earlier click) already handled this
+                return;
             }
 
             const userSnap = await txn.get(userRef);
@@ -1401,7 +1144,6 @@ app.post('/api/wallet/verify-topup', async (req, res) => {
 
         console.log(`✅ verify-topup credited userId=${userId} +₦${amount} (flwTxId=${flwTxId}, alreadyCredited=${alreadyCredited})`);
 
-        // Clear any orphan record now that it's resolved one way or another.
         db.collection('orphanedTopups').doc(flwTxId).delete().catch(() => {});
 
         return res.json({ success: true, credited: true, amount });
@@ -1411,16 +1153,6 @@ app.post('/api/wallet/verify-topup', async (req, res) => {
     }
 });
 
-/**
- * POST /api/wallet/pay-ride
- * Atomically deducts the fare from the student's wallet and creates the ride
- * document in a single Firestore transaction. The Firebase ID token in the
- * request body is verified server-side — the server never trusts the client's
- * self-reported userId.
- *
- * Body: { idToken, rideData: { customerName, customerPhone, pickupLocation,
- *          pickupCoords, destination, destinationCoords, numberOfPassengers, amount } }
- */
 app.post('/api/wallet/pay-ride', async (req, res) => {
     const { idToken, rideData } = req.body;
 
@@ -1453,7 +1185,6 @@ app.post('/api/wallet/pay-ride', async (req, res) => {
             const balance = userSnap.data().walletBalance || 0;
             if (balance < amount) throw new Error(`INSUFFICIENT_BALANCE:${balance}`);
 
-            // Create ride
             txn.set(rideRef, {
                 customerId: userId,
                 customerName: (rideData.customerName || 'Customer').trim(),
@@ -1475,12 +1206,10 @@ app.post('/api/wallet/pay-ride', async (req, res) => {
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
             });
 
-            // Deduct wallet balance
             txn.update(userRef, {
                 walletBalance: admin.firestore.FieldValue.increment(-amount),
             });
 
-            // Record wallet transaction
             const walletTxnRef = userRef.collection('walletTransactions').doc();
             txn.set(walletTxnRef, {
                 userId,
@@ -1515,15 +1244,6 @@ app.post('/api/wallet/pay-ride', async (req, res) => {
 });
 
 
-/**
- * POST /api/payments/complete-ride
- * Marks a ride as completed and transfers the driver's earnings to their bank account.
- * Platform keeps a flat fee on top of the driver's base-fare earnings —
- * amount set via admin-web's Pricing page (config/pricing), see
- * getPricingConfig(). No longer a fixed ₦ figure in code.
- *
- * Body: { idToken, rideId }
- */
 app.post('/api/payments/complete-ride', async (req, res) => {
     const { idToken, rideId } = req.body;
 
@@ -1531,7 +1251,6 @@ app.post('/api/payments/complete-ride', async (req, res) => {
         return res.status(400).json({ error: 'idToken and rideId are required' });
     }
 
-    // Verify driver identity
     let driverId;
     try {
         const decoded = await admin.auth().verifyIdToken(idToken);
@@ -1567,7 +1286,6 @@ app.post('/api/payments/complete-ride', async (req, res) => {
             return res.status(400).json({ error: `Cannot complete a ride with status: ${ride.status}` });
         }
 
-        // Mark ride completed
         await rideRef.update({
             status: 'completed',
             completedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -1575,15 +1293,12 @@ app.post('/api/payments/complete-ride', async (req, res) => {
 
         console.log(`✅ Ride ${rideId} marked as completed by driver ${driverId}`);
 
-        // Platform fee (the cut on top of the driver's base-fare earnings)
-        // is set from admin-web's Pricing page — see getPricingConfig().
         const totalAmount = Number(ride.amount) || 0;
         const passengers = Number(ride.numberOfPassengers) || 1;
         const pricing = await getPricingConfig();
         const platformFee = passengers >= pricing.groupThreshold ? pricing.platformFeeGroup : pricing.platformFeeStandard;
         const driverEarnings = Math.max(totalAmount - platformFee, 0);
 
-        // Only transfer if ride was paid digitally and driver has bank details
         if (totalAmount <= 0) {
             return res.json({ success: true, payout: null, reason: 'no_amount' });
         }
@@ -1593,13 +1308,6 @@ app.post('/api/payments/complete-ride', async (req, res) => {
 
         if (!driver?.bankCode || !driver?.accountNumber) {
             console.warn(`⚠️ Driver ${driverId} has no bank details — skipping payout`);
-            // Still record what's owed — without this, a ride completed before
-            // the driver added bank details had no payoutStatus at all, so the
-            // amount was invisible to every tracking mechanism (admin queue,
-            // retry sweep) forever, even after the driver later added details.
-            // Its own status (not 'failed'/'pending_manual') keeps the
-            // automatic retry sweep from calling Flutterwave with bank fields
-            // it knows are missing.
             await rideRef.update({
                 payoutStatus: 'awaiting_bank_details',
                 payoutAmount: driverEarnings,
@@ -1607,13 +1315,6 @@ app.post('/api/payments/complete-ride', async (req, res) => {
             return res.json({ success: true, payout: null, reason: 'no_bank_details' });
         }
 
-        // Flutterwave's live Transfers API currently rejects every call with
-        // an IP-whitelisting error (Render's plan has no static outbound IP
-        // yet). Rather than let every ride burn a doomed API call and sit in
-        // the automatic retry sweep, PAYOUT_MODE=manual (the default until
-        // that's fixed) skips straight to a manual queue — see
-        // scripts/list-pending-payouts.js and scripts/mark-payout-paid.js.
-        // Flip back with PAYOUT_MODE=automatic once IP whitelisting works.
         if (PAYOUT_MODE === 'manual') {
             console.log(`📝 Manual payout mode: ₦${driverEarnings} owed to driver ${driverId} for ride ${rideId}`);
             await rideRef.update({
@@ -1627,7 +1328,6 @@ app.post('/api/payments/complete-ride', async (req, res) => {
             });
         }
 
-        // Initiate Flutterwave transfer
         const reference = `krides_payout_${rideId}`;
         console.log(`💸 Transferring ₦${driverEarnings} to driver ${driverId} (${driver.accountNumber})`);
 
@@ -1635,7 +1335,6 @@ app.post('/api/payments/complete-ride', async (req, res) => {
             await transferToDriver(driver, driverEarnings, reference, `KRides ride payment - ${rideId.slice(0, 8)}`);
             console.log(`✅ Payout initiated for driver ${driverId}: ₦${driverEarnings}`);
 
-            // Record the payout on the ride document
             await rideRef.update({
                 payoutStatus: 'initiated',
                 payoutAmount: driverEarnings,
@@ -1649,7 +1348,6 @@ app.post('/api/payments/complete-ride', async (req, res) => {
         } catch (transferError) {
             console.error(`❌ Payout failed for driver ${driverId}:`, transferError.message);
             await rideRef.update({ payoutStatus: 'failed', payoutAmount: driverEarnings, payoutError: transferError.message });
-            // Ride is still completed — payout failure is non-blocking
             return res.json({
                 success: true,
                 payout: null,
@@ -1664,11 +1362,6 @@ app.post('/api/payments/complete-ride', async (req, res) => {
     }
 });
 
-/**
- * Executes a Flutterwave transfer to a driver's bank account. Throws with
- * Flutterwave's own message on any non-success status so callers can treat
- * "transfer rejected" and "network/parse error" the same way.
- */
 async function transferToDriver(driver, amount, reference, narration) {
     const secretKey = process.env.FLUTTERWAVE_SECRET_KEY;
     const result = await flutterwaveRequest('https://api.flutterwave.com/v3/transfers', {
@@ -1692,11 +1385,6 @@ async function transferToDriver(driver, amount, reference, narration) {
     return result;
 }
 
-/**
- * POST /api/payments/wallet-refund
- * Credits a cancelled wallet-paid ride back to the customer's wallet.
- * Body: { idToken, rideId }
- */
 app.post('/api/payments/wallet-refund', async (req, res) => {
     const { idToken, rideId } = req.body;
 
@@ -1730,12 +1418,10 @@ app.post('/api/payments/wallet-refund', async (req, res) => {
             return res.status(400).json({ error: 'This ride was not paid via wallet' });
         }
 
-        // Eligible if cancellation is in progress (refundProcessing=true) or ride is already cancelled
         if (ride.refundProcessing !== true && ride.status !== 'cancelled') {
             return res.status(400).json({ error: `Cannot refund ride with status: ${ride.status}` });
         }
 
-        // Idempotency — return success immediately if already refunded
         if (ride.walletRefunded === true) {
             return res.json({ success: true, alreadyRefunded: true });
         }
@@ -1750,9 +1436,6 @@ app.post('/api/payments/wallet-refund', async (req, res) => {
         let refundedAmount = amount;
 
         await db.runTransaction(async (txn) => {
-            // Re-read the ride *inside* the transaction so Firestore serializes
-            // concurrent refund attempts against it, instead of both racing past
-            // the walletRefunded check made outside the transaction above.
             const rideTxnSnap = await txn.get(rideRef);
             if (!rideTxnSnap.exists) throw new Error('Ride not found');
 
@@ -1779,7 +1462,6 @@ app.post('/api/payments/wallet-refund', async (req, res) => {
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
             });
 
-            // Idempotency guard — prevent a second refund if this endpoint is called twice
             txn.update(rideRef, { walletRefunded: true });
         });
 
@@ -1796,11 +1478,6 @@ app.post('/api/payments/wallet-refund', async (req, res) => {
     }
 });
 
-/**
- * POST /api/reports/driver
- * Customer reports a driver. Saves to Firestore and emails admin.
- * Body: { idToken, rideId, reason, description }
- */
 app.post('/api/reports/driver', async (req, res) => {
     const { idToken, rideId, reason, description } = req.body;
 
@@ -1817,7 +1494,6 @@ app.post('/api/reports/driver', async (req, res) => {
     }
 
     try {
-        // Read ride
         const rideSnap = await db.collection('rides').doc(rideId).get();
         if (!rideSnap.exists) return res.status(404).json({ error: 'Ride not found' });
         const ride = rideSnap.data();
@@ -1829,7 +1505,6 @@ app.post('/api/reports/driver', async (req, res) => {
             return res.status(400).json({ error: 'No driver on this ride' });
         }
 
-        // Idempotency — one report per customer per ride
         const existing = await db.collection('driverReports')
             .where('customerId', '==', customerId)
             .where('rideId', '==', rideId)
@@ -1839,7 +1514,6 @@ app.post('/api/reports/driver', async (req, res) => {
             return res.json({ success: true, alreadyReported: true });
         }
 
-        // Read driver and customer info for the email
         const [driverSnap, customerSnap] = await Promise.all([
             db.collection('drivers').doc(ride.driverId).get(),
             db.collection('users').doc(customerId).get(),
@@ -1855,7 +1529,6 @@ app.post('/api/reports/driver', async (req, res) => {
             ? ride.destination?.name || ride.destination?.address || 'Unknown'
             : ride.destination || 'Unknown';
 
-        // Save report to Firestore
         await db.collection('driverReports').add({
             customerId,
             customerName: customer.firstName ? `${customer.firstName} ${customer.lastName || ''}`.trim() : 'Unknown',
@@ -1904,14 +1577,8 @@ app.post('/api/reports/driver', async (req, res) => {
     }
 });
 
-/**
- * Auto-cancel pending rides nobody accepts in time.
- * Without this, a ride the customer paid for but that no driver accepted —
- * e.g. because the customer closed the app — sits at status 'pending'
- * indefinitely with the charge never resolved.
- */
-const PENDING_RIDE_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
-const PENDING_RIDE_SWEEP_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
+const PENDING_RIDE_TIMEOUT_MS = 10 * 60 * 1000;
+const PENDING_RIDE_SWEEP_INTERVAL_MS = 2 * 60 * 1000;
 
 async function refundFlutterwaveTransaction(transactionId, amount, comments) {
     const secretKey = process.env.FLUTTERWAVE_SECRET_KEY;
@@ -1939,8 +1606,6 @@ async function refundFlutterwaveTransaction(transactionId, amount, comments) {
 
 async function refundWalletForRide(rideRef, customerId, amount, description) {
     await db.runTransaction(async (txn) => {
-        // Re-read the ride inside the transaction (same fix as /wallet-refund)
-        // so this can never double-credit a ride refunded through another path.
         const rideTxnSnap = await txn.get(rideRef);
         if (!rideTxnSnap.exists || rideTxnSnap.data().walletRefunded === true) return;
 
@@ -1981,8 +1646,6 @@ async function sweepStalePendingRides() {
             const rideRef = rideDoc.ref;
             const ride = rideDoc.data();
 
-            // Atomically claim the ride so a driver accepting, or the customer
-            // cancelling, at the same moment wins the race instead of us.
             let claimed = false;
             try {
                 await db.runTransaction(async (txn) => {
@@ -2021,8 +1684,6 @@ async function sweepStalePendingRides() {
                     await rideRef.update({ refundStatus: 'completed', refundedAt: admin.firestore.FieldValue.serverTimestamp() });
                     refunded = true;
                 } else if (amount > 0 && ride.paymentMethod === 'flutterwave' && !ride.transactionId) {
-                    // Paid by card but the transaction ID was never recorded — the
-                    // same "needs manual review" flag used elsewhere for this gap.
                     await rideRef.update({
                         refundStatus: 'needs_review',
                         needsManualRefundReview: true,
@@ -2044,7 +1705,6 @@ async function sweepStalePendingRides() {
                     : 'no refund needed';
             console.log(`✅ Auto-cancelled stale pending ride ${rideDoc.id} (${refundLabel})`);
 
-            // Best-effort push notification — a failure here shouldn't block the sweep
             try {
                 if (ride.customerId) {
                     const customerSnap = await db.collection('users').doc(ride.customerId).get();
@@ -2078,24 +1738,9 @@ async function sweepStalePendingRides() {
 
 setInterval(sweepStalePendingRides, PENDING_RIDE_SWEEP_INTERVAL_MS);
 
-/**
- * Retry refunds that previously failed to confirm.
- * A ride that lands on refundStatus/walletRefundStatus 'failed' has no
- * refundId to poll (unlike a 'pending' Flutterwave refund, which
- * checkPendingRefunds on the client re-checks) — the failure happened before
- * we ever got a confirmed refund back, often from a transient issue (a
- * network blip, Flutterwave briefly returning an error page instead of
- * JSON). The safe move is to retry the refund attempt itself: Flutterwave
- * rejects refunding an already-refunded transaction rather than double
- * refunding, and refundWalletForRide's own transaction checks the
- * `walletRefunded` flag before crediting, so a retry can never double-pay a
- * refund that actually went through despite our side failing to confirm it.
- * Capped at a few attempts — after that it's flagged for manual review
- * instead of retrying forever against a persistent problem.
- */
 const REFUND_RETRY_MAX_ATTEMPTS = 3;
-const REFUND_RETRY_SWEEP_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
-const REFUND_RETRY_MIN_AGE_MS = 5 * 60 * 1000; // let transient blips clear first
+const REFUND_RETRY_SWEEP_INTERVAL_MS = 10 * 60 * 1000;
+const REFUND_RETRY_MIN_AGE_MS = 5 * 60 * 1000;
 
 async function retryFlutterwaveRefund(rideDoc) {
     const rideRef = rideDoc.ref;
@@ -2112,16 +1757,6 @@ async function retryFlutterwaveRefund(rideDoc) {
     }
 
     if (attempts >= REFUND_RETRY_MAX_ATTEMPTS) {
-        // Move off refundStatus:'failed' once given up on, or this same ride
-        // matches the sweep's query and gets "found" again on every future
-        // run forever, even though nothing further happens to it. Not
-        // gated on `!ride.needsManualRefundReview` — a ride already flagged
-        // from before this fix existed still has refundStatus:'failed' and
-        // needs this write to actually happen at least once to escape the
-        // loop; repeating it after that is harmless (idempotent), and it
-        // won't be fetched again either way once refundStatus changes. The
-        // admin review queue keys off needsManualRefundReview, not
-        // refundStatus, so this doesn't affect its visibility there.
         await rideRef.update({
             refundStatus: 'needs_review',
             needsManualRefundReview: true,
@@ -2154,10 +1789,6 @@ async function retryWalletRefund(rideDoc) {
     const attempts = ride.walletRefundRetryCount || 0;
 
     if (attempts >= REFUND_RETRY_MAX_ATTEMPTS) {
-        // Same reasoning as the card-refund branch above: move off
-        // walletRefundStatus:'failed' once given up on (unconditionally —
-        // see that comment for why it's not gated on needsManualRefundReview),
-        // so this ride stops matching the sweep's query forever.
         await rideRef.update({
             walletRefundStatus: 'needs_review',
             needsManualRefundReview: true,
@@ -2219,18 +1850,9 @@ async function retryFailedRefunds() {
 
 setInterval(retryFailedRefunds, REFUND_RETRY_SWEEP_INTERVAL_MS);
 
-/**
- * Retry driver payouts that previously failed (e.g. Flutterwave rejecting
- * the transfer outright — IP whitelisting, insufficient balance, etc).
- * Safe to retry with a fresh reference each time: transferToDriver only
- * ever marks a ride 'failed' when Flutterwave's synchronous response
- * confirms the transfer was rejected, never on an ambiguous timeout, so a
- * retry can't collide with a transfer that actually went through.
- * Capped at a few attempts — after that it's flagged for manual review.
- */
 const PAYOUT_RETRY_MAX_ATTEMPTS = 3;
-const PAYOUT_RETRY_SWEEP_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
-const PAYOUT_RETRY_MIN_AGE_MS = 5 * 60 * 1000; // let transient blips clear first
+const PAYOUT_RETRY_SWEEP_INTERVAL_MS = 10 * 60 * 1000;
+const PAYOUT_RETRY_MIN_AGE_MS = 5 * 60 * 1000;
 
 async function retryFailedPayout(rideDoc) {
     const rideRef = rideDoc.ref;
@@ -2238,11 +1860,6 @@ async function retryFailedPayout(rideDoc) {
     const attempts = ride.payoutRetryCount || 0;
 
     if (attempts >= PAYOUT_RETRY_MAX_ATTEMPTS) {
-        // Same class of bug as the refund sweeps above (see the comment
-        // there): move off payoutStatus:'failed' once given up on, or this
-        // ride matches this query forever. Unconditional (not gated on
-        // needsManualPayoutReview) so a ride already flagged from before
-        // this fix still escapes the loop on its next sweep.
         await rideRef.update({
             payoutStatus: 'needs_review',
             needsManualPayoutReview: true,
@@ -2266,9 +1883,6 @@ async function retryFailedPayout(rideDoc) {
 
     try {
         console.log(`🔁 Retrying payout for ride ${rideDoc.id} (attempt ${attempts + 1}/${PAYOUT_RETRY_MAX_ATTEMPTS})`);
-        // Flutterwave references must be unique per attempt — the original
-        // reference was already submitted (and rejected), so reusing it
-        // would itself get rejected as a duplicate.
         const reference = `krides_payout_${rideDoc.id}_retry${attempts + 1}`;
         await transferToDriver(driver, ride.payoutAmount, reference, `KRides ride payment - ${rideDoc.id.slice(0, 8)}`);
         await rideRef.update({
@@ -2288,9 +1902,6 @@ async function retryFailedPayout(rideDoc) {
 }
 
 async function retryFailedPayouts() {
-    // In manual mode, retrying through the API is pointless — it's the same
-    // call that's already known to fail. Ride's payoutStatus stays 'failed'
-    // (or whatever it already is) until picked up by the manual queue.
     if (PAYOUT_MODE === 'manual') return;
 
     try {
@@ -2316,10 +1927,6 @@ async function retryFailedPayouts() {
 
 setInterval(retryFailedPayouts, PAYOUT_RETRY_SWEEP_INTERVAL_MS);
 
-// ── Admin web app API ────────────────────────────────────────────────────
-// Backs the separately-hosted admin-web app (Vercel/Netlify). Auth and CORS
-// are handled by the /admin-api middleware registered near the top of this
-// file — everything below just assumes a valid request got through.
 
 app.post('/admin-api/login', (req, res) => {
     const { password } = req.body || {};
@@ -2329,31 +1936,14 @@ app.post('/admin-api/login', (req, res) => {
     res.json({ success: true });
 });
 
-// A ride marked paid stays visible on the payouts page (just badged/dimmed
-// on the frontend) instead of disappearing the instant it's settled — but
-// showing literally every paid ride a driver has ever had would make this
-// query grow unbounded forever. Cap "recently paid" to this window; older
-// settled rides still count in paidTotal (that's a running counter on the
-// driver doc, not derived from this list), they just drop off the visible
-// history after a month.
-const PAYOUTS_PAID_HISTORY_WINDOW_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const PAYOUTS_PAID_HISTORY_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
-// GET /admin-api/payouts/overview
-// Every driver — not just ones currently owed money — each with what's
-// pending now ("To Be Paid"), their all-time paid total ("Paid Total"), and
-// a combined recent ride list (owed + recently-settled) so the admin panel
-// can give each driver their own persistent tab instead of one flat list
-// that only shows whoever happens to have something pending right now.
 app.get('/admin-api/payouts/overview', async (req, res) => {
     try {
         const paidSince = admin.firestore.Timestamp.fromMillis(Date.now() - PAYOUTS_PAID_HISTORY_WINDOW_MS);
 
         const [owedSnap, paidSnap, driversSnap] = await Promise.all([
             db.collection('rides')
-                // 'needs_review' = the automatic-retry sweep gave up after
-                // PAYOUT_RETRY_MAX_ATTEMPTS — still owed, still needs a human
-                // to pay it, same as 'failed'; it just stops the sweep from
-                // rediscovering it every 10 minutes forever (see retryFailedPayout).
                 .where('payoutStatus', 'in', ['pending_manual', 'failed', 'awaiting_bank_details', 'needs_review'])
                 .get(),
             db.collection('rides')
@@ -2363,9 +1953,6 @@ app.get('/admin-api/payouts/overview', async (req, res) => {
             db.collection('drivers').limit(1000).get(),
         ]);
 
-        // pickupLocation/destination are strings on older rides, {name,
-        // address,...} objects on newer ones (see the same normalization
-        // in components/HistoryCard.js on the mobile side).
         const placeName = (place) =>
             typeof place === 'object' && place ? (place.name || place.address || null) : (place || null);
 
@@ -2426,8 +2013,6 @@ app.get('/admin-api/payouts/overview', async (req, res) => {
             };
         });
 
-        // A driver with rides owed but no drivers/{id} doc (shouldn't
-        // happen, but the old endpoint tolerated it) still needs to show up.
         for (const [driverId, rides] of ridesByDriver) {
             if (drivers.some((d) => d.driverId === driverId)) continue;
             const owedRides = owedByDriver.get(driverId) || [];
@@ -2443,7 +2028,6 @@ app.get('/admin-api/payouts/overview', async (req, res) => {
             });
         }
 
-        // Drivers owing money first (most owed first), then everyone else.
         drivers.sort((a, b) => b.toBePaid - a.toBePaid);
 
         res.json({ success: true, drivers });
@@ -2453,11 +2037,6 @@ app.get('/admin-api/payouts/overview', async (req, res) => {
     }
 });
 
-// POST /admin-api/payouts/mark-paid — body: { rideIds: string[] }
-// Marks each ride paid, then rolls its amount into that driver's running
-// totalPaidOut — the number "Paid Total" reads from. A ride that's already
-// paid_manually is skipped rather than re-counted, so a stale click or a
-// retried request never inflates totalPaidOut twice for the same ride.
 app.post('/admin-api/payouts/mark-paid', async (req, res) => {
     const { rideIds } = req.body || {};
     if (!Array.isArray(rideIds) || rideIds.length === 0) {
@@ -2511,7 +2090,6 @@ app.post('/admin-api/payouts/mark-paid', async (req, res) => {
     res.json({ success: true, results });
 });
 
-// GET /admin-api/refunds/review — rides flagged needsManualRefundReview
 app.get('/admin-api/refunds/review', async (req, res) => {
     try {
         const snap = await db.collection('rides')
@@ -2540,7 +2118,6 @@ app.get('/admin-api/refunds/review', async (req, res) => {
     }
 });
 
-// POST /admin-api/refunds/resolve — body: { rideId, note }
 app.post('/admin-api/refunds/resolve', async (req, res) => {
     const { rideId, note } = req.body || {};
     if (!rideId) return res.status(400).json({ error: 'rideId is required' });
@@ -2557,12 +2134,6 @@ app.post('/admin-api/refunds/resolve', async (req, res) => {
             refundReviewNote: note || null,
         };
 
-        // retryFailedRefunds's sweep queries on refundStatus/walletRefundStatus
-        // == 'failed', not on needsManualRefundReview — clearing only the flag
-        // would leave a 'failed' status in place, and the very next sweep
-        // (retryRefundCount already maxed out) immediately re-sets the flag,
-        // undoing this resolve within 10 minutes. Bump the status field itself
-        // to a terminal value so the sweep's query excludes it for good.
         if (['failed', 'needs_review'].includes(ride.refundStatus)) {
             updates.refundStatus = 'resolved_manually';
         }
@@ -2578,7 +2149,6 @@ app.post('/admin-api/refunds/resolve', async (req, res) => {
     }
 });
 
-// GET /admin-api/orphaned-charges — unresolved orphanedCharges docs
 app.get('/admin-api/orphaned-charges', async (req, res) => {
     try {
         const snap = await db.collection('orphanedCharges')
@@ -2605,7 +2175,6 @@ app.get('/admin-api/orphaned-charges', async (req, res) => {
     }
 });
 
-// POST /admin-api/orphaned-charges/resolve — body: { chargeId, note }
 app.post('/admin-api/orphaned-charges/resolve', async (req, res) => {
     const { chargeId, note } = req.body || {};
     if (!chargeId) return res.status(400).json({ error: 'chargeId is required' });
@@ -2623,9 +2192,6 @@ app.post('/admin-api/orphaned-charges/resolve', async (req, res) => {
     }
 });
 
-// GET /admin-api/orphaned-topups — unresolved orphanedTopups docs (a wallet
-// top-up webhook that verified but failed to credit — see the catch block
-// in POST /api/wallet/webhook)
 app.get('/admin-api/orphaned-topups', async (req, res) => {
     try {
         const snap = await db.collection('orphanedTopups')
@@ -2654,11 +2220,6 @@ app.get('/admin-api/orphaned-topups', async (req, res) => {
     }
 });
 
-// POST /admin-api/orphaned-topups/credit — body: { topupId }
-// Runs the same credit the webhook would have and marks the record
-// resolved. Safe to click more than once: it reuses the flwTxId-keyed
-// idempotency lock in walletTransactions, so a retry (webhook or admin)
-// that already landed is a no-op instead of a double credit.
 app.post('/admin-api/orphaned-topups/credit', async (req, res) => {
     const { topupId } = req.body || {};
     if (!topupId) return res.status(400).json({ error: 'topupId is required' });
@@ -2681,7 +2242,7 @@ app.post('/admin-api/orphaned-topups/credit', async (req, res) => {
 
         await db.runTransaction(async (txn) => {
             const txnSnap = await txn.get(txnRef);
-            if (txnSnap.exists) return; // already credited (e.g. a delayed webhook retry beat this click) — no-op
+            if (txnSnap.exists) return;
 
             const userSnap = await txn.get(userRef);
             if (!userSnap.exists) throw new Error(`User not found: ${orphan.userId}`);
@@ -2713,11 +2274,6 @@ app.post('/admin-api/orphaned-topups/credit', async (req, res) => {
     }
 });
 
-// POST /admin-api/orphaned-topups/resolve — body: { topupId, note }
-// Marks resolved without crediting — for records with no parseable userId,
-// or ones the admin has already fixed some other way (e.g. directly via
-// scripts/test-fund-wallet.js after confirming the transfer in Flutterwave's
-// dashboard).
 app.post('/admin-api/orphaned-topups/resolve', async (req, res) => {
     const { topupId, note } = req.body || {};
     if (!topupId) return res.status(400).json({ error: 'topupId is required' });
@@ -2735,11 +2291,6 @@ app.post('/admin-api/orphaned-topups/resolve', async (req, res) => {
     }
 });
 
-// GET /admin-api/reports — driver complaints from POST /api/reports/driver
-// (see driverReports collection there for the exact schema being read here).
-// Reports predating the resolved/open workflow have no `status` field at
-// all, which reads as 'open' — same fail-safe-to-visible approach as the
-// other review queues.
 app.get('/admin-api/reports', async (req, res) => {
     try {
         const snap = await db.collection('driverReports')
@@ -2778,7 +2329,6 @@ app.get('/admin-api/reports', async (req, res) => {
     }
 });
 
-// POST /admin-api/reports/resolve — body: { reportId, note }
 app.post('/admin-api/reports/resolve', async (req, res) => {
     const { reportId, note } = req.body || {};
     if (!reportId) return res.status(400).json({ error: 'reportId is required' });
@@ -2796,9 +2346,6 @@ app.post('/admin-api/reports/resolve', async (req, res) => {
     }
 });
 
-// POST /admin-api/reports/reopen — body: { reportId }
-// For when a report was marked resolved too early — puts it back in the
-// open queue without losing the earlier resolution note.
 app.post('/admin-api/reports/reopen', async (req, res) => {
     const { reportId } = req.body || {};
     if (!reportId) return res.status(400).json({ error: 'reportId is required' });
@@ -2814,19 +2361,11 @@ app.post('/admin-api/reports/reopen', async (req, res) => {
     }
 });
 
-// Generates a fresh password-reset link and emails it to the driver — the
-// only way into an admin-created account, since nobody (including the
-// admin) ever sees or sets the account's actual password. Shared by
-// drivers/create (right after account creation) and
-// drivers/resend-welcome-email (if that first send failed, or the driver
-// says they never got it).
 async function sendDriverSetPasswordEmail(driverName, driverEmail) {
     const resetLink = await admin.auth().generatePasswordResetLink(driverEmail);
     return sendDriverWelcomeEmail({ driverName, driverEmail, resetLink });
 }
 
-// GET /admin-api/pricing — current pricing config (or defaults, if
-// config/pricing has never been written).
 app.get('/admin-api/pricing', async (req, res) => {
     try {
         const pricing = await getPricingConfig();
@@ -2837,11 +2376,6 @@ app.get('/admin-api/pricing', async (req, res) => {
     }
 });
 
-// POST /admin-api/pricing/update — body: { baseFarePerPassenger,
-// platformFeeStandard, platformFeeGroup, groupThreshold }
-// Takes effect immediately for every ride booked/completed after this —
-// the mobile app has a live listener on config/pricing (see
-// constants/pricingConfig.js) and complete-ride reads it fresh on every call.
 app.post('/admin-api/pricing/update', async (req, res) => {
     const { baseFarePerPassenger, platformFeeStandard, platformFeeGroup, groupThreshold } = req.body || {};
 
@@ -2874,12 +2408,8 @@ app.post('/admin-api/pricing/update', async (req, res) => {
     }
 });
 
-// GET /admin-api/drivers — every driver, self-registered or admin-created.
 app.get('/admin-api/drivers', async (req, res) => {
     try {
-        // Not .orderBy('createdAt') — that silently drops any doc missing
-        // the field entirely, which older driver docs (predating that
-        // field) could well be. Sort in JS instead so nothing vanishes.
         const snap = await db.collection('drivers').limit(1000).get();
 
         const drivers = snap.docs.map((doc) => {
@@ -2906,14 +2436,6 @@ app.get('/admin-api/drivers', async (req, res) => {
     }
 });
 
-// POST /admin-api/drivers/create — body: { fullName, phone, email, vehicleId }
-// Creates a driver account the same way self-signup does (same
-// drivers/{uid} schema as hooks/Firebase.js's signUpWithEmail) but from the
-// admin side — for drivers onboarded in person, over the phone, etc. The
-// account gets a random password nobody ever sees; the driver sets their
-// own via the emailed reset link, then logs in through the normal driver
-// login screen (phone number, looked up to the real email server-side)
-// exactly like anyone who signed up themselves.
 app.post('/admin-api/drivers/create', async (req, res) => {
     const { fullName, phone, email, vehicleId } = req.body || {};
 
@@ -2930,9 +2452,6 @@ app.post('/admin-api/drivers/create', async (req, res) => {
     }
 
     try {
-        // Auth enforces email uniqueness itself (caught below); phone isn't
-        // the Auth identifier here, so it needs its own check across both
-        // collections, same as /api/auth/check-phone does pre-signup.
         const [usersSnap, driversSnap] = await Promise.all([
             db.collection('users').where('phone', '==', normalizedPhone).limit(1).get(),
             db.collection('drivers').where('phone', '==', normalizedPhone).limit(1).get(),
@@ -2983,7 +2502,6 @@ app.post('/admin-api/drivers/create', async (req, res) => {
     }
 });
 
-// POST /admin-api/drivers/resend-welcome-email — body: { driverId }
 app.post('/admin-api/drivers/resend-welcome-email', async (req, res) => {
     const { driverId } = req.body || {};
     if (!driverId) return res.status(400).json({ error: 'driverId is required' });
@@ -3006,12 +2524,10 @@ app.post('/admin-api/drivers/resend-welcome-email', async (req, res) => {
     }
 });
 
-// Health check endpoint
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', service: 'KRides Notification Server' });
 });
 
-// Start server
 app.listen(PORT, () => {
     console.log(`🚀 Notification server running on port ${PORT}`);
     console.log(`📡 Health check: http://localhost:${PORT}/health`);

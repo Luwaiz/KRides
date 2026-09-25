@@ -1,20 +1,3 @@
-/**
- * Manual-payout queue: lists every ride whose driver hasn't been paid yet
- * (payoutStatus 'pending_manual', the normal state while PAYOUT_MODE=manual,
- * plus legacy 'failed' rides left over from before that switch), grouped by
- * driver with their bank details, so you can pay each driver in one transfer
- * via the Flutterwave dashboard (or your bank app) instead of per-ride.
- *
- * Run from the notification-server directory, where FIREBASE_ADMIN_SDK is
- * already available as an environment variable (e.g. Render's Shell tab):
- *
- *   node scripts/list-pending-payouts.js
- *
- * After paying a driver, mark their rides settled so they drop off this
- * list and never get paid twice:
- *
- *   node scripts/mark-payout-paid.js <rideId> [rideId2 ...]
- */
 const admin = require('firebase-admin');
 
 if (!process.env.FIREBASE_ADMIN_SDK) {
@@ -43,18 +26,14 @@ async function main() {
         process.exit(0);
     }
 
-    // pickupLocation/destination are strings on older rides, {name,
-    // address,...} objects on newer ones (see the same normalization in
-    // components/HistoryCard.js on the mobile side).
     const placeName = (place) =>
         typeof place === 'object' && place ? (place.name || place.address || null) : (place || null);
 
-    // Group by driver
     const byDriver = new Map();
     for (const doc of snap.docs) {
         const ride = doc.data();
         const driverId = ride.driverId;
-        if (!driverId) continue; // shouldn't happen, but don't crash on bad data
+        if (!driverId) continue;
 
         if (!byDriver.has(driverId)) byDriver.set(driverId, []);
         byDriver.get(driverId).push({

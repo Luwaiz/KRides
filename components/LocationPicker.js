@@ -58,7 +58,6 @@ const LocationPicker = ({
 				...doc.data(),
 			}));
 
-			// Sort by name
 			locationsData.sort((a, b) => a.name.localeCompare(b.name));
 
 			setLocations(locationsData);
@@ -69,7 +68,6 @@ const LocationPicker = ({
 			console.error("Error fetching locations:", error);
 			setLoading(false);
 
-			// Show specific error message to user
 			if (error.code === 'permission-denied') {
 				Alert.alert(
 					'Permission Error',
@@ -106,19 +104,15 @@ const LocationPicker = ({
 
 		const query = searchQuery.toLowerCase().trim();
 		const filtered = locations.filter((location) => {
-			// Search in name
 			if (location.name.toLowerCase().includes(query)) {
 				return true;
 			}
-			// Search in address
 			if (location.address?.toLowerCase().includes(query)) {
 				return true;
 			}
-			// Search in category
 			if (location.category?.toLowerCase().includes(query)) {
 				return true;
 			}
-			// Search in keywords
 			if (location.searchKeywords?.some((keyword) => keyword.includes(query))) {
 				return true;
 			}
@@ -195,7 +189,7 @@ const LocationPicker = ({
 			onRequestClose={onClose}
 		>
 			<View style={styles.container}>
-				{/* Header */}
+				{}
 				<View style={styles.header}>
 					<TouchableOpacity onPress={onClose} style={styles.backButton}>
 						<AntDesign name="arrowleft" size={24} color="black" />
@@ -204,7 +198,7 @@ const LocationPicker = ({
 					<View style={{ width: 24 }} />
 				</View>
 
-				{/* Search Bar */}
+				{}
 				<View style={styles.searchContainer}>
 					<Ionicons name="search" size={20} color={colors.lightGrey} />
 					<TextInput
@@ -226,14 +220,14 @@ const LocationPicker = ({
 					)}
 				</View>
 
-				{/* Popular Locations (shown when no search) */}
+				{}
 				{!searchQuery && popularLocations.length > 0 && (
 					<View style={styles.popularSection}>
 						<Text style={styles.sectionTitle}>Popular Locations</Text>
 					</View>
 				)}
 
-				{/* Locations List */}
+				{}
 				{loading ? (
 					<View style={styles.loadingContainer}>
 						<ActivityIndicator size="large" color={colors.primaryBlue} />
@@ -273,7 +267,6 @@ const styles = StyleSheet.create({
 		paddingVertical: 16,
 		borderBottomWidth: 1,
 		borderBottomColor: colors.lightGrey2,
-		// paddingTop: 50,
 	},
 	backButton: {
 		padding: 4,

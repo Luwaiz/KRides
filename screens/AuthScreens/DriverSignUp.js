@@ -26,18 +26,15 @@ const DriverSignup = ({ navigation }) => {
 	}));
 
 	const isPhoneValid = (phone) => {
-		// Accept 11-digit local format or international +234 format
 		const phoneRegex = /^\+?\d{7,15}$/;
 		return phoneRegex.test(phone.replace(/\s/g, ""));
 	};
 
 	const isNameValid = (name) => {
-		// Name should be at least 2 characters
 		return name && name.trim().length >= 2;
 	};
 
 	const isVehicleIdValid = (vehicleId) => {
-		// Vehicle ID should not be empty
 		return vehicleId && vehicleId.trim().length > 0;
 	};
 
@@ -64,7 +61,6 @@ const DriverSignup = ({ navigation }) => {
 			return false;
 		}
 
-		// Validate full name
 		if (!isNameValid(fullName)) {
 			Alert.alert(
 				"Oops! Invalid Name",
@@ -73,7 +69,6 @@ const DriverSignup = ({ navigation }) => {
 			return false;
 		}
 
-		// Validate vehicle ID
 		if (!isVehicleIdValid(vehicle_id)) {
 			Alert.alert(
 				"Oops! Invalid Vehicle ID",
@@ -82,7 +77,6 @@ const DriverSignup = ({ navigation }) => {
 			return false;
 		}
 
-		// Validate phone number
 		if (!isPhoneValid(phone)) {
 			Alert.alert(
 				"Oops! Invalid Phone Number",
@@ -91,7 +85,6 @@ const DriverSignup = ({ navigation }) => {
 			return false;
 		}
 
-		// Validate email
 		if (!isEmailValid(email)) {
 			Alert.alert(
 				"Oops! Invalid Email",
@@ -100,7 +93,6 @@ const DriverSignup = ({ navigation }) => {
 			return false;
 		}
 
-		// Validate password strength
 		if (!isPasswordValid(password)) {
 			Alert.alert(
 				"Weak Password",
@@ -136,9 +128,6 @@ const DriverSignup = ({ navigation }) => {
 				return;
 			}
 
-			// Set pending_role BEFORE auth fires so Navigation.js routes as driver
-			// even if the Firestore driver doc hasn't been written yet.
-			// Include expiry so a crash mid-signup doesn't permanently misroute logins.
 			await AsyncStorage.setItem('pending_role', JSON.stringify({ role: 'driver', expiresAt: Date.now() + 5 * 60 * 1000 }));
 
 			const user = await Firebase.signUpDriver({
@@ -158,8 +147,6 @@ const DriverSignup = ({ navigation }) => {
 			try {
 				await Firebase.registerFcmToken(user.uid);
 			} catch (fcmError) {
-				// Don't fail signup if FCM registration fails — the account and
-				// Firestore doc are already committed at this point.
 				console.warn("⚠️ FCM token registration failed:", fcmError);
 			}
 
@@ -168,7 +155,6 @@ const DriverSignup = ({ navigation }) => {
 		} catch (error) {
 			console.error("❌ Driver signup error:", error.code, error.message);
 			setLoading(false);
-			// Clear pending_role so a failed signup doesn't misroute the next login attempt
 			await AsyncStorage.removeItem('pending_role').catch(() => {});
 			if (error.code === "auth/email-already-in-use") {
 				Alert.alert("Already Registered", "An account with this email already exists. Please login instead.");
@@ -280,6 +266,5 @@ const styles = StyleSheet.create({
 		borderTopLeftRadius: 30,
 		borderTopRightRadius: 30,
 		flex: 1,
-		// minHeight: 500, // Ensure minimum height to cover screen
 	},
 });

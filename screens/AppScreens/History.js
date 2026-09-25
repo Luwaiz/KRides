@@ -50,9 +50,6 @@ const History = () => {
 		}
 	};
 
-	// Older rides beyond the first page — previously there was no way to
-	// reach them at all once a rider/driver passed the fixed single-page
-	// fetch, so they'd silently vanish from history with no indication.
 	const loadMoreHistory = async () => {
 		if (!userId || !hasMore || loadingMore) return;
 
@@ -71,17 +68,12 @@ const History = () => {
 		}
 	};
 
-	// Re-fetch the first page every time this screen regains focus (not just
-	// on mount) — otherwise a ride completed while this screen stayed mounted
-	// further down the stack wouldn't show up until something else forced a
-	// remount.
 	useFocusEffect(
 		useCallback(() => {
 			getHistory();
 		}, [userId, isDriver])
 	);
 
-	// Reset day selection when month or year changes
 	useEffect(() => {
 		setSelectedDay(null);
 	}, [selectedMonth, selectedYear]);
@@ -114,7 +106,7 @@ const History = () => {
 		<SafeAreaView style={styles.container}>
 			<BackButton text={<Text style={styles.headText}>Ride history</Text>} />
 
-			{/* Year selector */}
+			{}
 			<View style={styles.yearRow}>
 				<TouchableOpacity onPress={() => setSelectedYear((y) => y - 1)} style={styles.arrowBtn}>
 					<Ionicons name="chevron-back" size={22} color={colors.primaryBlue} />
@@ -133,7 +125,7 @@ const History = () => {
 				</TouchableOpacity>
 			</View>
 
-			{/* Month pills */}
+			{}
 			<ScrollView
 				horizontal
 				showsHorizontalScrollIndicator={false}
@@ -159,7 +151,7 @@ const History = () => {
 				})}
 			</ScrollView>
 
-			{/* Day picker */}
+			{}
 			<ScrollView
 				horizontal
 				showsHorizontalScrollIndicator={false}

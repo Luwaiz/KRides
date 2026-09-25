@@ -41,8 +41,8 @@ const ConfirmRide = () => {
 	const [rideId, setRideId] = useState(null);
 	const [acceptedDriverName, setAcceptedDriverName] = useState("");
 	const [showRatingModal, setShowRatingModal] = useState(false);
-	const [walletBalance, setWalletBalance] = useState(null); // null = not yet loaded
-	const [paymentMethod, setPaymentMethod] = useState('flutterwave'); // 'flutterwave' | 'wallet'
+	const [walletBalance, setWalletBalance] = useState(null);
+	const [paymentMethod, setPaymentMethod] = useState('flutterwave');
 	const bookingInFlight = useRef(false);
 	const navigation = useNavigation();
 	const activeRide = useActiveRideStore((state) => state.activeRide);
@@ -89,7 +89,6 @@ const ConfirmRide = () => {
 		return calculateFare(dist, parseInt(numberOfPassenger));
 	}, [pickupLocation, destinationCoords, numberOfPassenger]);
 
-	// Real-time wallet balance — updates the moment a top-up webhook fires
 	useEffect(() => {
 		if (!UserId) return;
 		const unsub = onSnapshot(
@@ -100,7 +99,6 @@ const ConfirmRide = () => {
 		return () => unsub();
 	}, [UserId]);
 
-	// Pay for the ride by deducting the wallet balance server-side
 	const handleWalletPay = async () => {
 		if (!UserId || bookingInFlight.current) return;
 		if (!phone) {
@@ -139,7 +137,6 @@ const ConfirmRide = () => {
 			});
 			Toast.show({ type: 'tomatoToast', text1: 'Ride Booked!', text2: 'Searching for a driver near you...', position: 'top', visibilityTime: 3000 });
 			setHomePage();
-			// Notify online drivers — fire-and-forget, same as the Flutterwave path
 			notifyDriversAboutNewRide(
 				result.rideId,
 				`${firstName || ''} ${lastName || ''}`.trim() || 'Customer',
@@ -159,12 +156,10 @@ const ConfirmRide = () => {
 		}
 	};
 
-	// ✅ Create a new ride using Firebase helper
 	const BookRide = async (transactionId = null) => {
 		setLoading(true);
 		const currentUser = FIREBASE_AUTH.currentUser;
 
-		// Validation: Check if user is logged in
 		if (!UserId) {
 			setLoading(false);
 			Toast.show({
@@ -185,7 +180,6 @@ const ConfirmRide = () => {
 			return;
 		}
 
-		// Validation: Check if Firebase Auth user matches store user
 		if (!currentUser || currentUser.uid !== UserId) {
 			setLoading(false);
 			Toast.show({
@@ -206,7 +200,6 @@ const ConfirmRide = () => {
 			return;
 		}
 
-		// Validation before booking
 		if (!pickupLocation || !destinationCoords) {
 			setLoading(false);
 			Toast.show({
@@ -229,11 +222,6 @@ const ConfirmRide = () => {
 			return;
 		}
 
-		// A missing phone number leaves the driver with no way to reach the
-		// customer — block booking instead of silently creating a ride with
-		// blank customerPhone (this is how "N/A" was showing up in driver
-		// history: mainly customers who signed up via Google, which never
-		// collects a phone number).
 		if (!phone) {
 			setLoading(false);
 			Alert.alert(
@@ -247,11 +235,9 @@ const ConfirmRide = () => {
 			return;
 		}
 
-		// Validation: Check if user profile data is loaded
 		if (!email || !firstName) {
 			console.log("⚠️ Warning: User profile data incomplete");
 			setLoading(false);
-			// Use Toast for warning too
 			Toast.show({
 				type: 'tomatoToast',
 				text1: 'Profile Incomplete',
@@ -290,7 +276,6 @@ const ConfirmRide = () => {
 			setRideId(newRideId);
 
 
-			// Set active ride in store so status bar appears
 			console.log("Setting active ride in store...");
 			useActiveRideStore.getState().setActiveRide({
 				rideId: newRideId,
@@ -302,7 +287,6 @@ const ConfirmRide = () => {
 				hasArrived: false,
 			});
 
-			// Show booking confirmation toast before navigating
 			Toast.show({
 				type: "tomatoToast",
 				text1: "Ride Booked!",
@@ -311,9 +295,7 @@ const ConfirmRide = () => {
 				visibilityTime: 3000,
 			});
 
-			// Navigate to home immediately after booking
 			console.log("🏠 Navigating to home page...");
-			// Small delay before major UI change to ensure previous transitions/modals are clean
 			setTimeout(() => {
 				setHomePage();
 			}, 500);
@@ -335,9 +317,6 @@ const ConfirmRide = () => {
 				messageBody = "Please check your internet connection.";
 			}
 
-			// The card was already charged (transactionId exists) but no ride
-			// document exists to refund against — reconcile the charge instead
-			// of letting it silently disappear.
 			if (transactionId) {
 				try {
 					await processRefund(transactionId, Price, 'Ride creation failed after payment');
@@ -377,7 +356,6 @@ const ConfirmRide = () => {
 	};
 
 
-	// ❌ Cancel ride with confirmation dialog
 	const handleCancelRide = () => {
 		const cancelRideId = activeRide?.rideId || rideId;
 		if (!cancelRideId) {
@@ -385,7 +363,6 @@ const ConfirmRide = () => {
 			return;
 		}
 
-		// Show confirmation dialog
 		Alert.alert(
 			"Cancel Ride",
 			rideStatus === "accepted"
@@ -406,7 +383,6 @@ const ConfirmRide = () => {
 							const result = await cancelRideWithRefund(cancelRideId, 'customer', 'Customer cancelled ride');
 							console.log("✅ Ride cancelled successfully");
 
-							// Notify driver if one had already accepted
 							if (rideSnapshot?.driverId) {
 								notifyDriverRideCancelled(
 									rideSnapshot.driverId,
@@ -415,12 +391,10 @@ const ConfirmRide = () => {
 								).catch(() => {});
 							}
 
-							// Reset local states
 							setSelectRider(false);
 							setRideId(null);
 							setAcceptedDriverName("");
 
-							// Navigate back to home
 							setHomePage();
 
 							if (result.refundStatus === "completed") {
@@ -486,7 +460,7 @@ const ConfirmRide = () => {
 				handleComponent={null}
 			>
 				<View style={styles.bottomCont}>
-					{/* Driver section */}
+					{}
 					<View style={styles.callDriver}>
 						<Avatar width={50} height={50} />
 						<View style={styles.driverDetails}>
@@ -506,7 +480,7 @@ const ConfirmRide = () => {
 						</TouchableOpacity>
 					</View>
 
-					{/* Pickup/Destination */}
+					{}
 					<View style={styles.locationCont}>
 						<Direction width={40} height={80} />
 						<View style={styles.places}>
@@ -523,19 +497,19 @@ const ConfirmRide = () => {
 						</View>
 					</View>
 
-					{/* Payment */}
+					{}
 					<View style={styles.payment}>
 						<Naira />
 						<Text style={styles.PaymentText}>Price</Text>
 						<Text style={styles.price}>₦ {Price}</Text>
 					</View>
 
-					{/* Promo link — coming soon, shown dimmed */}
+					{}
 					<View style={[styles.promo, styles.promoDisabled]}>
 						<Text style={[styles.promoText, styles.promoTextDisabled]}>Promo codes — coming soon</Text>
 					</View>
 
-					{/* Buttons */}
+					{}
 					<View style={styles.button}>
 						{activeRide ? (
 							<View style={{ alignItems: "center", flexDirection: "row", justifyContent: "space-between", gap: 10 }}>
@@ -551,7 +525,7 @@ const ConfirmRide = () => {
 							</View>
 						) : (
 							<>
-								{/* Payment method selector */}
+								{}
 								<View style={styles.payMethodRow}>
 									<TouchableOpacity
 										onPress={() => setPaymentMethod('wallet')}
@@ -611,8 +585,7 @@ const ConfirmRide = () => {
 				</View>
 			</BottomSheet>
 
-			{/* Booking-in-progress overlay — plain View instead of Modal to avoid
-			    _presentViewController crash on iOS when Flutterwave modal is mid-dismiss */}
+			{}
 			{loading && (
 				<View style={[StyleSheet.absoluteFillObject, styles.loadingOverlay]}>
 					<View style={styles.loadingCard}>
@@ -627,7 +600,7 @@ const ConfirmRide = () => {
 					visible={showRatingModal}
 					onClose={() => {
 						setShowRatingModal(false);
-						setHomePage(); // Navigate back to home after rating
+						setHomePage();
 					}}
 					rideId={rideId}
 					driverId={activeRide?.driverId || null}

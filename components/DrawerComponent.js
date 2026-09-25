@@ -15,11 +15,6 @@ import { FIREBASE_AUTH, FIREBASE_DB } from "../firebaseConfig";
 import { signOut } from "firebase/auth";
 
 const details = [
-	// {
-	// 	icon: <AntDesign name="clockcircle" size={25} color={colors.IconGrey} />,
-	// 	title: "Ride history",
-	// 	navigateTo: "History",
-	// },
 	{
 		icon: <MaterialCommunityIcons name="wallet-outline" size={24} color={colors.IconGrey} />,
 		title: "Wallet",
@@ -96,7 +91,6 @@ const DrawerContent = (props) => {
 };
 
 const DrawerComponent = (props) => {
-	// DrawerComponent (customer)
 
 	const navigation = useNavigation();
 	const [name, setName] = useState("Loading...");
@@ -105,7 +99,6 @@ const DrawerComponent = (props) => {
 	const listenerSetup = useRef(false);
 
 	useEffect(() => {
-		// Prevent duplicate listener setup
 		if (listenerSetup.current) {
 			console.log("⚠️ Listener already set up, skipping...");
 			return;
@@ -118,7 +111,6 @@ const DrawerComponent = (props) => {
 		if (user) {
 			listenerSetup.current = true;
 
-			// Set up real-time listener for customer profile
 			const unsub = onSnapshot(
 				doc(db, "users", user.uid),
 				(docSnap) => {
@@ -135,7 +127,6 @@ const DrawerComponent = (props) => {
 					setLoading(false);
 				},
 				(error) => {
-					// Silently handle permission-denied errors (happens during logout)
 					if (error.code === "permission-denied") {
 						console.log("🔒 Permission denied - user likely logged out");
 					} else {
@@ -147,7 +138,6 @@ const DrawerComponent = (props) => {
 				}
 			);
 
-			// Cleanup listener on unmount
 			return () => {
 				listenerSetup.current = false;
 				unsub();
@@ -156,7 +146,7 @@ const DrawerComponent = (props) => {
 			setName("No User");
 			setLoading(false);
 		}
-	}, []); // Empty dependency array - only run once
+	}, []);
 
 	return (
 		<View style={{ flex: 1 }}>

@@ -5,9 +5,6 @@ import Constants from 'expo-constants';
 import { doc, updateDoc, setDoc, getDoc, deleteField } from 'firebase/firestore';
 import { FIREBASE_DB } from '../firebaseConfig';
 
-/**
- * Configure notification handler for foreground notifications
- */
 Notifications.setNotificationHandler({
     handleNotification: async () => ({
         shouldShowAlert: true,
@@ -16,9 +13,6 @@ Notifications.setNotificationHandler({
     }),
 });
 
-/**
- * Notification Manager - Centralized notification handling
- */
 class NotificationManager {
     constructor() {
         this.notificationListener = null;
@@ -26,11 +20,6 @@ class NotificationManager {
         this.currentToken = null;
     }
 
-    /**
-     * Initialize notifications for authenticated user
-     * @param {string} uid - User ID
-     * @param {string} role - User role ('customer' or 'driver')
-     */
     async initialize(uid, role) {
         if (!uid || !role) {
             console.warn('⚠️ NotificationManager: uid and role required');
@@ -40,19 +29,14 @@ class NotificationManager {
         console.log(`🔔 Initializing notifications for ${role}: ${uid}`);
 
         try {
-            // Register for push notifications and get token
             const token = await this.registerForPushNotifications();
 
             if (token) {
                 this.currentToken = token;
-                // Clear any stale token from a previous account on this device
-                // before writing the new one, so the server never routes to a
-                // token that belongs to a different user.
                 await this.clearStaleTokenIfNeeded(uid, token, role);
                 await this.saveTokenToFirestore(uid, token, role);
             }
 
-            // Set up notification listeners
             this.setupListeners();
 
         } catch (error) {
@@ -60,14 +44,9 @@ class NotificationManager {
         }
     }
 
-    /**
-     * Register for push notifications and get FCM Token
-     * @returns {Promise<string|null>} FCM Token or null if failed
-     */
     async registerForPushNotifications() {
         let token = null;
 
-        // Configure Android notification channel
         if (Platform.OS === 'android') {
             await Notifications.setNotificationChannelAsync('default', {
                 name: 'default',
@@ -94,7 +73,6 @@ class NotificationManager {
             }
 
             try {
-                // Get FCM token directly (instead of Expo push token)
                 const fcmTokenData = await Notifications.getDevicePushTokenAsync();
                 token = fcmTokenData.data;
                 console.log('✅ FCM token obtained:', token.substring(0, 30) + '...');
@@ -108,11 +86,6 @@ class NotificationManager {
         return token;
     }
 
-    /**
-     * If the Firestore doc already holds a different token, null it out first.
-     * This handles shared-device scenarios where a previous user's token would
-     * otherwise linger and receive notifications meant for this user.
-     */
     async clearStaleTokenIfNeeded(uid, newToken, role) {
         try {
             const collectionName = role === 'driver' ? 'drivers' : 'users';
@@ -125,7 +98,6 @@ class NotificationManager {
             if (existingToken && existingToken !== newToken) {
                 updates.fcmToken = null;
             }
-            // Remove legacy fcmTokens map field if present
             if (data?.fcmTokens !== undefined) {
                 updates.fcmTokens = deleteField();
             }
@@ -138,12 +110,6 @@ class NotificationManager {
         }
     }
 
-    /**
-     * Save push token to Firestore
-     * @param {string} uid - User ID
-     * @param {string} token - FCM Token
-     * @param {string} role - User role ('customer' or 'driver')
-     */
     async saveTokenToFirestore(uid, token, role) {
         if (!uid || !token) {
             console.warn('⚠️ Cannot save token: missing uid or token');
@@ -154,11 +120,9 @@ class NotificationManager {
             const collectionName = role === 'driver' ? 'drivers' : 'users';
             const userRef = doc(FIREBASE_DB, collectionName, uid);
 
-            // Check if document exists
             const userSnap = await getDoc(userRef);
 
             if (userSnap.exists()) {
-                // Skip write if token hasn't changed (idempotent registration)
                 if (userSnap.data()?.fcmToken === token) {
                     console.log(`✅ FCM token unchanged, skipping write for ${collectionName}/${uid}`);
                     return;
@@ -181,28 +145,18 @@ class NotificationManager {
         }
     }
 
-    /**
-     * Set up notification listeners
-     */
     setupListeners() {
-        // Remove existing listeners if any
         this.removeListeners();
 
-        // Listener for notifications received while app is in foreground
         this.notificationListener = Notifications.addNotificationReceivedListener(notification => {
             console.log('🔔 Notification received (foreground):', notification);
-            // You can add custom handling here (e.g., show in-app banner)
         });
 
-        // Listener for when user taps on notification
         this.responseListener = Notifications.addNotificationResponseReceivedListener(response => {
             console.log('👆 Notification tapped:', response);
             const data = response.notification.request.content.data;
 
-            // Handle notification tap based on type
             if (data?.type === 'ride_booked' || data?.type === 'ride_accepted' || data?.type === 'ride_completed') {
-                // You can navigate to specific screen here
-                // Example: navigation.navigate('RideDetails', { rideId: data.rideId });
                 console.log('Navigate to ride:', data.rideId);
             }
         });
@@ -210,9 +164,6 @@ class NotificationManager {
         console.log('✅ Notification listeners set up');
     }
 
-    /**
-     * Remove notification listeners
-     */
     removeListeners() {
         if (this.notificationListener) {
             this.notificationListener.remove();
@@ -224,15 +175,9 @@ class NotificationManager {
         }
     }
 
-    /**
-     * Clean up on logout
-     * @param {string} uid - User ID
-     * @param {string} role - User role
-     */
     async cleanup(uid, role) {
         console.log('🧹 Cleaning up notifications');
 
-        // Remove token from Firestore
         if (uid && role) {
             try {
                 const collectionName = role === 'driver' ? 'drivers' : 'users';
@@ -242,8 +187,6 @@ class NotificationManager {
                 });
                 console.log('✅ FCM token removed from Firestore');
             } catch (error) {
-                // Silently handle permission errors during logout
-                // The token will be overwritten on next login anyway
                 if (error.code === 'permission-denied') {
                     console.log('ℹ️ Could not remove push token (permission denied) - will be overwritten on next login');
                 } else {
@@ -252,19 +195,14 @@ class NotificationManager {
             }
         }
 
-        // Remove listeners
         this.removeListeners();
         this.currentToken = null;
     }
 
-    /**
-     * Get current push token
-     */
     getToken() {
         return this.currentToken;
     }
 }
 
-// Export singleton instance
 const notificationManager = new NotificationManager();
 export default notificationManager;

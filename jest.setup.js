@@ -1,9 +1,6 @@
-// Basic Jest setup for React Native testing
 
-// Mock react-native modules
 jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
 
-// Mock AsyncStorage
 jest.mock('@react-native-async-storage/async-storage', () => ({
     setItem: jest.fn(() => Promise.resolve()),
     getItem: jest.fn(() => Promise.resolve(null)),
@@ -11,7 +8,6 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
     clear: jest.fn(() => Promise.resolve()),
 }));
 
-// Mock Firebase
 jest.mock('./firebaseConfig', () => ({
     FIREBASE_AUTH: {
         currentUser: { uid: 'test-uid', email: 'test@example.com' },
@@ -20,7 +16,6 @@ jest.mock('./firebaseConfig', () => ({
     FIREBASE_STORAGE: {},
 }));
 
-// Mock firebase/auth
 jest.mock('firebase/auth', () => ({
     GoogleAuthProvider: {
         credential: jest.fn(() => ({ providerId: 'google.com' })),
@@ -30,7 +25,6 @@ jest.mock('firebase/auth', () => ({
     })),
 }));
 
-// Mock Google Sign-In
 jest.mock('@react-native-google-signin/google-signin', () => ({
     GoogleSignin: {
         configure: jest.fn(),
@@ -50,7 +44,6 @@ jest.mock('@react-native-google-signin/google-signin', () => ({
     },
 }));
 
-// Silence console warnings in tests
 global.console = {
     ...console,
     warn: jest.fn(),

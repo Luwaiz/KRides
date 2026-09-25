@@ -16,7 +16,6 @@ const TextInput1 = ({ text, placeholder, password,onChangeText,value, editable})
     const togglePasswordVisibility = () => {
         setPasswordVisible(!passwordVisible);
     };
-    // text input component
 
 	return (
 		<View style={styles.container}>

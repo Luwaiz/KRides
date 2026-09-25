@@ -1,7 +1,6 @@
 import { FIREBASE_DB } from "../firebaseConfig";
 import { NOTIFICATION_API_KEY } from "@env";
 
-// ── Validation ────────────────────────────────────────────────────────────────
 
 const VALID_STATUSES = new Set(['pending', 'accepted', 'in_progress', 'completed', 'cancelled']);
 
@@ -70,7 +69,6 @@ function validateRideData(data) {
 	return errors;
 }
 
-// ── Imports ───────────────────────────────────────────────────────────────────
 
 import {
 	collection,
@@ -96,36 +94,7 @@ import {
 	notifyCustomerRideCompleted,
 } from "./notificationHelpers";
 
-/**
- * Firestore Collections Structure:
- *
- * rides/{rideId}
- *   - id: string
- *   - customerId: string
- *   - customerName: string
- *   - customerPhone: string
- *   - pickupLocation: string (name)
- *   - pickupCoords: { latitude, longitude, address }
- *   - destination: string (name)
- *   - destinationCoords: { latitude, longitude, address }
- *   - numberOfPassengers: number
- *   - amount: number
- *   - status: 'pending' | 'accepted' | 'in_progress' | 'completed' | 'cancelled'
- *   - driverId: string | null
- *   - driverName: string | null
- *   - driverPhone: string | null
- *   - vehicleId: string | null
- *   - paymentMethod: string
- *   - createdAt: timestamp
- *   - acceptedAt: timestamp | null
- *   - completedAt: timestamp | null
- */
 
-/**
- * Create a new ride booking
- * @param {Object} rideData - Ride details
- * @returns {Promise<string>} rideId
- */
 export const createRide = async (rideData) => {
 	const validationErrors = validateRideData(rideData);
 	if (validationErrors.length > 0) {
@@ -135,7 +104,6 @@ export const createRide = async (rideData) => {
 	}
 
 	try {
-		// Import FIREBASE_AUTH to check current user
 		const { FIREBASE_AUTH } = require("../firebaseConfig");
 		const currentUser = FIREBASE_AUTH.currentUser;
 
@@ -183,8 +151,6 @@ export const createRide = async (rideData) => {
 		await setDoc(rideDoc, ride);
 		console.log("✅ Ride created:", rideId);
 
-		// Fire-and-forget: if notification fails, mark the ride so the
-		// customer's listener can surface a warning instead of silently waiting.
 		notifyDriversAboutNewRide(
 			rideId,
 			rideData.customerName,
@@ -202,12 +168,6 @@ export const createRide = async (rideData) => {
 	}
 };
 
-/**
- * Update ride status
- * @param {string} rideId - Ride ID
- * @param {string} status - New status
- * @returns {Promise<void>}
- */
 export const updateRideStatus = async (rideId, status) => {
 	if (!VALID_STATUSES.has(status)) {
 		throw new Error(
@@ -240,21 +200,10 @@ export const updateRideStatus = async (rideId, status) => {
 	}
 };
 
-/**
- * Cancel a ride with automatic refund processing
- * @param {string} rideId - Ride ID
- * @param {string} cancelledBy - Who cancelled the ride ('customer' or 'driver')
- * @param {string} reason - Cancellation reason (optional)
- * @returns {Promise<Object>} Cancellation result with refund status
- */
 export const cancelRideWithRefund = async (rideId, cancelledBy = 'customer', reason = '') => {
 	const { processRefund } = require('./flutterwaveRefund');
 	const rideRef = doc(FIREBASE_DB, "rides", rideId);
 
-	// Atomically claim the cancellation slot. If another request already
-	// set refundProcessing=true or already cancelled, we bail out early —
-	// this prevents a double-refund when the user taps Cancel twice or when
-	// two code paths race.
 	let rideData;
 	try {
 		await runTransaction(FIREBASE_DB, async (txn) => {
@@ -283,19 +232,18 @@ export const cancelRideWithRefund = async (rideId, cancelledBy = 'customer', rea
 		status: "cancelled",
 		cancelledAt: serverTimestamp(),
 		cancelledBy,
-		refundProcessing: false, // Release the lock regardless of outcome
+		refundProcessing: false,
 	};
 
 	if (reason) updates.cancellationReason = reason;
 
-	// Process refund if payment was made via Flutterwave
 	if (rideData.transactionId && rideData.paymentMethod === 'flutterwave') {
 		try {
 			console.log("💰 Processing refund for cancelled ride, amount:", rideData.amount);
 
 			const refundResult = await processRefund(
 				rideData.transactionId,
-				null, // Full refund
+				null,
 				reason || `Ride cancelled by ${cancelledBy}`
 			);
 
@@ -306,7 +254,6 @@ export const cancelRideWithRefund = async (rideId, cancelledBy = 'customer', rea
 					updates.refundStatus = "completed";
 					updates.refundedAt = serverTimestamp();
 				} else {
-					// Flutterwave processing async — checkPendingRefunds will poll for completion
 					updates.refundStatus = "pending";
 				}
 				console.log("✅ Refund initiated:", refundResult.refundId, "status:", refundResult.status);
@@ -323,9 +270,6 @@ export const cancelRideWithRefund = async (rideId, cancelledBy = 'customer', rea
 			const idToken = await FIREBASE_AUTH.currentUser?.getIdToken();
 			if (!idToken) throw new Error("No authenticated user for wallet refund");
 
-			// Match flutterwaveRefund.js's timeout — an unbounded fetch here could
-			// hang indefinitely after the server already committed the credit,
-			// leaving walletRefundStatus stuck out of sync with reality.
 			const controller = new AbortController();
 			const timeoutId = setTimeout(() => controller.abort(), 10000);
 			let response;
@@ -361,8 +305,6 @@ export const cancelRideWithRefund = async (rideId, cancelledBy = 'customer', rea
 			updates.walletRefundError = walletRefundErr.message;
 		}
 	} else if (rideData.paymentMethod === 'flutterwave' && !rideData.transactionId) {
-		// Paid via Flutterwave but transaction ID is missing (callback lost mid-flow)
-		// Flag for manual support review so the customer isn't silently left without a refund.
 		console.warn("⚠️ Flutterwave payment with no transactionId — flagging for manual review");
 		updates.refundStatus = 'needs_review';
 		updates.needsManualRefundReview = true;
@@ -375,7 +317,6 @@ export const cancelRideWithRefund = async (rideId, cancelledBy = 'customer', rea
 		await updateDoc(rideRef, updates);
 		console.log(`✅ Ride cancelled by ${cancelledBy}:`, rideId);
 	} catch (writeError) {
-		// Release the processing lock even if the full update fails
 		updateDoc(rideRef, { refundProcessing: false }).catch(() => {});
 		throw writeError;
 	}
@@ -383,13 +324,6 @@ export const cancelRideWithRefund = async (rideId, cancelledBy = 'customer', rea
 	return updates;
 };
 
-/**
- * Decline a ride (driver side)
- * Adds driver ID to declined_by array so ride won't show for this driver again
- * @param {string} rideId - Ride ID
- * @param {string} driverId - Driver ID who declined
- * @returns {Promise<void>}
- */
 export const declineRide = async (rideId, driverId) => {
 	try {
 		const rideRef = doc(FIREBASE_DB, "rides", rideId);
@@ -422,14 +356,6 @@ export const declineRide = async (rideId, driverId) => {
 	}
 };
 
-/**
- * Check and update pending refund statuses for one customer
- * Useful for monitoring refunds that are still processing
- * @param {string} customerId - Customer ID (required — firestore.rules rejects
- *   an unscoped query across the whole rides collection outright, since it
- *   can't guarantee every match belongs to the requesting user)
- * @returns {Promise<Array>} Array of refund status updates
- */
 export const checkPendingRefunds = async (customerId) => {
 	if (!customerId) return [];
 
@@ -496,16 +422,9 @@ export const checkPendingRefunds = async (customerId) => {
 	}
 };
 
-/**
- * Listen to pending rides (driver side)
- * @param {Function} callback - Called with array of pending rides
- * @param {string} driverId - Optional driver ID to filter out declined rides
- * @returns {Function} Unsubscribe function
- */
 export const listenToPendingRides = (callback, driverId = null) => {
 	try {
 		const ridesRef = collection(FIREBASE_DB, "rides");
-		// Cap at 50 — avoids a full-collection scan when many rides accumulate.
 		const q = query(ridesRef, where("status", "==", "pending"), limit(50));
 
 		const unsubscribe = onSnapshot(
@@ -515,28 +434,25 @@ export const listenToPendingRides = (callback, driverId = null) => {
 				snapshot.forEach((doc) => {
 					const rideData = doc.data();
 
-					// Filter out rides declined by this driver
 					if (driverId) {
 						const declinedBy = rideData.declined_by || [];
 						if (declinedBy.includes(driverId)) {
 							console.log(`🚫 Filtering out ride ${doc.id} - declined by driver ${driverId}`);
-							return; // Skip this ride
+							return;
 						}
 					}
 
 					rides.push({ ...rideData, rideId: doc.id });
 				});
-				// Sort by createdAt on client side
 				rides.sort((a, b) => {
 					const aTime = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
 					const bTime = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
-					return bTime - aTime; // descending order (newest first)
+					return bTime - aTime;
 				});
 				console.log("📨 Pending rides updated:", rides.length);
 				callback(rides);
 			},
 			(error) => {
-				// Silently handle permission-denied errors (happens during logout)
 				if (error.code === "permission-denied") {
 					console.log(
 						"🔒 Permission denied listening to pending rides - user likely logged out"
@@ -544,7 +460,7 @@ export const listenToPendingRides = (callback, driverId = null) => {
 				} else {
 					console.error("❌ Error listening to pending rides:", error);
 				}
-				callback([]); // Return empty array on error
+				callback([]);
 			}
 		);
 
@@ -555,12 +471,6 @@ export const listenToPendingRides = (callback, driverId = null) => {
 	}
 };
 
-/**
- * Listen to a specific ride (customer side)
- * @param {string} rideId - Ride ID
- * @param {Function} callback - Called with ride data
- * @returns {Function} Unsubscribe function
- */
 export const listenToRide = (rideId, callback) => {
 	try {
 		const rideRef = doc(FIREBASE_DB, "rides", rideId);
@@ -578,7 +488,6 @@ export const listenToRide = (rideId, callback) => {
 				}
 			},
 			(error) => {
-				// Silently handle permission-denied errors (happens during logout)
 				if (error.code === "permission-denied") {
 					console.log(
 						"🔒 Permission denied listening to ride - user likely logged out"
@@ -597,11 +506,6 @@ export const listenToRide = (rideId, callback) => {
 	}
 };
 
-/**
- * Get ride by ID
- * @param {string} rideId - Ride ID
- * @returns {Promise<Object|null>} Ride data
- */
 export const getRide = async (rideId) => {
 	try {
 		const rideRef = doc(FIREBASE_DB, "rides", rideId);
@@ -621,14 +525,12 @@ export const getCustomerHistory = async (customerId) => {
 	try {
 		const ridesRef = collection(FIREBASE_DB, "rides");
 
-		// Query for completed rides
 		const completedQuery = query(
 			ridesRef,
 			where("customerId", "==", customerId),
 			where("status", "==", "completed")
 		);
 
-		// Query for cancelled rides
 		const cancelledQuery = query(
 			ridesRef,
 			where("customerId", "==", customerId),
@@ -650,7 +552,6 @@ export const getCustomerHistory = async (customerId) => {
 			rides.push({ ...doc.data(), rideId: doc.id });
 		});
 
-		// Sort by completion/cancellation date (newest first)
 		rides.sort((a, b) => {
 			const aTime = (a.completedAt || a.cancelledAt)?.toMillis
 				? (a.completedAt || a.cancelledAt).toMillis()
@@ -669,23 +570,16 @@ export const getCustomerHistory = async (customerId) => {
 	}
 };
 
-/**
- * Get driver ride history (completed and cancelled rides)
- * @param {string} driverId - Driver ID
- * @returns {Promise<Array>} Array of completed/cancelled rides
- */
 export const getDriverHistory = async (driverId) => {
 	try {
 		const ridesRef = collection(FIREBASE_DB, "rides");
 
-		// Query for completed rides
 		const completedQuery = query(
 			ridesRef,
 			where("driverId", "==", driverId),
 			where("status", "==", "completed")
 		);
 
-		// Query for cancelled rides
 		const cancelledQuery = query(
 			ridesRef,
 			where("driverId", "==", driverId),
@@ -707,7 +601,6 @@ export const getDriverHistory = async (driverId) => {
 			rides.push({ ...doc.data(), rideId: doc.id });
 		});
 
-		// Sort by completion/cancellation date (newest first)
 		rides.sort((a, b) => {
 			const aTime = (a.completedAt || a.cancelledAt)?.toMillis
 				? (a.completedAt || a.cancelledAt).toMillis()
@@ -726,22 +619,10 @@ export const getDriverHistory = async (driverId) => {
 	}
 };
 
-/**
- * Get customer ride history with pagination
- * @param {string} customerId - Customer ID
- * @param {number} pageSize - Number of rides per page (default: 20)
- * @param {Object} lastDoc - Last document from previous page (for pagination)
- * @returns {Promise<{rides: Array, lastVisible: Object, hasMore: boolean}>}
- */
 export const getCustomerHistoryPaginated = async (customerId, pageSize = 20, lastDoc = null) => {
 	try {
 		const ridesRef = collection(FIREBASE_DB, "rides");
 
-		// Ordered by date so startAfter(lastDoc) actually advances the page
-		// instead of re-fetching the same first batch every time — this needs
-		// a composite index per status (customerId + status + completedAt /
-		// cancelledAt); Firestore will log a console link to create it on
-		// first use if it's missing.
 		const completedQuery = query(
 			ridesRef,
 			where("customerId", "==", customerId),
@@ -779,7 +660,6 @@ export const getCustomerHistoryPaginated = async (customerId, pageSize = 20, las
 			lastCancelledDoc = doc;
 		});
 
-		// Sort by completion/cancellation date (newest first)
 		rides.sort((a, b) => {
 			const aTime = (a.completedAt || a.cancelledAt)?.toMillis
 				? (a.completedAt || a.cancelledAt).toMillis()
@@ -790,10 +670,8 @@ export const getCustomerHistoryPaginated = async (customerId, pageSize = 20, las
 			return bTime - aTime;
 		});
 
-		// Limit to pageSize after merging
 		const paginatedRides = rides.slice(0, pageSize);
 
-		// Check if there are more rides
 		const hasMore = completedSnapshot.size === pageSize || cancelledSnapshot.size === pageSize;
 
 		const lastVisible = {
@@ -809,22 +687,10 @@ export const getCustomerHistoryPaginated = async (customerId, pageSize = 20, las
 	}
 };
 
-/**
- * Get driver ride history with pagination
- * @param {string} driverId - Driver ID
- * @param {number} pageSize - Number of rides per page (default: 20)
- * @param {Object} lastDoc - Last document from previous page (for pagination)
- * @returns {Promise<{rides: Array, lastVisible: Object, hasMore: boolean}>}
- */
 export const getDriverHistoryPaginated = async (driverId, pageSize = 20, lastDoc = null) => {
 	try {
 		const ridesRef = collection(FIREBASE_DB, "rides");
 
-		// Ordered by date so startAfter(lastDoc) actually advances the page
-		// instead of re-fetching the same first batch every time — this needs
-		// a composite index per status (driverId + status + completedAt /
-		// cancelledAt); Firestore will log a console link to create it on
-		// first use if it's missing.
 		const completedQuery = query(
 			ridesRef,
 			where("driverId", "==", driverId),
@@ -862,7 +728,6 @@ export const getDriverHistoryPaginated = async (driverId, pageSize = 20, lastDoc
 			lastCancelledDoc = doc;
 		});
 
-		// Sort by completion/cancellation date (newest first)
 		rides.sort((a, b) => {
 			const aTime = (a.completedAt || a.cancelledAt)?.toMillis
 				? (a.completedAt || a.cancelledAt).toMillis()
@@ -873,10 +738,8 @@ export const getDriverHistoryPaginated = async (driverId, pageSize = 20, lastDoc
 			return bTime - aTime;
 		});
 
-		// Limit to pageSize after merging
 		const paginatedRides = rides.slice(0, pageSize);
 
-		// Check if there are more rides
 		const hasMore = completedSnapshot.size === pageSize || cancelledSnapshot.size === pageSize;
 
 		const lastVisible = {

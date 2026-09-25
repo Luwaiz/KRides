@@ -70,7 +70,6 @@ textarea {
     resize: vertical;
 }
 
-/* Login screen */
 .login-screen {
     min-height: 100vh;
     display: flex;
@@ -112,7 +111,6 @@ textarea {
     text-transform: uppercase;
 }
 
-/* App shell — sidebar + content */
 .app {
     display: flex;
     min-height: 100vh;
@@ -202,8 +200,6 @@ main > div {
     max-width: 880px;
 }
 
-/* The payouts driver-list + detail layout wants more room than a single
-   reading column — scoped override so every other page keeps 880px. */
 main > div.payouts-page {
     max-width: 1100px;
 }
@@ -229,7 +225,6 @@ main h2 {
     line-height: 1.5;
 }
 
-/* Toolbar: search + filter */
 .toolbar {
     display: flex;
     gap: 10px;
@@ -410,13 +405,10 @@ table td {
     background: rgba(107, 114, 128, 0.1);
 }
 
-/* A paid ride stays in the list instead of disappearing — dimmed rather
-   than removed, so it's clearly settled without losing the history. */
 .card-paid {
     opacity: 0.6;
 }
 
-/* Payouts: driver list + selected-driver detail ("tab") */
 .payout-layout {
     display: flex;
     gap: 24px;

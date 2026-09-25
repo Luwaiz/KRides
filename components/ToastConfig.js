@@ -48,9 +48,6 @@ const styles = StyleSheet.create({
     },
     textContainer: {
         gap:5,
-        // Bounded to the row's remaining width so longer messages wrap
-        // instead of overflowing past the card's right edge or getting
-        // clipped by a fixed-height container.
         flex: 1,
         flexShrink: 1,
     },

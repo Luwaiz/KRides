@@ -1,17 +1,10 @@
 import { FIREBASE_DB } from "../firebaseConfig";
 import { collection, query, where, getDocs } from "firebase/firestore";
 
-/**
- * Get coordinates for a location by name from Firestore
- * @param {string|object} locationName - Name of the location or location object
- * @returns {Promise<{latitude: number, longitude: number, name: string} | null>}
- */
 export const getLocationCoordinates = async (locationName) => {
 	if (!locationName) return null;
 
-	// If locationName is already an object with coordinates, return it
 	if (typeof locationName === "object") {
-		// Check if it already has coordinates
 		if (locationName.latitude && locationName.longitude) {
 			return {
 				latitude: parseFloat(locationName.latitude),
@@ -20,7 +13,6 @@ export const getLocationCoordinates = async (locationName) => {
 				address: locationName.address || "",
 			};
 		}
-		// If it's an object but only has a name property, extract the name
 		if (locationName.name) {
 			locationName = locationName.name;
 		} else {
@@ -29,7 +21,6 @@ export const getLocationCoordinates = async (locationName) => {
 		}
 	}
 
-	// Ensure locationName is a string
 	if (typeof locationName !== "string") {
 		console.warn("Location name must be a string or object:", locationName);
 		return null;
@@ -56,7 +47,6 @@ export const getLocationCoordinates = async (locationName) => {
 			};
 		}
 
-		// If exact match not found, try searching by keyword
 		const allLocations = await getDocs(
 			query(locationsRef, where("active", "==", true))
 		);
@@ -79,24 +69,14 @@ export const getLocationCoordinates = async (locationName) => {
 			}
 		}
 
-		// Genuinely no matching location in Firestore — not an error, just no result.
 		console.warn(`No location found matching "${locationName}"`);
 		return null;
 	} catch (error) {
-		// A real backend/network failure, distinct from "no match found" above —
-		// kept as a separate log line so the two cases aren't indistinguishable
-		// when diagnosing production issues from logs.
 		console.error("Error fetching location coordinates (network/backend):", error);
 		return null;
 	}
 };
 
-/**
- * Get coordinates for both pickup and destination
- * @param {string} pickupName - Pickup location name
- * @param {string} destinationName - Destination location name
- * @returns {Promise<{pickup: object, destination: object}>}
- */
 export const getRideCoordinates = async (pickupName, destinationName) => {
 	try {
 		const [pickup, destination] = await Promise.all([

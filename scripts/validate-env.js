@@ -3,11 +3,9 @@ const path = require('path');
 
 console.log('🔍 Validating Environment Configuration...\n');
 
-// Check .env file
 const envPath = path.join(__dirname, '..', '.env');
 const hasEnvFile = fs.existsSync(envPath);
 
-// Check eas.json
 const easPath = path.join(__dirname, '..', 'eas.json');
 let easConfig = null;
 
@@ -37,11 +35,9 @@ if (hasEnvFile) {
     console.log('⚠️  .env file not found (this is OK if using eas.json)');
 }
 
-// Check eas.json
 if (easConfig) {
     console.log('✅ eas.json found\n');
 
-    // Check development build config
     if (easConfig.build && easConfig.build.development && easConfig.build.development.env) {
         console.log('📦 Development Build Environment:');
         const devEnv = easConfig.build.development.env;
@@ -58,7 +54,6 @@ if (easConfig) {
 
     console.log('');
 
-    // Check preview build config
     if (easConfig.build && easConfig.build.preview && easConfig.build.preview.env) {
         console.log('📦 Preview Build Environment:');
         const previewEnv = easConfig.build.preview.env;

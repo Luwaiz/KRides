@@ -1,5 +1,3 @@
-// Refund calls go through our server so the Flutterwave secret key
-// never touches the client bundle.
 import { NOTIFICATION_API_KEY } from "@env";
 import { FIREBASE_AUTH } from "../firebaseConfig";
 
@@ -12,12 +10,6 @@ function fetchWithTimeout(url, options = {}) {
     return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer));
 }
 
-/**
- * Process refund via server → Flutterwave
- * @param {string} transactionId - Flutterwave transaction ID
- * @param {number|null} amount - Amount to refund (null = full refund)
- * @param {string} comments - Reason for refund
- */
 export const processRefund = async (transactionId, amount = null, comments = 'Ride cancelled by customer') => {
     console.log('💰 Processing refund for transaction:', transactionId);
 
@@ -51,10 +43,6 @@ export const processRefund = async (transactionId, amount = null, comments = 'Ri
     };
 };
 
-/**
- * Check refund status via server → Flutterwave
- * @param {string} refundId - Flutterwave refund ID
- */
 export const checkRefundStatus = async (refundId) => {
     console.log('🔍 Checking refund status for:', refundId);
 

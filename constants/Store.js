@@ -58,7 +58,6 @@ export const useDriverDetails = create((set) => ({
 	accountName: "",
 	bankDetailsVerified: false,
 	bankDetailsSkipped: false,
-	// Actions
 	setDriverProfile: (profile) =>
 		set({
 			fullName: profile.name || profile.fullName || profile.fullname || "",
@@ -124,7 +123,6 @@ export const useDriverDetails = create((set) => ({
 		}),
 }));
 
-// Auth store for user/driver profile and role
 const useAuthStore = create((set) => ({
 	user: null,
 	profile: null,
@@ -159,13 +157,12 @@ export const useRideStore = create((set) => ({
 }));
 
 export const useRideDetailsStore = create((set) => ({
-	pickupLocation: null, // { latitude, longitude, name }
-	destination: null, // { latitude, longitude, name }
+	pickupLocation: null,
+	destination: null,
 	numPassengers: 1,
-	selectedDriver: null, // Driver object
+	selectedDriver: null,
 	rideCost: 0,
 	paymentMethod: null,
-	// Actions to update the state
 	setPickupLocation: (location) => set({ pickupLocation: location }),
 	setDestination: (location) => set({ destination: location }),
 	setNumPassengers: (count) => set({ numPassengers: count }),
@@ -183,10 +180,9 @@ export const useRideDetailsStore = create((set) => ({
 		}),
 }));
 
-// Store for driver's accepted ride details
 export const useAcceptedRideStore = create((set) => ({
-	acceptedRide: null, // Current active ride
-	nextRide: null, // Next queued ride
+	acceptedRide: null,
+	nextRide: null,
 	isRideActive: false,
 	setAcceptedRide: (ride) => set({ acceptedRide: ride, isRideActive: true }),
 	updateRideCoords: (pickupCoords, destinationCoords) => set((state) => ({
@@ -195,7 +191,6 @@ export const useAcceptedRideStore = create((set) => ({
 	setNextRide: (ride) => set({ nextRide: ride }),
 	clearAcceptedRide: () => set({ acceptedRide: null, isRideActive: false }),
 	clearNextRide: () => set({ nextRide: null }),
-	// Move next ride to active when current ride completes
 	activateNextRide: () => set((state) => {
 		console.log('🔄 activateNextRide called in Store');
 		console.log('   Current state:', {
@@ -223,7 +218,6 @@ export const useAcceptedRideStore = create((set) => ({
 	}),
 }));
 
-// Store for customer's active ride (for status bar)
 export const useActiveRideStore = create((set) => ({
 	activeRide: null,
 	rideStatus: null,
@@ -258,7 +252,6 @@ export const useActiveRideStore = create((set) => ({
 	}),
 }));
 
-// Store for driver availability (online/offline status)
 export const useDriverAvailability = create((set) => ({
 	isOnline: false,
 	setOnline: () => set({ isOnline: true }),

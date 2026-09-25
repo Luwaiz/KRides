@@ -1,16 +1,3 @@
-/**
- * One-off dev script: credits a wallet the exact same way the real
- * Flutterwave webhook does (POST /api/wallet/webhook), so you can verify
- * the wallet UI without waiting on a real bank transfer.
- *
- * Run from the notification-server directory, where FIREBASE_ADMIN_SDK is
- * already available as an environment variable (e.g. Render's Shell tab):
- *
- *   node scripts/test-fund-wallet.js <userId> <amountNaira>
- *
- * Example:
- *   node scripts/test-fund-wallet.js reFdepLARHNLVTMTggnX8PGi3GM2 500
- */
 const admin = require('firebase-admin');
 
 const [, , userId, amountArg] = process.argv;

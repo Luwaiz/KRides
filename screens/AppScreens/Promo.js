@@ -11,10 +11,6 @@ const Promo = () => {
     const navigation = useNavigation();
     const [code, setCode] = useState("");
 
-    // There is no promo/voucher backend yet — this used to accept any input
-    // (or none) and silently navigate back, which looked like a code had
-    // been applied when nothing happened. Say so honestly until redemption
-    // is actually implemented, instead of faking success.
     const submitCode = () => {
         if (!code.trim()) {
             Alert.alert("Enter a Code", "Please enter a promo code.");

@@ -10,11 +10,6 @@ const Support = () => {
     Linking.openURL('mailto:kampusrides24@gmail.com');
   };
 
-  // Read once at render rather than subscribing — this is FAQ copy, not a
-  // live price quote, so it doesn't need to update mid-visit if an admin
-  // happens to change pricing while this screen is open. It's still always
-  // correct on every mount, which is what matters: hardcoding the numbers
-  // here is exactly the kind of drift the Pricing dashboard is meant to end.
   const { baseFarePerPassenger, platformFeeStandard, platformFeeGroup, groupThreshold } = getPricingConfig();
 
   return (
@@ -24,7 +19,7 @@ const Support = () => {
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-        {/* Students Support Section */}
+        {}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Students</Text>
           <Text style={styles.text}>
@@ -39,7 +34,7 @@ const Support = () => {
 
         <View style={styles.divider} />
 
-        {/* Drivers Support Section */}
+        {}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Drivers Support</Text>
           <Text style={styles.text}>
@@ -54,7 +49,7 @@ const Support = () => {
 
         <View style={styles.divider} />
 
-        {/* Contact Us Section */}
+        {}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Contact Us</Text>
           <Text style={styles.text}>
@@ -67,11 +62,11 @@ const Support = () => {
 
         <View style={styles.divider} />
 
-        {/* FAQ Section */}
+        {}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>FAQ</Text>
 
-          {/* Students FAQ */}
+          {}
           <Text style={styles.subSectionTitle}>Students FAQ</Text>
 
           <View style={styles.faqItem}>
@@ -112,7 +107,7 @@ const Support = () => {
 
           <View style={styles.divider} />
 
-          {/* Drivers FAQ */}
+          {}
           <Text style={styles.subSectionTitle}>Drivers FAQ</Text>
 
           <View style={styles.faqItem}>

@@ -32,11 +32,9 @@ const HomeTab = () => {
 			destination: state.destination,
 		}));
 
-	// Check if there's an active ride
 	const activeRide = useActiveRideStore(state => state.activeRide);
 	const hasActiveRide = !!activeRide;
 
-	// Define canContinue based on location and destination selection
 	const canContinue = !!location && !!destination;
 
 	return (
@@ -59,7 +57,7 @@ const HomeTab = () => {
 						<Text style={styles.date}>{TODAY_FORMATTED}</Text>
 					</View>
 
-					{/* Show different messages based on state */}
+					{}
 					{hasActiveRide ? (
 						<View style={styles.lockedContainer}>
 							<Feather name="lock" size={ms(20)} color={colors.primaryBlue} />

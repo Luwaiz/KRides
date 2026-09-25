@@ -45,29 +45,22 @@ const AcceptTab = () => {
 		navigation.dispatch(DrawerActions.openDrawer());
 	};
 
-	// Listen to pending rides only when the driver is on an active ride
-	// (to allow queueing the next ride — not needed when idle, HomeTab handles that)
 	useEffect(() => {
 		if (!uid || !acceptedRide) return;
 
 		const unsubscribe = listenToPendingRides((rides) => {
-			// Filter out rides this driver has declined and limit to 2
 			const filteredRides = rides
 				.filter(ride => {
 					const declinedBy = ride.declined_by || [];
 					return !declinedBy.includes(uid);
 				})
-				.slice(0, 2); // Limit to maximum 2 rides
+				.slice(0, 2);
 
 			setPendingRides(filteredRides);
 		}, uid);
 		return unsubscribe;
 	}, [uid, acceptedRide]);
 
-	// Listen for the customer cancelling this ride out from under the driver.
-	// Without this, the only signal was a best-effort push notification, which
-	// can silently fail (stale token, backgrounded app, notifications denied) —
-	// leaving the driver believing they still have an active ride.
 	useEffect(() => {
 		if (!acceptedRide?.rideId) return;
 
@@ -95,9 +88,8 @@ const AcceptTab = () => {
 		);
 	};
 
-	// Called when driver taps OK on the Arrival/completion modal
 	const handleRideCompleteDismiss = () => {
-		const queued = nextRide; // capture before state changes
+		const queued = nextRide;
 		if (queued) {
 			Alert.alert(
 				"Next Ride Ready",
@@ -119,9 +111,6 @@ const AcceptTab = () => {
 					{
 						text: "Accept",
 						onPress: async () => {
-							// Re-fetch from Firestore to confirm the ride is still valid.
-							// The queued ride may have been cancelled or taken by another
-							// driver in the time since the driver queued it.
 							const freshRide = await getRide(queued.rideId).catch(() => null);
 							if (!freshRide || freshRide.status !== 'accepted' || freshRide.driverId !== uid) {
 								Alert.alert(
@@ -169,8 +158,6 @@ const AcceptTab = () => {
 			const result = await response.json();
 			if (!result.success) throw new Error(result.error || 'Could not complete ride');
 
-			// The ride can complete successfully while the payout to the driver's
-			// bank account fails or is skipped — don't let that go unnoticed.
 			if (!result.payout && result.reason === 'no_bank_details') {
 				Alert.alert(
 					"Ride Completed — Add Bank Details to Get Paid",
@@ -202,7 +189,6 @@ const AcceptTab = () => {
 		}
 	};
 
-	// Open navigation to pickup location
 	const openNavigation = () => {
 		if (!acceptedRide?.pickupCoords) {
 			Alert.alert('Error', 'Pickup location not available');
@@ -216,7 +202,6 @@ const AcceptTab = () => {
 			if (supported) {
 				Linking.openURL(url);
 			} else {
-				// Fallback to Google Maps web
 				const webUrl = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
 				Linking.openURL(webUrl);
 			}
@@ -226,7 +211,6 @@ const AcceptTab = () => {
 		});
 	};
 
-	// Notify customer that driver has arrived
 	const notifyArrival = () => {
 		if (!acceptedRide?.customerId) {
 			Alert.alert('Error', 'Customer information not available');
@@ -251,9 +235,6 @@ const AcceptTab = () => {
 
 			const rideRef = doc(FIREBASE_DB, 'rides', acceptedRide.rideId);
 
-			// Guard against the ride having been cancelled (and refunded) between
-			// when this screen loaded and when the driver tapped Arrived — a plain
-			// updateDoc here would silently flip a cancelled ride back to in_progress.
 			await runTransaction(FIREBASE_DB, async (txn) => {
 				const snap = await txn.get(rideRef);
 				if (!snap.exists()) throw new Error("RIDE_NOT_FOUND");
@@ -294,7 +275,6 @@ const AcceptTab = () => {
 			return;
 		}
 
-		// Check if bank details are verified
 		const driverDetails = useDriverDetails.getState();
 		if (!driverDetails.bankDetailsVerified) {
 			Alert.alert(
@@ -330,7 +310,6 @@ const AcceptTab = () => {
 				rideDetails.destination
 			);
 
-			// Atomic transaction prevents two drivers accepting the same ride simultaneously
 			const rideRef = doc(FIREBASE_DB, "rides", rideId);
 			await runTransaction(FIREBASE_DB, async (txn) => {
 				const snap = await txn.get(rideRef);
@@ -383,7 +362,7 @@ const AcceptTab = () => {
 			>
 				<BottomSheetScrollView>
 					<View style={styles.sheetCont}>
-						{/* Menu Button */}
+						{}
 
 						<View style={styles.topText}>
 							<Text style={styles.where}>Current Ride</Text>
@@ -534,7 +513,7 @@ const AcceptTab = () => {
 							</View>
 						)}
 
-						{/* I've Arrived Button */}
+						{}
 						<TouchableOpacity
 							style={[
 								styles.arrivalButton,

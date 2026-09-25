@@ -6,7 +6,6 @@ const Indicator = ({item,currentIndex,setCurrentIndex}) => {
     const currentSlide = (index)=>{
         setCurrentIndex(index)
     }
-    // Indicator for onBoarding Page
   return (
     <View style={styles.container}>
     {item.map((_,index)=>(

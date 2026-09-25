@@ -26,18 +26,13 @@ import React from "react";
 
 enableScreens();
 
-// Global error handler for production
 if (!__DEV__) {
 	const originalConsoleError = console.error;
 	console.error = (...args) => {
-		// Log to console
 		originalConsoleError(...args);
 
-		// Show user-friendly alert for critical errors only
 		const errorMessage = args.join(' ');
 
-		// Only show alert for truly fatal crashes or errors we explicitly mark as FATAL
-		// Avoid showing for common background Firebase/Network warnings that are often non-fatal
 		if (errorMessage.includes('FATAL') &&
 			!errorMessage.includes('Firebase: Error (auth/user-not-found)') &&
 			!errorMessage.includes('Firestore: Error (permission-denied)')) {
@@ -53,15 +48,10 @@ if (!__DEV__) {
 }
 
 
-// This is the default configuration
 configureReanimatedLogger({
 	level: ReanimatedLogLevel.warn,
-	strict: false, // Reanimated runs in strict mode by default
+	strict: false,
 });
-// Toast's default topOffset (40px, fixed) doesn't account for a notch/dynamic
-// island — on those devices it can render up under the status bar. Needs to
-// be a child of SafeAreaProvider to read insets, so it can't just be inlined
-// where <SafeAreaProvider> itself is created.
 function AppToast() {
 	const insets = useSafeAreaInsets();
 	return <Toast config={ToastConfig} topOffset={insets.top + 12} />;
