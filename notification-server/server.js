@@ -16,6 +16,18 @@ const flutterwaveProxyAgent = FLUTTERWAVE_PROXY_URL ? new HttpsProxyAgent(FLUTTE
 async function flutterwaveRequest(url, config = {}) {
     const axiosConfig = {
         url,
+        // Every call site below inspects Flutterwave's own status/message in
+        // the response body (a carryover from when these were plain fetch()
+        // calls, which never throws on an HTTP error status) — axios's
+        // default is the opposite: it throws on any non-2xx before that body
+        // is ever reachable. Flutterwave routinely returns non-2xx for
+        // perfectly ordinary outcomes (verify_by_reference 404s until a
+        // transfer clears, a rejected transfer, an unresolvable account
+        // number), so left at axios's default this silently replaced every
+        // one of those specific, useful error messages with a generic
+        // "Request failed with status code 4xx". Accept every status here so
+        // response.data is always what the caller actually checks.
+        validateStatus: () => true,
         ...config,
     };
 
