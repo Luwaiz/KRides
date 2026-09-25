@@ -50,7 +50,6 @@ const NIGERIAN_BANKS = [
 const BankAccountDetails = ({ navigation, route }) => {
     const isEditing = !!route?.params?.isEditing;
 
-    // Get driver details from store or route params
     const { fullName, phone, uid, existingBankCode, existingAccountNumber, existingAccountName } = useDriverDetails((state) => ({
         fullName: state.fullName,
         phone: state.phone,
@@ -60,8 +59,6 @@ const BankAccountDetails = ({ navigation, route }) => {
         existingAccountName: state.accountName,
     }));
 
-    // Pre-fill with what's already on file when editing, instead of making
-    // the driver re-enter everything from scratch to fix one field.
     const [bankCode, setBankCode] = useState(
         (isEditing && existingBankCode) || NIGERIAN_BANKS[0].value
     );
@@ -93,7 +90,6 @@ const BankAccountDetails = ({ navigation, route }) => {
 
             const idToken = await currentUser.getIdToken();
 
-            // Call our backend — secret key stays server-side
             const response = await fetch(`${PAYMENTS_SERVER_URL}/create-subaccount`, {
                 method: "POST",
                 headers: {
@@ -116,13 +112,8 @@ const BankAccountDetails = ({ navigation, route }) => {
             if (result.success) {
                 const subaccountId = result.data.subaccount_id;
                 const verifiedBankName = result.data.bank_name || bankName;
-                // Server resolves the account number against the bank before
-                // creating the subaccount — use that verified name rather than
-                // the driver's app profile name, which is often different from
-                // the name on their bank account.
                 const verifiedAccountName = result.data.verified_account_name || accountName;
 
-                // 2. Update Firestore locally
                 const driverRef = doc(FIREBASE_DB, "drivers", driverId);
                 await updateDoc(driverRef, {
                     bankName: verifiedBankName,
@@ -134,7 +125,6 @@ const BankAccountDetails = ({ navigation, route }) => {
                     bankDetailsVerified: true,
                 });
 
-                // Update local store to trigger navigation switch
                 useDriverDetails.getState().setDriverProfile({
                     ...useDriverDetails.getState(),
                     bankName: verifiedBankName,

@@ -12,10 +12,6 @@ const PAYMENT_LABELS = { flutterwave: 'Card', wallet: 'Wallet', cash: 'Cash' };
 const paymentLabel = (method) => PAYMENT_LABELS[method] || method || 'Unknown method';
 const naira = (n) => `₦${Number(n || 0).toLocaleString('en-NG')}`;
 
-// A ride stays on screen once paid instead of disappearing — this is what
-// tells the two states apart. 'needs_review' covers both the automatic-retry
-// sweep giving up and a couple of other stuck states, so it's worth its own
-// label rather than showing the raw status string.
 const STATUS_BADGES = {
     paid_manually: { label: 'Paid', className: 'badge-resolved' },
     pending_manual: { label: 'Pending', className: 'badge-pending' },
@@ -25,12 +21,6 @@ const STATUS_BADGES = {
 };
 const statusBadge = (status) => STATUS_BADGES[status] || { label: status || 'Unknown', className: 'badge-pending' };
 
-// Each driver gets their own tab (the list on the left selects it) instead
-// of one long scroll of every driver's card — "To Be Paid" and "Paid Total"
-// sit at the top of whichever driver is selected. "Mark All As Paid" settles
-// everything owed as of that moment; anything that completes afterward
-// starts a fresh "To Be Paid" total while "Paid Total" keeps its running
-// lifetime sum (see totalPaidOut on the driver doc, server-side).
 export default function Payouts() {
     const [drivers, setDrivers] = useState(null);
     const [error, setError] = useState('');
@@ -54,7 +44,6 @@ export default function Payouts() {
 
     useEffect(() => {
         load(false);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const filtered = useMemo(() => {

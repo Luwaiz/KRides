@@ -41,7 +41,6 @@ const ProfilePage = () => {
 		email: "",
 	});
 
-	// Fetch user profile on mount
 	useEffect(() => {
 		fetchUserProfile();
 	}, []);
@@ -55,10 +54,8 @@ const ProfilePage = () => {
 				return;
 			}
 
-			// Try to get user from "users" collection first (customers)
 			let userDoc = await getDoc(doc(FIREBASE_DB, "users", user.uid));
 
-			// If not found, try "drivers" collection
 			if (!userDoc.exists()) {
 				userDoc = await getDoc(doc(FIREBASE_DB, "drivers", user.uid));
 			}
@@ -85,19 +82,16 @@ const ProfilePage = () => {
 	};
 
 	const isPhoneValid = (phone) => {
-		// Check if phone is exactly 11 digits
 		const phoneRegex = /^\d{11}$/;
 		return phoneRegex.test(phone);
 	};
 
 	const isEmailValid = (email) => {
-		// Basic email validation
 		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 		return emailRegex.test(email);
 	};
 
 	const isNameValid = (name) => {
-		// Name should be at least 2 characters
 		return name && name.trim().length >= 2;
 	};
 
@@ -195,10 +189,8 @@ const ProfilePage = () => {
 
 	const Edit = async (field, value) => {
 		if (editableStates[field]) {
-			// Field is currently editable, save changes
 			await handleEdit(field, value);
 		} else {
-			// Entering edit mode, sync temp value with current value
 			setTempValues((prev) => ({
 				...prev,
 				[field]: field === "name" ? name : field === "phone" ? phone : email,
@@ -219,7 +211,6 @@ const ProfilePage = () => {
 			return;
 		}
 
-		// Validate based on field type
 		if (field === "name" && !isNameValid(value)) {
 			Alert.alert(
 				"Oops! Invalid Name",
@@ -252,7 +243,6 @@ const ProfilePage = () => {
 				return;
 			}
 
-			// Determine which collection to update
 			let userDoc = await getDoc(doc(FIREBASE_DB, "users", user.uid));
 			const isDriver = !userDoc.exists();
 			const collection = isDriver ? "drivers" : "users";
@@ -262,14 +252,10 @@ const ProfilePage = () => {
 				[fieldName]: value.trim(),
 			});
 
-			// Update local state
 			if (field === "name") setName(value.trim());
 			if (field === "phone") setPhone(value.trim());
 			if (field === "email") setEmail(value.trim());
 
-			// Ride booking (ConfirmRide) reads phone straight from the global
-			// profile store, not Firestore — without this, a phone number
-			// added here wouldn't reach a new ride until the next login.
 			if (field === "phone") {
 				if (isDriver) {
 					useDriverDetails.getState().setPhone(value.trim());

@@ -32,8 +32,6 @@ const DriverLogin = ({ navigation }) => {
 			return;
 		}
 
-		// Normalize so "08123456789" and "+2348123456789" for the same number
-		// share one rate-limit bucket instead of doubling the attempt budget.
 		const identifier = Firebase.normalizeNigerianPhone(phone) || phone.trim();
 		const rateCheck = await checkRateLimit(identifier);
 		if (rateCheck.blocked) {
@@ -43,16 +41,10 @@ const DriverLogin = ({ navigation }) => {
 
 		setLoading(true);
 		try {
-			// Look up the driver's real email via the notification server (Admin SDK)
 			const email = await Firebase.getDriverEmailByPhone(phone);
 
-			// Tell Navigation.js to treat this auth event as a driver login,
-			// guarding against the stale-closure race where a previous customer
-			// role is still in memory when onAuthStateChanged fires.
-			// Include expiry so a network failure mid-login doesn't permanently misroute future logins.
 			await AsyncStorage.setItem('pending_role', JSON.stringify({ role: 'driver', expiresAt: Date.now() + 5 * 60 * 1000 }));
 
-			// Sign in with the real email
 			await Firebase.signInWithEmail(email, password);
 
 			clearAttempts(identifier);
@@ -60,7 +52,6 @@ const DriverLogin = ({ navigation }) => {
 		} catch (error) {
 			setLoading(false);
 			recordAttempt(identifier);
-			// Clear pending_role so a failed login doesn't misroute the next successful one
 			await AsyncStorage.removeItem('pending_role').catch(() => {});
 
 			let errorMessage = "Invalid phone number or password. Please try again.";

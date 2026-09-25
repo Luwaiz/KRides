@@ -63,7 +63,7 @@ const Destination = ({
 				</View>
 			</View>
 
-			{/* Pickup Location Picker */}
+			{}
 			<LocationPicker
 				visible={showPickupPicker}
 				onClose={() => setShowPickupPicker(false)}
@@ -72,7 +72,7 @@ const Destination = ({
 				showPopularOnly={true}
 			/>
 
-			{/* Destination Picker */}
+			{}
 			<LocationPicker
 				visible={showDestinationPicker}
 				onClose={() => setShowDestinationPicker(false)}

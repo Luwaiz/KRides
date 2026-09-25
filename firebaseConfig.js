@@ -1,4 +1,3 @@
-// Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import {
@@ -17,8 +16,6 @@ import {
 	FIREBASE_MEASUREMENT_ID,
 } from "@env";
 
-// Fail fast if required Firebase env vars are missing — never fall back to
-// hardcoded credentials, as they would end up in the app bundle.
 const requiredVars = {
 	apiKey: FIREBASE_API_KEY,
 	authDomain: FIREBASE_AUTH_DOMAIN,
@@ -41,10 +38,9 @@ if (missingVars.length > 0) {
 
 const firebaseConfig = {
 	...requiredVars,
-	measurementId: FIREBASE_MEASUREMENT_ID, // optional — Google Analytics
+	measurementId: FIREBASE_MEASUREMENT_ID,
 };
 
-// Initialize Firebase
 export const FIREBASE_APP = initializeApp(firebaseConfig);
 export const FIREBASE_AUTH = initializeAuth(FIREBASE_APP, {
 	persistence: getReactNativePersistence(ReactNativeAsyncStorage),

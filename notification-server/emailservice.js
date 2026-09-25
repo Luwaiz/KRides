@@ -17,12 +17,6 @@ function getTransporter() {
     return transporter;
 }
 
-/**
- * Email the admin about a new driver report.
- * Fails open — the report is already saved to Firestore by the caller before
- * this runs, so a missing/broken email config should never fail the report
- * submission itself. Returns { sent: false, reason } instead of throwing.
- */
 async function sendDriverReportEmail(report) {
     const adminEmail = process.env.ADMIN_EMAIL;
     const t = getTransporter();
@@ -62,13 +56,6 @@ async function sendDriverReportEmail(report) {
     }
 }
 
-/**
- * Email a newly admin-created driver their set-password link. Unlike the
- * report email, this one's failure matters to the caller — it's the only
- * way the driver gets into the account that was just created for them — so
- * this still fails open (never throws) but callers should surface `sent:
- * false` to the admin rather than treat it as fire-and-forget.
- */
 async function sendDriverWelcomeEmail({ driverName, driverEmail, resetLink }) {
     const t = getTransporter();
     if (!t) {

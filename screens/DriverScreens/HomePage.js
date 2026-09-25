@@ -33,7 +33,6 @@ const HomePage = () => {
 	const { uid } = useDriverDetails((state) => ({ uid: state.uid }));
 	const directionsErrorShown = useRef(false);
 
-	// Request location permissions
 	const requestLocationPermissions = async () => {
 		try {
 			const permission = await PermissionsAndroid.request(
@@ -66,14 +65,10 @@ const HomePage = () => {
 		}
 	};
 
-	// Request permissions on mount
 	useEffect(() => {
 		requestLocationPermissions();
 	}, []);
 
-	// Register for push notifications. notificationManager also clears any
-	// stale token left behind by a previous account on this device before
-	// writing this driver's token — see helpers/notificationManager.js.
 	useEffect(() => {
 		if (!uid) return;
 		notificationManager.initialize(uid, 'driver').catch((error) => {
@@ -83,21 +78,12 @@ const HomePage = () => {
 
 	const isOnline = useDriverAvailability((state) => state.isOnline);
 
-	// Track driver location — while online, and (independent of the online
-	// toggle) for the duration of an active ride, so the rider's map can show
-	// it. Lives here rather than in HomeTab so it keeps running across the
-	// HomeTab → AcceptTab switch instead of stopping the moment a ride is
-	// accepted. activeRideCustomerId is denormalized onto the location doc so
-	// firestore.rules can grant read access to just that one rider.
 	useEffect(() => {
 		if (!uid || !(isOnline || acceptedRide)) return;
 
 		const activeRideCustomerId = acceptedRide?.customerId || null;
 		const locationRef = doc(FIREBASE_DB, "driver_locations", uid);
 
-		// Write immediately on ride-state change, decoupled from the next GPS
-		// fix — otherwise a rider whose ride just ended could keep read access
-		// until the driver's position next updates.
 		setDoc(locationRef, { activeRideCustomerId }, { merge: true }).catch(() => {});
 
 		const watchId = Geolocation.watchPosition(
@@ -126,8 +112,6 @@ const HomePage = () => {
 		};
 	}, [uid, isOnline, acceptedRide?.rideId, acceptedRide?.customerId]);
 
-	// Validated, stable coordinate objects — prevent NaN from reaching the map
-	// when acceptedRide coords are missing or malformed.
 	const pickupCoords = useMemo(() => {
 		const p = acceptedRide?.pickupCoords;
 		if (!p) return null;
@@ -153,9 +137,6 @@ const HomePage = () => {
 		longitudeDelta: 0.015,
 	};
 
-	// Use acceptedRide as the single source of truth — the AcceptRidePage flag in
-	// useBottomTabStore is never reset on ride completion, so relying on it caused
-	// the screen to stay stuck on AcceptTab after a ride ended.
 	const HeaderComponents = useMemo(() => {
 		return acceptedRide ? <AcceptHeader /> : <HomeHeader />;
 	}, [acceptedRide]);
@@ -164,7 +145,6 @@ const HomePage = () => {
 		return acceptedRide ? <AcceptTab /> : <HomeTab />;
 	}, [acceptedRide]);
 
-	// Fit map once the map is ready and valid ride coordinates are available
 	useEffect(() => {
 		if (!mapReady || !isRideActive || !mapRef.current || !pickupCoords || !destCoords) return;
 		mapRef.current.fitToCoordinates(
@@ -177,7 +157,7 @@ const HomePage = () => {
 		<View style={styles.container}>
 			<View style={styles.head}>{HeaderComponents}</View>
 
-			{/* Map is always visible */}
+			{}
 			{GOOGLE_MAPS_API_KEY || true ? (
 				<MapView
 					ref={mapRef}
@@ -190,7 +170,7 @@ const HomePage = () => {
 					loadingEnabled={true}
 					onMapReady={() => setMapReady(true)}
 				>
-					{/* Route line — only rendered when both coords are valid */}
+					{}
 					{isRideActive && pickupCoords && destCoords && (
 						<MapViewDirections
 							origin={pickupCoords}
@@ -219,7 +199,7 @@ const HomePage = () => {
 						/>
 					)}
 
-					{/* Pickup marker — only rendered when coords are valid */}
+					{}
 					{isRideActive && pickupCoords && (
 						<Marker
 							coordinate={pickupCoords}
@@ -233,7 +213,7 @@ const HomePage = () => {
 						/>
 					)}
 
-					{/* Destination marker — only rendered when coords are valid */}
+					{}
 					{isRideActive && destCoords && (
 						<Marker
 							coordinate={destCoords}

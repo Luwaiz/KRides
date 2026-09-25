@@ -2,12 +2,6 @@ import { FIREBASE_DB } from "../firebaseConfig";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { calculateDriverEarnings, calculatePlatformFee } from "../constants/commission";
 
-/**
- * Get driver earnings for a specific time period
- * @param {string} driverId - Driver ID
- * @param {string} period - 'today', 'week', 'month', 'year'
- * @returns {Promise<Object>} Earnings data with statistics
- */
 export const getDriverEarnings = async (driverId, period = 'month', year = null, month = null) => {
     try {
         const now = new Date();
@@ -18,7 +12,6 @@ export const getDriverEarnings = async (driverId, period = 'month', year = null,
 
         console.log(`📊 Fetching earnings for driver ${driverId} from ${startDate.toISOString()}`);
 
-        // Query completed rides for this driver within the period
         const ridesRef = collection(FIREBASE_DB, "rides");
         const q = query(
             ridesRef,
@@ -35,14 +28,12 @@ export const getDriverEarnings = async (driverId, period = 'month', year = null,
             rides.push({ ...doc.data(), rideId: doc.id });
         });
 
-        // Sort by completion date (newest first)
         rides.sort((a, b) => {
             const aTime = a.completedAt?.toMillis ? a.completedAt.toMillis() : 0;
             const bTime = b.completedAt?.toMillis ? b.completedAt.toMillis() : 0;
             return bTime - aTime;
         });
 
-        // Calculate earnings — driver sees net only, platform fee is internal
         const totalRides = rides.length;
 
         let netEarnings = 0;
@@ -78,11 +69,6 @@ export const getDriverEarnings = async (driverId, period = 'month', year = null,
     }
 };
 
-/**
- * Format currency for display
- * @param {number} amount - Amount in naira
- * @returns {string} Formatted currency string
- */
 export const formatCurrency = (amount) => {
     return `₦${(Number(amount) || 0).toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 };

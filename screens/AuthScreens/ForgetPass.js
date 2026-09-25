@@ -25,7 +25,6 @@ const ForgetPass = ({ navigation }) => {
 			return;
 		}
 
-		// Basic email validation
 		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 		if (!emailRegex.test(email)) {
 			Alert.alert("Error", "Please enter a valid email address");
@@ -43,13 +42,8 @@ const ForgetPass = ({ navigation }) => {
 		try {
 			console.log("🔐 Sending password reset email to:", email);
 
-			// Record every request (not just failures) — a successful send is
-			// itself the spammy action a rate limit here needs to bound.
 			recordAttempt(identifier);
 
-			// Send password reset email (without action code settings to avoid domain errors)
-			// To use custom redirect URLs, you need to allowlist them in Firebase Console:
-			// Authentication → Settings → Authorized domains
 			await sendPasswordResetEmail(FIREBASE_AUTH, email);
 
 			console.log("✅ Password reset email sent successfully");
@@ -62,7 +56,6 @@ const ForgetPass = ({ navigation }) => {
 				visibilityTime: 5000,
 			});
 
-			// Navigate back to login after a short delay
 			setTimeout(() => {
 				navigation.goBack();
 			}, 2000);

@@ -162,7 +162,6 @@ const DriverProfilePage = () => {
 
 			setProfileUrl(url);
 
-			// Update local store
 			const driverSnap = await getDoc(driverRef);
 			if (driverSnap.exists()) {
 				const updatedProfile = driverSnap.data();
@@ -185,10 +184,8 @@ const DriverProfilePage = () => {
 
 	const Edit = async (field, value) => {
 		if (editableStates[field]) {
-			// Field is currently editable, save changes
 			await handleEdit(field, value);
 		}
-		// Toggle the editable state
 		setEditableStates((prevStates) => ({
 			...prevStates,
 			[field]: !prevStates[field],
@@ -196,18 +193,15 @@ const DriverProfilePage = () => {
 	};
 
 	const isPhoneValid = (phone) => {
-		// Check if phone is exactly 11 digits
 		const phoneRegex = /^\d{11}$/;
 		return phoneRegex.test(phone);
 	};
 
 	const isNameValid = (name) => {
-		// Name should be at least 2 characters
 		return name && name.trim().length >= 2;
 	};
 
 	const isVehicleIdValid = (vehicleId) => {
-		// Vehicle ID should not be empty
 		return vehicleId && vehicleId.trim().length > 0;
 	};
 
@@ -220,7 +214,6 @@ const DriverProfilePage = () => {
 			return;
 		}
 
-		// Validate based on field type
 		if ((field === "fullName" || field === "name") && !isNameValid(value)) {
 			Alert.alert(
 				"Oops! Invalid Name",
@@ -247,16 +240,13 @@ const DriverProfilePage = () => {
 
 		setLoading(true);
 		try {
-			// Get the current user's UID from profile
 			const driverUid = profile?.uid || uid;
 			if (!driverUid) {
 				throw new Error("User ID not found");
 			}
 
-			// Update the field in Firestore drivers collection
 			const driverRef = doc(FIREBASE_DB, "drivers", driverUid);
 
-			// Map field names to Firestore field names
 			const fieldMap = {
 				name: "fullname",
 				fullName: "fullname",
@@ -267,13 +257,11 @@ const DriverProfilePage = () => {
 			const firestoreField = fieldMap[field] || field;
 			await updateDoc(driverRef, { [firestoreField]: value });
 
-			// Fetch updated profile
 			const driverSnap = await getDoc(driverRef);
 			if (driverSnap.exists()) {
 				const updatedProfile = driverSnap.data();
 				setDriverProfile(updatedProfile);
 
-				// Also update auth store
 				const { setAuthData, user, role } = useAuthStore.getState();
 				setAuthData(user, updatedProfile, role);
 
@@ -326,7 +314,7 @@ const DriverProfilePage = () => {
 					</View>
 				</View>
 
-				{/* View Reviews Button */}
+				{}
 				<View style={styles.reviewsButtonCont}>
 					<TouchableOpacity
 						style={styles.reviewsButton}
@@ -368,8 +356,7 @@ const DriverProfilePage = () => {
 						value={profile?.email || email || ""}
 						editable={false}
 					/>
-					{/* Only offer to set up bank details when none are on file yet —
-						once they exist, the card below is shown instead. */}
+					{}
 					{!(profile?.bankName || bankName) && (
 						<View style={{ marginTop: 20 }}>
 							<ActiveButton
@@ -379,7 +366,7 @@ const DriverProfilePage = () => {
 						</View>
 					)}
 
-					{/* Display Bank Details if available */}
+					{}
 					{(profile?.bankName || bankName) && (
 						<View style={styles.bankDetailsCont}>
 							<Text style={styles.bankHeader}>Bank Information</Text>

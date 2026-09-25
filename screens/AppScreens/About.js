@@ -84,7 +84,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 22,
-    fontFamily: 'Albert-Bold', // Assuming this font exists based on other files, or fallback to fontWeight
+    fontFamily: 'Albert-Bold',
     fontWeight: 'bold',
     color: colors.primaryBlue,
     marginBottom: 12,
@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
     color: colors.lightGrey4,
     lineHeight: 24,
     marginBottom: 12,
-    fontFamily: 'Albert-Regular', // Assuming
+    fontFamily: 'Albert-Regular',
   },
   bulletPoints: {
     marginBottom: 12,

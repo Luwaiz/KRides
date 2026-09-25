@@ -4,8 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../constants/styling';
 import { sp, fs, br } from '../constants/responsive';
 
-const NO_DRIVER_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
-const STILL_SEARCHING_TIMEOUT_MS = 90 * 1000; // 1.5 minutes
+const NO_DRIVER_TIMEOUT_MS = 3 * 60 * 1000;
+const STILL_SEARCHING_TIMEOUT_MS = 90 * 1000;
 
 const RideStatusBar = ({
     status,
@@ -22,7 +22,6 @@ const RideStatusBar = ({
     const pulseAnim = useRef(new Animated.Value(1)).current;
     const noDriverTimerRef = useRef(null);
     const stillSearchingTimerRef = useRef(null);
-    // Guards timer callbacks so a stale fire after status change is ignored
     const isPendingRef = useRef(false);
 
     useEffect(() => {
@@ -149,7 +148,7 @@ const RideStatusBar = ({
                 </View>
             </View>
 
-            {/* Driver Details Dropdown */}
+            {}
             {expanded && (status === 'accepted' || status === 'in_progress') && (
                 <View style={styles.dropdown}>
                     <View style={styles.divider} />
@@ -193,7 +192,7 @@ const RideStatusBar = ({
 const styles = StyleSheet.create({
     container: {
         position: 'absolute',
-        top: sp(70), // Below header
+        top: sp(70),
         left: sp(16),
         right: sp(16),
         backgroundColor: 'white',

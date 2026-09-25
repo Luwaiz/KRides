@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+const WINDOW_MS = 15 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
 const KEY_PREFIX = 'rate_limit_';
 
@@ -17,7 +17,6 @@ async function setEntry(identifier, entry) {
     try {
         await AsyncStorage.setItem(KEY_PREFIX + identifier, JSON.stringify(entry));
     } catch {
-        // Non-fatal — fail open so a storage error never locks the user out
     }
 }
 
@@ -28,7 +27,6 @@ export async function checkRateLimit(identifier) {
     if (!entry) return { blocked: false };
 
     if (now - entry.windowStart > WINDOW_MS) {
-        // Window expired — remove stale key
         AsyncStorage.removeItem(KEY_PREFIX + identifier).catch(() => {});
         return { blocked: false };
     }
@@ -56,6 +54,5 @@ export async function clearAttempts(identifier) {
     try {
         await AsyncStorage.removeItem(KEY_PREFIX + identifier);
     } catch {
-        // Non-fatal
     }
 }

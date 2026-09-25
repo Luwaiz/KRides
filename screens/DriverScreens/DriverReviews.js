@@ -126,7 +126,7 @@ const DriverReviews = () => {
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}
             >
-                {/* Overall Rating Section */}
+                {}
                 <View style={styles.overallSection}>
                     <Text style={styles.averageRating}>
                         {ratingsData.averageRating.toFixed(1)}
@@ -149,7 +149,7 @@ const DriverReviews = () => {
                     </View>
                 )}
 
-                {/* Filter Tabs */}
+                {}
                 {ratingsData.totalRatings > 0 && (
                     <View style={styles.filterSection}>
                         <ScrollView
@@ -202,7 +202,7 @@ const DriverReviews = () => {
                     </View>
                 )}
 
-                {/* Reviews List */}
+                {}
                 <View style={styles.reviewsSection}>
                     {filteredRatings.length === 0 ? (
                         <View style={styles.emptyState}>

@@ -65,7 +65,6 @@ const HomeTab = () => {
 	const processedRideIds = useRef(new Set());
 	const pulseAnim = useRef(new Animated.Value(1)).current;
 
-	// Pulse animation for the listening indicator — runs while the list is empty
 	useEffect(() => {
 		if (rides.length > 0 || !isOnline) {
 			pulseAnim.setValue(1);
@@ -81,7 +80,6 @@ const HomeTab = () => {
 		return () => pulse.stop();
 	}, [rides.length, isOnline]);
 
-	// ✅ Listen to pending rides from Firestore (real-time)
 	useEffect(() => {
 		if (!uid || !bankDetailsVerified) return;
 
@@ -92,7 +90,7 @@ const HomeTab = () => {
 			console.log("📨 Received pending rides:", pendingRides.length);
 			setRides(pendingRides);
 			setLoading(false);
-		}, uid); // Pass driver ID to filter out declined rides
+		}, uid);
 
 		return () => {
 			console.log("🔌 Cleaning up pending rides listener");
@@ -100,24 +98,17 @@ const HomeTab = () => {
 		};
 	}, [uid, bankDetailsVerified]);
 
-	// Show modal for first ride when rides update
 	useEffect(() => {
 		if (!bankDetailsVerified) return;
 
 		const isOnline = useDriverAvailability.getState().isOnline;
 
-		// Don't show modal if driver is offline
 		if (!isOnline) {
 			setShowRideModal(false);
 			setCurrentRideRequest(null);
 			return;
 		}
 
-		// Only show modal if:
-		// 1. There are rides available
-		// 2. No modal is currently showing
-		// 3. No current ride request is set
-		// 4. Not currently accepting a ride
 		if (rides.length > 0 && !showRideModal && !currentRideRequest && !accepting) {
 			const firstRide = rides.find(r => !processedRideIds.current.has(r.rideId));
 			if (firstRide) {
@@ -130,12 +121,10 @@ const HomeTab = () => {
 
 	const onRefresh = () => {
 		console.log("🔄 Manual refresh - Firestore listeners auto-update");
-		// Firestore listeners automatically update, but we can show refreshing state
 		setRefreshing(true);
 		setTimeout(() => setRefreshing(false), 1000);
 	};
 
-	// ❌ Decline ride
 	const DeclineRide = async (rideId) => {
 		console.log("❌ Declining ride:", rideId);
 		setDeclining(rideId);
@@ -164,7 +153,6 @@ const HomeTab = () => {
 		}
 	};
 
-	// Handle modal accept
 	const handleModalAccept = async (rideId) => {
 		console.log('✅ Modal accept - closing modal and clearing current request');
 		processedRideIds.current.add(rideId);
@@ -173,7 +161,6 @@ const HomeTab = () => {
 		await AcceptRide(rideId);
 	};
 
-	// Handle modal decline
 	const handleModalDecline = async (rideId) => {
 		console.log('❌ Modal decline - closing modal and clearing current request');
 		processedRideIds.current.add(rideId);
@@ -182,26 +169,17 @@ const HomeTab = () => {
 		await DeclineRide(rideId);
 	};
 
-	// Handle modal timeout
 	const handleModalTimeout = async (rideId) => {
 		console.log("⏰ Ride request timed out:", rideId);
-		// Auto-decline uses the same logic as manual decline
 		await handleModalDecline(rideId);
 	};
 
-	// ✅ Accept ride — atomic Firestore transaction prevents double-acceptance
 	const AcceptRide = async (rideId) => {
 		if (!uid) {
 			Alert.alert("Error", "Driver account not loaded. Please log out and log back in.");
 			return;
 		}
 
-		// Matches the field the pending-rides listener above and Firestore's
-		// security rules both gate on — accountNumber and bankDetailsVerified
-		// are normally set together, but bankDetailsVerified is the one that's
-		// actually authoritative (only set true after Flutterwave confirms the
-		// subaccount), so checking anything else here risks a confusing raw
-		// "permission denied" from Firestore instead of this friendly prompt.
 		const driverDetails = useDriverDetails.getState();
 		if (!driverDetails.bankDetailsVerified) {
 			Alert.alert(
@@ -241,10 +219,8 @@ const HomeTab = () => {
 			return;
 		}
 
-		setAccepting(rideId); // shows spinner on the Accept button
+		setAccepting(rideId);
 
-		// Atomic transaction: read current state, verify still pending, then write.
-		// If another driver accepted first, the transaction throws and we abort.
 		const rideRef = doc(FIREBASE_DB, "rides", rideId);
 		try {
 			await runTransaction(FIREBASE_DB, async (txn) => {
@@ -275,7 +251,6 @@ const HomeTab = () => {
 			return;
 		}
 
-		// Transaction succeeded — switch UI
 		setAcceptedRide({
 			...rideDetails,
 			rideId,
@@ -287,7 +262,6 @@ const HomeTab = () => {
 		setAcceptRidePage();
 		setAccepting(null);
 
-		// Background: fetch coords and notify customer
 		const fetchCoords = () =>
 			getRideCoordinates(rideDetails.pickupLocation, rideDetails.destination)
 				.then(({ pickup, destination }) => {
@@ -305,9 +279,6 @@ const HomeTab = () => {
 		console.log("✅ Ride accepted atomically, switched to AcceptTab");
 	};
 
-	// Driver location tracking now lives in HomePage.js (the shared parent of
-	// HomeTab and AcceptTab) so it keeps running across the HomeTab → AcceptTab
-	// switch instead of stopping the moment a ride is accepted.
 
 	return (
 		<>

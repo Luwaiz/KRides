@@ -4,7 +4,7 @@ import { api } from '../api';
 const PREVIEW_PASSENGER_COUNTS = [1, 2, 3, 4];
 
 export default function Pricing() {
-    const [form, setForm] = useState(null); // null while loading
+    const [form, setForm] = useState(null);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');

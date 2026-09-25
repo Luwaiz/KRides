@@ -5,7 +5,6 @@ import HomePage from "../screens/DriverScreens/HomePage";
 import Support from "../screens/AppScreens/Support";
 import About from "../screens/AppScreens/About";
 import History from "../screens/AppScreens/History";
-// Driver-specific profile
 import DriverProfilePage from "../screens/DriverScreens/DriverProfilePage";
 import DriverReviews from "../screens/DriverScreens/DriverReviews";
 import DriverEarnings from "../screens/DriverScreens/DriverEarnings";

@@ -11,10 +11,6 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-// Deferred ratings are stored as a list keyed by rideId rather than a single
-// flat object — a single shared key meant deferring one ride's rating and
-// then completing another before returning to it would silently discard the
-// first one (whichever write happened last won).
 export const PENDING_RATINGS_KEY = "pending_customer_ratings";
 
 async function readPendingRatings() {
@@ -32,7 +28,6 @@ async function writePendingRatings(list) {
 	try {
 		await AsyncStorage.setItem(PENDING_RATINGS_KEY, JSON.stringify(list));
 	} catch {
-		// Non-fatal — worst case the reminder is lost for this session
 	}
 }
 
@@ -51,7 +46,6 @@ export async function removePendingRating(rideId) {
 	}
 }
 
-// Oldest deferred rating first — first deferred, first re-surfaced.
 export async function getNextPendingRating() {
 	const list = await readPendingRatings();
 	return list.length > 0 ? list[0] : null;
@@ -115,9 +109,6 @@ const RatingModal = ({ visible, onClose, rideId, driverId, driverName, pickupLoc
 			onClose();
 		} catch (error) {
 			console.error("❌ Error submitting rating:", error);
-			// Keep the rating from vanishing if this was a network/server hiccup —
-			// queue it the same way a deferred rating is queued so it resurfaces
-			// instead of being lost the moment the user backs out of the alert.
 			await addPendingRating({
 				rideId,
 				driverId,
@@ -134,7 +125,6 @@ const RatingModal = ({ visible, onClose, rideId, driverId, driverName, pickupLoc
 
 	const handleRateLater = async () => {
 		if (isReminder) {
-			// Second dismissal — treat as a permanent skip
 			await removePendingRating(rideId);
 			setRating(0);
 			setFeedback("");
@@ -150,9 +140,6 @@ const RatingModal = ({ visible, onClose, rideId, driverId, driverName, pickupLoc
 				{
 					text: "Remind Me Later",
 					onPress: async () => {
-						// Persist the ride details so we can re-surface the modal on next
-						// open — keyed by rideId alongside any other deferred ratings so
-						// completing a different ride in the meantime doesn't discard it.
 						await addPendingRating({
 							rideId,
 							driverId,
@@ -184,7 +171,7 @@ const RatingModal = ({ visible, onClose, rideId, driverId, driverName, pickupLoc
 						How was your experience with {driverName}?
 					</Text>
 
-					{/* Ride summary */}
+					{}
 					{(pickupLocation || destination || amount) && (
 						<View style={styles.rideSummary}>
 							{pickupLocation && destination && (
@@ -203,7 +190,7 @@ const RatingModal = ({ visible, onClose, rideId, driverId, driverName, pickupLoc
 						</View>
 					)}
 
-					{/* Star Rating */}
+					{}
 					<View style={styles.starsContainer}>
 						{[1, 2, 3, 4, 5].map((star) => (
 							<TouchableOpacity
@@ -221,7 +208,7 @@ const RatingModal = ({ visible, onClose, rideId, driverId, driverName, pickupLoc
 						))}
 					</View>
 
-					{/* Rating Text */}
+					{}
 					{rating > 0 && (
 						<Text style={styles.ratingText}>
 							{rating === 1 && "Poor"}
@@ -232,7 +219,7 @@ const RatingModal = ({ visible, onClose, rideId, driverId, driverName, pickupLoc
 						</Text>
 					)}
 
-					{/* Feedback Input */}
+					{}
 					<TextInput
 						style={styles.feedbackInput}
 						placeholder="Share your experience (optional)"
@@ -244,7 +231,7 @@ const RatingModal = ({ visible, onClose, rideId, driverId, driverName, pickupLoc
 						textAlignVertical="top"
 					/>
 
-					{/* Buttons */}
+					{}
 					<View style={styles.buttonsContainer}>
 						<TouchableOpacity
 							style={styles.skipButton}

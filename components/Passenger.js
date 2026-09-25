@@ -23,7 +23,7 @@ import {
 
 const Passenger = () => {
 	const MIN_PASSENGERS = 1;
-	const MAX_PASSENGERS = 4; // Keke capacity
+	const MAX_PASSENGERS = 4;
 	const [selected, setSelected] = useState(null);
 	const [error, setError] = useState("");
 	const [distance, setDistance] = useState(0);
@@ -40,7 +40,6 @@ const Passenger = () => {
 			destination: state.destination,
 		}));
 
-	// Calculate distance and time when locations change
 	useEffect(() => {
 		if (pickupLocation && destinationCoords) {
 			const dist = calculateDistance(
@@ -63,7 +62,6 @@ const Passenger = () => {
 	const handlePassengerSelect = (value) => {
 		const numValue = parseInt(value);
 
-		// Validate passenger count
 		if (numValue < MIN_PASSENGERS) {
 			setError(`Minimum ${MIN_PASSENGERS} passenger required`);
 			setSelected(null);
@@ -76,7 +74,6 @@ const Passenger = () => {
 			return;
 		}
 
-		// Valid selection
 		setError("");
 		setSelected(value);
 	};
@@ -88,10 +85,9 @@ const Passenger = () => {
 		}
 
 		setNumberOfPassenger(selected);
-		confirm(); // Go directly to ConfirmRide, skip AvailableRiders
+		confirm();
 	};
 
-	// Calculate estimated price based on distance and passengers
 	const estimatedPrice = selected
 		? calculateFare(distance, parseInt(selected))
 		: 0;
@@ -146,7 +142,7 @@ const Passenger = () => {
 						<Text style={styles.radioText}>4 Passengers</Text>
 					</View>
 
-					{/* Error Message */}
+					{}
 					{error ? (
 						<View style={styles.errorContainer}>
 							<Feather name="alert-circle" size={16} color={colors.error} />
@@ -154,7 +150,7 @@ const Passenger = () => {
 						</View>
 					) : null}
 
-					{/* Distance and Time Info */}
+					{}
 					{distance > 0 && (
 						<View style={styles.infoCard}>
 							<View style={styles.infoRow}>
@@ -176,7 +172,7 @@ const Passenger = () => {
 						</View>
 					)}
 
-					{/* Price Preview */}
+					{}
 					{selected && (
 						<View style={styles.pricePreview}>
 							<Text style={styles.priceLabel}>Estimated Fare:</Text>
