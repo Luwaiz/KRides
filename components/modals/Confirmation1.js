@@ -5,7 +5,6 @@ import {
 	View,
 	Alert,
 	ActivityIndicator,
-	TextInput,
 } from "react-native";
 import React, { useState } from "react";
 import ActiveButton from "../buttons/ActiveButton";
@@ -15,26 +14,19 @@ import useAuthStore, {
 	useDriverDetails,
 	useUserDetails,
 } from "../../constants/Store";
-import { FIREBASE_AUTH, FIREBASE_DB } from "../../firebaseConfig";
-import {
-	signOut,
-	deleteUser as firebaseDeleteUser,
-	reauthenticateWithCredential,
-	GoogleAuthProvider,
-	EmailAuthProvider,
-} from "firebase/auth";
-import { GoogleSignin } from "@react-native-google-signin/google-signin";
-import { doc, deleteDoc } from "firebase/firestore";
+import { FIREBASE_AUTH } from "../../firebaseConfig";
+import { signOut } from "firebase/auth";
 import Toast from "react-native-toast-message";
 import { colors } from "../../constants/styling";
 import notificationManager from "../../helpers/notificationManager";
+import { NOTIFICATION_API_KEY } from "@env";
+
+const SERVER_URL = 'https://krides.onrender.com/api';
 
 const Confirmation1 = ({ modal, setModal, title }) => {
 	const navigation = useNavigation();
 	const { email } = useUserDetails((state) => ({ email: state.email }));
 	const [loading, setLoading] = useState(false);
-	const [passwordPrompt, setPasswordPrompt] = useState(false);
-	const [passwordInput, setPasswordInput] = useState("");
 
 	const ToAuthScreen = () => {
 		setModal(false);
@@ -48,24 +40,15 @@ const Confirmation1 = ({ modal, setModal, title }) => {
 		setModal(false);
 	};
 
-	const reauthenticate = async (currentUser, password = null) => {
-		const providers = currentUser.providerData.map((p) => p.providerId);
-		if (providers.includes("google.com")) {
-			await GoogleSignin.hasPlayServices();
-			const response = await GoogleSignin.signIn();
-			const idToken = response.idToken || response.data?.idToken;
-			const credential = GoogleAuthProvider.credential(idToken);
-			await reauthenticateWithCredential(currentUser, credential);
-		} else {
-			if (!password) throw new Error("PASSWORD_NEEDED");
-			const credential = EmailAuthProvider.credential(currentUser.email, password);
-			await reauthenticateWithCredential(currentUser, credential);
-		}
-	};
-
-	const performDeletion = async (password = null) => {
+	// The actual delete — of the Firestore doc, any driver bank/Flutterwave
+	// data, and the Firebase Auth account itself — happens server-side via
+	// POST /api/account/delete (Admin SDK; firestore.rules blocks a client
+	// from ever deleting its own doc directly, deliberately). That also
+	// means no client-side re-authentication step is needed here: the
+	// "requires recent login" restriction is specific to the client SDK's
+	// own deleteUser() call, which this no longer makes.
+	const performDeletion = async () => {
 		setLoading(true);
-		setPasswordPrompt(false);
 		try {
 			const currentUser = FIREBASE_AUTH.currentUser;
 			if (!currentUser) {
@@ -73,33 +56,19 @@ const Confirmation1 = ({ modal, setModal, title }) => {
 				return;
 			}
 
-			const { role } = useAuthStore.getState();
-			const collectionName = role === "driver" ? "drivers" : "users";
+			const idToken = await currentUser.getIdToken();
 
-			try {
-				await firebaseDeleteUser(currentUser);
-			} catch (authError) {
-				if (authError.code === "auth/requires-recent-login") {
-					try {
-						await reauthenticate(currentUser, password);
-						await firebaseDeleteUser(currentUser);
-					} catch (reauthError) {
-						if (reauthError.message === "PASSWORD_NEEDED") {
-							setLoading(false);
-							setPasswordInput("");
-							setPasswordPrompt(true);
-							return;
-						}
-						throw reauthError;
-					}
-				} else {
-					throw authError;
-				}
-			}
-
-			try {
-				await deleteDoc(doc(FIREBASE_DB, collectionName, currentUser.uid));
-			} catch (e) {
+			const response = await fetch(`${SERVER_URL}/account/delete`, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					"x-api-key": NOTIFICATION_API_KEY || "",
+					"Authorization": `Bearer ${idToken}`,
+				},
+			});
+			const result = await response.json().catch(() => ({}));
+			if (!response.ok || !result.success) {
+				throw new Error(result.error || "Could not delete account");
 			}
 
 			useUserDetails.getState().clearUser();
@@ -123,7 +92,7 @@ const Confirmation1 = ({ modal, setModal, title }) => {
 		}
 	};
 
-	const deleteUser = () => performDeletion(null);
+	const deleteUser = () => performDeletion();
 
 	const logOut = async () => {
 		try {
@@ -181,29 +150,6 @@ const Confirmation1 = ({ modal, setModal, title }) => {
 			</Modal>
 
 			{}
-			{passwordPrompt && (
-				<Modal visible transparent statusBarTranslucent animationType="fade">
-					<View style={styles.modal}>
-						<View style={styles.container}>
-							<Text style={styles.text}>Enter your password to confirm deletion</Text>
-							<TextInput
-								style={styles.passwordInput}
-								placeholder="Password"
-								secureTextEntry
-								value={passwordInput}
-								onChangeText={setPasswordInput}
-								autoFocus
-							/>
-							<View style={styles.button}>
-								<ActiveButton title={"Confirm"} onPress={() => performDeletion(passwordInput)} disabled={!passwordInput} />
-								<LoginButton title={"Cancel"} onPress={() => { setPasswordPrompt(false); setPasswordInput(""); }} />
-							</View>
-						</View>
-					</View>
-				</Modal>
-			)}
-
-			{}
 			{loading && (
 				<Modal
 					visible={loading}
@@ -253,16 +199,6 @@ const styles = StyleSheet.create({
 	},
 	button: {
 		marginTop: "auto",
-	},
-	passwordInput: {
-		width: "100%",
-		borderWidth: 1,
-		borderColor: colors.lightGrey,
-		borderRadius: 8,
-		paddingHorizontal: 12,
-		paddingVertical: 10,
-		fontSize: 15,
-		marginVertical: 16,
 	},
 	loadingOverlay: {
 		flex: 1,

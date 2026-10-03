@@ -685,9 +685,20 @@ app.post('/api/payments/create-subaccount', async (req, res) => {
 
         const driverSnap = await db.collection('drivers').doc(decoded.uid).get();
         const existing = driverSnap.exists ? driverSnap.data() : null;
-        const isUpdate = !!(existing?.subaccountId && existing?.bankCode === bankCode);
+        let isUpdate = !!(existing?.subaccountId && existing?.bankCode === bankCode);
 
-        const result = isUpdate
+        const createPayload = {
+            account_bank: bankCode,
+            account_number: accountNumber,
+            business_name: businessName || verifiedAccountName,
+            business_email: `${phone}@rideapp.com`,
+            business_mobile: phone,
+            country: 'NG',
+            split_type: 'flat',
+            split_value: 50,
+        };
+
+        let result = isUpdate
             ? await flutterwaveRequest(`https://api.flutterwave.com/v3/subaccounts/${existing.subaccountId}`, {
                 method: 'PUT',
                 headers: {
@@ -707,17 +718,28 @@ app.post('/api/payments/create-subaccount', async (req, res) => {
                     Authorization: `Bearer ${secretKey}`,
                     'Content-Type': 'application/json',
                 },
-                data: {
-                    account_bank: bankCode,
-                    account_number: accountNumber,
-                    business_name: businessName || verifiedAccountName,
-                    business_email: `${phone}@rideapp.com`,
-                    business_mobile: phone,
-                    country: 'NG',
-                    split_type: 'flat',
-                    split_value: 50,
-                },
+                data: createPayload,
             });
+
+        // A stored subaccountId can go stale (e.g. it was created under a
+        // different Flutterwave key/mode than what's live now) and the
+        // update then fails on a lookup that will never succeed no matter
+        // how many times it's retried — "Merchant not found" from Flutterwave
+        // is exactly this. Rather than leave the driver stuck re-submitting
+        // the same failing update, fall back to creating a fresh subaccount
+        // once, which is the actual fix for a reference that's gone bad.
+        if (result.status !== 'success' && isUpdate) {
+            console.warn(`⚠️ Subaccount update failed for driver ${decoded.uid} (${result.message}) — retrying as a fresh create`);
+            isUpdate = false;
+            result = await flutterwaveRequest('https://api.flutterwave.com/v3/subaccounts', {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${secretKey}`,
+                    'Content-Type': 'application/json',
+                },
+                data: createPayload,
+            });
+        }
 
         if (result.status === 'success') {
             const subaccountId = result.data?.subaccount_id || (isUpdate ? existing.subaccountId : undefined);
@@ -728,6 +750,79 @@ app.post('/api/payments/create-subaccount', async (req, res) => {
     } catch (error) {
         console.error('❌ Flutterwave subaccount error:', error);
         res.status(500).json({ error: 'Payment service unavailable. Please try again.' });
+    }
+});
+
+// POST /api/account/delete
+// firestore.rules deliberately sets `allow delete: if false` on both
+// users/{id} and drivers/{id} — a client can never delete its own doc
+// directly, so the client-side deleteDoc() call this used to make was
+// silently failing every single time (swallowed by an empty catch), leaving
+// full name, phone, ride history references, and for drivers, bank details
+// and a live Flutterwave subaccount, sitting in Firestore forever after
+// "successful" deletion. This does the real cleanup server-side via the
+// Admin SDK, which bypasses those rules, then deletes the Firebase Auth
+// account last — the Admin SDK's deleteUser doesn't have the client SDK's
+// "requires recent login" restriction, so no re-authentication step is
+// needed here at all.
+app.post('/api/account/delete', async (req, res) => {
+    const decoded = await verifyFirebaseToken(req);
+    if (!decoded) return res.status(401).json({ error: 'Unauthorized' });
+
+    const uid = decoded.uid;
+
+    try {
+        const driverRef = db.collection('drivers').doc(uid);
+        const userRef = db.collection('users').doc(uid);
+        const [driverSnap, userSnap] = await Promise.all([driverRef.get(), userRef.get()]);
+
+        if (driverSnap.exists) {
+            const driver = driverSnap.data();
+
+            // Best-effort: Flutterwave's subaccounts API has no documented
+            // delete endpoint (only create/update/fetch) — this at least
+            // attempts to strip it. Never blocks account deletion either way.
+            if (driver?.subaccountId) {
+                const secretKey = process.env.FLUTTERWAVE_SECRET_KEY;
+                if (secretKey) {
+                    try {
+                        const fwResult = await flutterwaveRequest(`https://api.flutterwave.com/v3/subaccounts/${driver.subaccountId}`, {
+                            method: 'DELETE',
+                            headers: { Authorization: `Bearer ${secretKey}` },
+                        });
+                        if (fwResult.status === 'success') {
+                            console.log(`🗑️ Flutterwave subaccount ${driver.subaccountId} removed for driver ${uid}`);
+                        } else {
+                            console.warn(`⚠️ Flutterwave subaccount removal not confirmed for driver ${uid}: ${fwResult.message || 'unknown response'}`);
+                        }
+                    } catch (fwError) {
+                        console.warn(`⚠️ Could not reach Flutterwave to remove subaccount for driver ${uid}:`, fwError.message);
+                    }
+                }
+            }
+
+            await Promise.all([
+                driverRef.delete(),
+                db.collection('driver_locations').doc(uid).delete().catch(() => {}),
+            ]);
+        } else if (userSnap.exists) {
+            await userRef.delete();
+        }
+
+        // Ride history is intentionally kept, for both roles — it's a
+        // shared record with the other party on each ride, and for a
+        // driver, the record of payouts already made. Deleting it here
+        // would corrupt someone else's history, not just this account's.
+
+        await admin.auth().deleteUser(uid).catch((err) => {
+            console.warn(`⚠️ Could not delete Firebase Auth user ${uid}:`, err.message);
+        });
+
+        console.log(`🗑️ Account fully deleted: ${uid} (${driverSnap.exists ? 'driver' : 'customer'})`);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('❌ delete-account error:', error);
+        res.status(500).json({ error: 'Could not delete account. Please try again.' });
     }
 });
 
@@ -936,6 +1031,94 @@ app.post('/api/wallet/create-topup-account', async (req, res) => {
     }
 });
 
+// Resolves a driver-payout Transfer's actual settlement outcome, delivered
+// by Flutterwave as its own webhook event (see the 'transfer.completed'
+// branch in POST /api/wallet/webhook). SUCCESSFUL is folded into the exact
+// same terminal state a manual admin "Mark Paid" produces — same status
+// value, same totalPaidOut increment — so every existing admin surface
+// (Payouts page, paidTotal, "recently paid" query) picks it up with no
+// separate handling needed. FAILED re-enters the existing failed-payout
+// retry sweep the same way a synchronous rejection from transferToDriver
+// already does.
+async function handleTransferWebhook(data, res) {
+    if (!data) return res.sendStatus(200);
+
+    const reference = data.reference || '';
+    if (!reference.startsWith('krides_payout_')) {
+        console.log(`ℹ️ Ignoring unrelated transfer reference: ${reference}`);
+        return res.sendStatus(200);
+    }
+
+    // Reference format: krides_payout_{rideId} or, for a retried transfer,
+    // krides_payout_{rideId}_retry{n} — see transferToDriver/retryFailedPayout.
+    const withoutPrefix = reference.replace('krides_payout_', '');
+    const retryIdx = withoutPrefix.indexOf('_retry');
+    const rideId = retryIdx > -1 ? withoutPrefix.slice(0, retryIdx) : withoutPrefix;
+    if (!rideId) {
+        console.error('❌ Could not parse rideId from transfer reference:', reference);
+        return res.sendStatus(200);
+    }
+
+    const status = data.status; // Flutterwave transfer lifecycle: NEW, SUCCESSFUL, FAILED
+    if (status !== 'SUCCESSFUL' && status !== 'FAILED') {
+        console.log(`ℹ️ Ignoring non-terminal transfer status '${status}' for ride ${rideId}`);
+        return res.sendStatus(200);
+    }
+
+    try {
+        const rideRef = db.collection('rides').doc(rideId);
+        let driverIdToCredit = null;
+        let amountToCredit = 0;
+
+        await db.runTransaction(async (txn) => {
+            const rideSnap = await txn.get(rideRef);
+            if (!rideSnap.exists) {
+                console.error(`❌ Transfer webhook: ride not found: ${rideId}`);
+                return;
+            }
+
+            const ride = rideSnap.data();
+            // The ride's own payoutStatus is the idempotency lock here (no
+            // separate ledger doc like the wallet-topup webhook uses) — a
+            // duplicate delivery of this same event, or the admin having
+            // already resolved it manually in between, both leave
+            // payoutStatus no longer 'initiated', so this becomes a no-op
+            // instead of double-crediting totalPaidOut.
+            if (ride.payoutStatus !== 'initiated') {
+                console.log(`ℹ️ Transfer webhook: ride ${rideId} payoutStatus is '${ride.payoutStatus}', not 'initiated' — skipping`);
+                return;
+            }
+
+            if (status === 'SUCCESSFUL') {
+                txn.update(rideRef, {
+                    payoutStatus: 'paid_manually',
+                    payoutPaidAt: admin.firestore.FieldValue.serverTimestamp(),
+                    payoutError: admin.firestore.FieldValue.delete(),
+                });
+                driverIdToCredit = ride.driverId || null;
+                amountToCredit = Number(ride.payoutAmount) || 0;
+            } else {
+                txn.update(rideRef, {
+                    payoutStatus: 'failed',
+                    payoutError: data.complete_message || 'Transfer failed during bank processing',
+                });
+            }
+        });
+
+        if (driverIdToCredit && amountToCredit > 0) {
+            await db.collection('drivers').doc(driverIdToCredit)
+                .update({ totalPaidOut: admin.firestore.FieldValue.increment(amountToCredit) })
+                .catch((err) => console.error(`❌ Could not update totalPaidOut for driver ${driverIdToCredit}:`, err.message));
+        }
+
+        console.log(`${status === 'SUCCESSFUL' ? '✅' : '❌'} Transfer webhook resolved ride ${rideId}: ${status}`);
+        return res.sendStatus(200);
+    } catch (error) {
+        console.error('❌ Transfer webhook processing error:', error);
+        return res.sendStatus(500); // let Flutterwave retry
+    }
+}
+
 app.post('/api/wallet/webhook', async (req, res) => {
     const webhookSecret = process.env.FLUTTERWAVE_WEBHOOK_SECRET;
     if (!webhookSecret) {
@@ -950,6 +1133,15 @@ app.post('/api/wallet/webhook', async (req, res) => {
     }
 
     const { event, data } = req.body || {};
+
+    // 'initiated' (see transferToDriver) only ever meant "Flutterwave accepted
+    // the request" — the actual outcome (money landed, or the bank rejected
+    // it) arrives later as this separate event, sent to the same webhook URL
+    // as everything else. Without handling it, a ride sits at 'initiated'
+    // forever regardless of what actually happened to the transfer.
+    if (event === 'transfer.completed') {
+        return handleTransferWebhook(data, res);
+    }
 
     if (event !== 'charge.completed' || data?.status !== 'successful') {
         console.log(`ℹ️ Ignoring webhook: event=${event} status=${data?.status}`);
@@ -1944,7 +2136,13 @@ app.get('/admin-api/payouts/overview', async (req, res) => {
 
         const [owedSnap, paidSnap, driversSnap] = await Promise.all([
             db.collection('rides')
-                .where('payoutStatus', 'in', ['pending_manual', 'failed', 'awaiting_bank_details', 'needs_review'])
+                // 'initiated' = a Transfer was accepted by Flutterwave and is
+                // awaiting the transfer.completed webhook to resolve it one
+                // way or the other (see handleTransferWebhook) — included
+                // here so a payout mid-flight is visible as still-owed
+                // rather than vanishing from the admin panel for however
+                // long settlement takes.
+                .where('payoutStatus', 'in', ['pending_manual', 'failed', 'awaiting_bank_details', 'needs_review', 'initiated'])
                 .get(),
             db.collection('rides')
                 .where('payoutStatus', '==', 'paid_manually')
