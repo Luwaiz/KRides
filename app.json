@@ -51,6 +51,7 @@
       "googleServicesFile": "./google-services.json",
       "package": "com.eluwaiz.KRides",
       "versionCode": 1,
+      "allowBackup": false,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"

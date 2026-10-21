@@ -33,6 +33,7 @@ import useAuthStore from "../constants/Store";
 import { notifyDriversAboutNewRide, notifyDriverRideCancelled } from "../helpers/notificationHelpers";
 import { payWithWallet } from "../helpers/walletHelpers";
 import { processRefund } from "../helpers/flutterwaveRefund";
+import notificationManager from "../helpers/notificationManager";
 
 const ConfirmRide = () => {
 	const [selectRider, setSelectRider] = useState(false);
@@ -170,6 +171,15 @@ const ConfirmRide = () => {
 			});
 			setTimeout(async () => {
 				try {
+					// Clear this device's push token off the account being
+					// signed out of first — skipping this is how a signed-out
+					// account keeps "receiving" notifications on this device:
+					// the token sitting on its Firestore doc still points here
+					// until something nulls it out, same fix as Confirmation1's
+					// normal logout flow.
+					if (currentUser?.uid) {
+						await notificationManager.cleanup(currentUser.uid, 'customer');
+					}
 					await signOut(FIREBASE_AUTH);
 					clearAuth();
 					clearUser();
@@ -190,6 +200,9 @@ const ConfirmRide = () => {
 			});
 			setTimeout(async () => {
 				try {
+					if (currentUser?.uid) {
+						await notificationManager.cleanup(currentUser.uid, 'customer');
+					}
 					await signOut(FIREBASE_AUTH);
 					clearAuth();
 					clearUser();

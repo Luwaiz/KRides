@@ -10,12 +10,6 @@ service cloud.firestore {
       return isAuth() && request.auth.uid == uid;
     }
 
-    function isRatingUpdate() {
-      return request.resource.data.diff(resource.data)
-               .affectedKeys()
-               .hasOnly(['ratings', 'totalRatings', 'ratingSum']);
-    }
-
     function rideFieldLengthsOk() {
       let d = request.resource.data;
       return (!('customerName'   in d) || (d.customerName   is string && d.customerName.size()   <= 100)) &&
@@ -44,7 +38,16 @@ service cloud.firestore {
     match /drivers/{driverId} {
       allow read:   if isOwner(driverId);
       allow create: if isOwner(driverId);
-      allow update: if isOwner(driverId) || (isAuth() && isRatingUpdate());
+      // Ratings are written server-side only (POST /api/rides/rate, Admin
+      // SDK — bypasses these rules entirely), after verifying the caller
+      // actually owns the ride being rated and hasn't rated it before.
+      // There used to be a client-side allowance here for exactly the
+      // 'ratings' field with no caller-identity or value check at all —
+      // any authenticated user (not just customers, not just ones who'd
+      // actually ridden with this driver) could overwrite any driver's
+      // entire rating history directly via the client SDK. Removed: the
+      // real flow never needed it, and it was pure unguarded attack surface.
+      allow update: if isOwner(driverId);
       allow delete: if false;
     }
 

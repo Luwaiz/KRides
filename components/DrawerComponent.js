@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, Image, Alert } from "react-native";
+import { StyleSheet, Text, View, Image } from "react-native";
 import { DrawerContentScrollView, DrawerItem } from "@react-navigation/drawer";
 import React, { useEffect, useState, useRef } from "react";
 import { AntDesign } from "@expo/vector-icons";
@@ -9,10 +9,8 @@ import { useNavigation } from "@react-navigation/native";
 import { TouchableOpacity } from "react-native-gesture-handler";
 import Confirmation1 from "./modals/Confirmation1";
 import Avatar from "../assets/svg/Frame 77avatar.svg";
-import useAuthStore, { useUserDetails } from "../constants/Store";
 import { doc, onSnapshot } from "firebase/firestore";
 import { FIREBASE_AUTH, FIREBASE_DB } from "../firebaseConfig";
-import { signOut } from "firebase/auth";
 
 const details = [
 	{
@@ -55,23 +53,14 @@ const DrawerLayout = ({ icon, title, navigateTo }) => {
 						: () => navigation.navigate(navigateTo)
 				}
 			/>
+			{/* Confirmation1 doesn't take an onConfirm prop — it owns Logout/Delete
+			    itself internally (and does the push-token cleanup that a
+			    duplicate signOut() here would skip). An onConfirm here used to
+			    look live but was dead code, never actually called. */}
 			<Confirmation1
 				modal={modal}
 				setModal={setModal}
 				title={title}
-				onConfirm={async () => {
-					if (title === "Logout") {
-						try {
-							await signOut(FIREBASE_AUTH);
-							useUserDetails.getState().clearUser();
-							useAuthStore.getState().clearAuth();
-							navigation.replace("AuthStack");
-						} catch (err) {
-							console.error("Logout error:", err);
-							Alert.alert("Logout Failed", "Failed to logout. Please try again.");
-						}
-					}
-				}}
 			/>
 		</>
 	);

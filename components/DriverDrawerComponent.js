@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { StyleSheet, Text, View, TouchableOpacity, Alert } from "react-native";
+import { StyleSheet, Text, View, TouchableOpacity } from "react-native";
 import { DrawerContentScrollView, DrawerItem } from "@react-navigation/drawer";
 import {
 	AntDesign,
@@ -15,7 +15,6 @@ import Confirmation1 from "./modals/Confirmation1";
 import useAuthStore, { useDriverDetails } from "../constants/Store";
 import { FIREBASE_AUTH, FIREBASE_DB } from "../firebaseConfig";
 import { doc, onSnapshot } from "firebase/firestore";
-import { signOut } from "firebase/auth";
 
 const driverDetails = [
 	{
@@ -57,16 +56,6 @@ const DriverDrawerItem = ({ icon, title, navigateTo }) => {
 	const navigation = useNavigation();
 	const [modal, setModal] = useState(false);
 
-	const handleLogout = async () => {
-		try {
-			await signOut(FIREBASE_AUTH);
-			navigation.replace("Login");
-		} catch (err) {
-			console.error("Logout error", err);
-			Alert.alert("Logout Failed", "Failed to logout. Please try again.");
-		}
-	};
-
 	const onPress = () => {
 		if (title === "Logout") {
 			setModal(true);
@@ -86,23 +75,14 @@ const DriverDrawerItem = ({ icon, title, navigateTo }) => {
 				label={title}
 				onPress={onPress}
 			/>
+			{/* Confirmation1 doesn't take an onConfirm prop — it owns Logout/
+			    Delete itself internally (and does the push-token cleanup that
+			    a duplicate signOut() here would skip). An onConfirm here used
+			    to look live but was dead code, never actually called. */}
 			<Confirmation1
 				modal={modal}
 				setModal={setModal}
 				title={title}
-				onConfirm={async () => {
-					if (title === "Logout") {
-						try {
-							await signOut(FIREBASE_AUTH);
-							useDriverDetails.getState().clearDriver();
-							useAuthStore.getState().clearAuth();
-							navigation.replace("AuthStack");
-						} catch (err) {
-							console.error("Logout error:", err);
-							Alert.alert("Logout Failed", "Failed to logout. Please try again.");
-						}
-					}
-				}}
 			/>
 		</>
 	);

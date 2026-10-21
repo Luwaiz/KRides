@@ -4,20 +4,21 @@ import { MaterialIcons, Octicons } from "@expo/vector-icons";
 import React, { useState, useEffect } from "react";
 import Phone from "../../assets/svg/Call.svg";
 import ActiveButton from "../buttons/ActiveButton";
+import DangerButton from "../buttons/DangerButton";
 import { colors } from "../../constants/styling";
 import { sp, fs, br } from "../../constants/responsive";
 import { useAcceptedRideStore, useDriverDetails } from "../../constants/Store";
 import useAuthStore from "../../constants/Store";
 import Avatar from "../../assets/svg/Frame 77avatar.svg";
 import Arrival from "../modals/Arrival";
-import { updateRideStatus, listenToPendingRides, listenToRide, declineRide, getRide } from "../../helpers/firebaseRides";
+import { updateRideStatus, listenToPendingRides, listenToRide, declineRide, getRide, cancelRideWithRefund } from "../../helpers/firebaseRides";
 import { getRideCoordinates } from "../../helpers/getLocationCoordinates";
 import { doc, runTransaction, serverTimestamp } from "firebase/firestore";
 import { FIREBASE_DB, FIREBASE_AUTH } from "../../firebaseConfig";
 import { NOTIFICATION_API_KEY } from "@env";
 import { DrawerActions, useNavigation } from "@react-navigation/native";
 import { calculateDriverEarnings } from "../../constants/commission";
-import { notifyCustomerDriverArrived } from "../../helpers/notificationHelpers";
+import { notifyCustomerDriverArrived, notifyCustomerRideCancelled } from "../../helpers/notificationHelpers";
 
 const AcceptTab = () => {
 	const [endRide, setEndRide] = useState(false);
@@ -27,6 +28,7 @@ const AcceptTab = () => {
 	const [pendingRides, setPendingRides] = useState([]);
 	const [hasArrived, setHasArrived] = useState(false);
 	const [arriving, setArriving] = useState(false);
+	const [cancelling, setCancelling] = useState(false);
 
 	const acceptedRide = useAcceptedRideStore((state) => state.acceptedRide);
 	const nextRide = useAcceptedRideStore((state) => state.nextRide);
@@ -187,6 +189,66 @@ const AcceptTab = () => {
 			clearTimeout(timeoutId);
 			setLoading(false);
 		}
+	};
+
+	// Previously, once a driver accepted a ride, there was no way for them to
+	// back out of it — only the customer could cancel. A driver who couldn't
+	// actually complete it (breakdown, change of plans) had no path forward,
+	// and the customer's payment had no way to get refunded. This reuses the
+	// exact same cancelRideWithRefund the customer side uses, just with
+	// cancelledBy: 'driver' — same refund handling (card, wallet, or
+	// needs-manual-review), same atomic claim against a double-cancel race.
+	const handleCancelRide = () => {
+		if (!acceptedRide?.rideId) return;
+
+		Alert.alert(
+			"Cancel This Ride?",
+			"The customer will be notified and refunded automatically if they already paid. This can't be undone.",
+			[
+				{ text: "Never Mind", style: "cancel" },
+				{
+					text: "Yes, Cancel Ride",
+					style: "destructive",
+					onPress: async () => {
+						setCancelling(true);
+						try {
+							const result = await cancelRideWithRefund(acceptedRide.rideId, 'driver', 'Driver cancelled ride');
+
+							if (acceptedRide.customerId) {
+								notifyCustomerRideCancelled(
+									acceptedRide.customerId,
+									acceptedRide.rideId,
+									acceptedRide.driverName || fullName || 'Your driver'
+								).catch(() => {});
+							}
+
+							clearAcceptedRide();
+							setHasArrived(false);
+							setEndRide(false);
+
+							if (result.refundStatus === "completed") {
+								Alert.alert("Ride Cancelled", `Ride cancelled — the customer's ₦${result.refundAmount} refund has been initiated.`);
+							} else if (result.walletRefundStatus === "completed") {
+								Alert.alert("Ride Cancelled", `Ride cancelled — ₦${result.refundAmount} has been returned to the customer's wallet.`);
+							} else if (
+								result.refundStatus === "failed" ||
+								result.refundStatus === "needs_review" ||
+								result.walletRefundStatus === "failed"
+							) {
+								Alert.alert("Ride Cancelled", "Ride cancelled, but the customer's refund could not be processed automatically. Support has been notified.");
+							} else {
+								Alert.alert("Ride Cancelled", "The ride has been cancelled.");
+							}
+						} catch (error) {
+							console.error("❌ Error cancelling ride:", error);
+							Alert.alert("Error", "Unable to cancel ride. Please check your connection and try again.");
+						} finally {
+							setCancelling(false);
+						}
+					},
+				},
+			]
+		);
 	};
 
 	const openNavigation = () => {
@@ -538,6 +600,14 @@ const AcceptTab = () => {
 								onPress={RideEnded}
 								loading={loading}
 								disabled={!hasArrived}
+							/>
+						</View>
+
+						<View style={[styles.button, { marginTop: sp(8) }]}>
+							<DangerButton
+								title={cancelling ? "Cancelling..." : "Cancel Ride"}
+								onPress={cancelling ? () => {} : handleCancelRide}
+								width={"100%"}
 							/>
 						</View>
 					</View>

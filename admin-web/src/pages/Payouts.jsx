@@ -18,6 +18,7 @@ const STATUS_BADGES = {
     awaiting_bank_details: { label: 'Awaiting Bank Details', className: 'badge-open' },
     failed: { label: 'Failed', className: 'badge-open' },
     needs_review: { label: 'Needs Review', className: 'badge-open' },
+    initiated: { label: 'Processing', className: 'badge-pending' },
 };
 const statusBadge = (status) => STATUS_BADGES[status] || { label: status || 'Unknown', className: 'badge-pending' };
 
@@ -80,7 +81,20 @@ export default function Payouts() {
         }
     };
 
-    if (!drivers) return <p className="loading">Loading…</p>;
+    // A failed load leaves `drivers` null forever (it's only ever set on
+    // success) — showing the error here instead of just "Loading…" is what
+    // actually surfaces a failure instead of it looking identical to a slow
+    // network for however long someone's willing to wait.
+    if (!drivers) {
+        return error ? (
+            <div>
+                <p className="error">{error}</p>
+                <button onClick={() => load(false)}>Retry</button>
+            </div>
+        ) : (
+            <p className="loading">Loading…</p>
+        );
+    }
 
     return (
         <div className="payouts-page">

@@ -192,6 +192,39 @@ export async function notifyDriverRideCancelled(driverId, rideId, customerName) 
     }
 }
 
+export async function notifyCustomerRideCancelled(customerId, rideId, driverName) {
+    try {
+        return await retryWithBackoff(
+            async () => {
+                const response = await api.post(`${NOTIFICATION_SERVER_URL}/send`, {
+                    userId: customerId,
+                    role: 'customer',
+                    title: 'Ride Cancelled ❌',
+                    body: `${driverName || 'Your driver'} cancelled the ride — any payment has been refunded`,
+                    data: {
+                        type: 'ride_cancelled',
+                        rideId: String(rideId),
+                    },
+                });
+                console.log('✅ Customer notified about driver-cancelled ride:', response.data);
+                return response.data;
+            },
+            {
+                maxRetries: 3,
+                initialDelay: 1000,
+                shouldRetry: shouldRetryError,
+                onRetry: (attempt, delay, error) => {
+                    console.log(`⚠️ Retry attempt ${attempt}/3 for notifyCustomerRideCancelled after ${delay}ms`);
+                    console.log(`   Error: ${error.message}`);
+                }
+            }
+        );
+    } catch (error) {
+        console.error('❌ Error notifying customer (all retries failed):', error.message);
+        return null;
+    }
+}
+
 export async function sendNotificationToUser(userId, role, title, body, data = {}) {
     try {
         return await retryWithBackoff(
