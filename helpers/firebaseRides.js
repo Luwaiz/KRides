@@ -244,7 +244,8 @@ export const cancelRideWithRefund = async (rideId, cancelledBy = 'customer', rea
 			const refundResult = await processRefund(
 				rideData.transactionId,
 				null,
-				reason || `Ride cancelled by ${cancelledBy}`
+				reason || `Ride cancelled by ${cancelledBy}`,
+				rideId
 			);
 
 			if (refundResult.success) {

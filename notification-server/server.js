@@ -576,10 +576,10 @@ app.post('/api/payments/refund', async (req, res) => {
     const decoded = await verifyFirebaseToken(req);
     if (!decoded) return res.status(401).json({ error: 'Unauthorized' });
 
-    const { transactionId, amount, comments } = req.body;
+    const { transactionId, rideId, amount, comments } = req.body;
 
-    if (!transactionId) {
-        return res.status(400).json({ error: 'transactionId is required' });
+    if (!transactionId && !rideId) {
+        return res.status(400).json({ error: 'transactionId or rideId is required' });
     }
 
     const secretKey = process.env.FLUTTERWAVE_SECRET_KEY;
@@ -587,11 +587,36 @@ app.post('/api/payments/refund', async (req, res) => {
         return res.status(500).json({ error: 'Payment service not configured' });
     }
 
+    // rideId is how the caller is authorized: only that ride's own customer
+    // or its assigned driver may trigger its refund (covers both
+    // customer-initiated and driver-initiated cancellation). When it's
+    // omitted entirely — only the orphaned-charge bootstrap path does this,
+    // where a card charge succeeded but the ride document itself was never
+    // created, so there's nothing to check ownership against — this falls
+    // back to the narrower pre-existing trust model (any authenticated
+    // caller). Prefer ride.transactionId (server-trusted) over whatever the
+    // client sent whenever a ride is available, so a mismatched or spoofed
+    // client-supplied transactionId can't be refunded under a real ride's
+    // authorization.
+    let refundTransactionId = transactionId;
+    if (rideId) {
+        const rideSnap = await db.collection('rides').doc(rideId).get();
+        if (!rideSnap.exists) return res.status(404).json({ error: 'Ride not found' });
+        const ride = rideSnap.data();
+        if (ride.customerId !== decoded.uid && ride.driverId !== decoded.uid) {
+            return res.status(403).json({ error: 'This ride does not belong to you' });
+        }
+        if (!ride.transactionId) {
+            return res.status(400).json({ error: 'This ride has no transaction to refund' });
+        }
+        refundTransactionId = ride.transactionId;
+    }
+
     try {
-        const payload = { comments: comments || 'Ride cancelled by customer' };
+        const payload = { comments: comments || 'Ride cancelled' };
         if (amount) payload.amount = amount;
 
-        const result = await flutterwaveRequest(`https://api.flutterwave.com/v3/transactions/${transactionId}/refund`, {
+        const result = await flutterwaveRequest(`https://api.flutterwave.com/v3/transactions/${refundTransactionId}/refund`, {
             method: 'POST',
             headers: {
                 Authorization: `Bearer ${secretKey}`,
@@ -1584,10 +1609,10 @@ app.post('/api/payments/wallet-refund', async (req, res) => {
         return res.status(400).json({ error: 'idToken and rideId are required' });
     }
 
-    let customerId;
+    let callerId;
     try {
         const decoded = await admin.auth().verifyIdToken(idToken);
-        customerId = decoded.uid;
+        callerId = decoded.uid;
     } catch (err) {
         return res.status(401).json({ error: 'Invalid or expired session. Please log in again.' });
     }
@@ -1602,7 +1627,11 @@ app.post('/api/payments/wallet-refund', async (req, res) => {
 
         const ride = rideSnap.data();
 
-        if (ride.customerId !== customerId) {
+        // Either party to this specific ride may trigger its refund — the
+        // customer cancelling, or the driver cancelling (see cancelRideWithRefund
+        // and AcceptTab's "Cancel Ride"). The money always goes back to
+        // ride.customerId regardless of which of them called this.
+        if (ride.customerId !== callerId && ride.driverId !== callerId) {
             return res.status(403).json({ error: 'This ride does not belong to you' });
         }
 
@@ -1623,7 +1652,7 @@ app.post('/api/payments/wallet-refund', async (req, res) => {
             return res.json({ success: true, refunded: false, reason: 'no_amount' });
         }
 
-        const userRef = db.collection('users').doc(customerId);
+        const userRef = db.collection('users').doc(ride.customerId);
         let alreadyRefunded = false;
         let refundedAmount = amount;
 
@@ -1646,7 +1675,7 @@ app.post('/api/payments/wallet-refund', async (req, res) => {
 
             const txRef = db.collection('walletTransactions').doc();
             txn.set(txRef, {
-                userId: customerId,
+                userId: ride.customerId,
                 type: 'refund',
                 amount: refundedAmount,
                 description: 'Ride cancellation refund',
@@ -1661,7 +1690,7 @@ app.post('/api/payments/wallet-refund', async (req, res) => {
             return res.json({ success: true, alreadyRefunded: true });
         }
 
-        console.log(`✅ Wallet refund of ₦${refundedAmount} credited to customer ${customerId} (ride ${rideId})`);
+        console.log(`✅ Wallet refund of ₦${refundedAmount} credited to customer ${ride.customerId} (ride ${rideId}, triggered by ${callerId})`);
         return res.json({ success: true, refundedAmount });
 
     } catch (error) {
@@ -1726,7 +1755,7 @@ app.post('/api/reports/driver', async (req, res) => {
             customerName: customer.firstName ? `${customer.firstName} ${customer.lastName || ''}`.trim() : 'Unknown',
             customerPhone: customer.phone || ride.customerPhone || 'N/A',
             driverId: ride.driverId,
-            driverName: driver.fullName || driver.name || ride.driverName || 'Unknown',
+            driverName: driver.fullname || ride.driverName || 'Unknown',
             driverPhone: driver.phone || ride.driverPhone || 'N/A',
             driverEmail: driver.email || 'N/A',
             driverVehicleId: driver.vehicle_id || 'N/A',
@@ -1741,7 +1770,7 @@ app.post('/api/reports/driver', async (req, res) => {
         });
 
         const emailResult = await sendDriverReportEmail({
-            driverName: driver.fullName || driver.name || ride.driverName || 'Unknown',
+            driverName: driver.fullname || ride.driverName || 'Unknown',
             driverPhone: driver.phone || ride.driverPhone || 'N/A',
             driverEmail: driver.email || 'N/A',
             driverVehicleId: driver.vehicle_id || 'N/A',

@@ -10,8 +10,13 @@ function fetchWithTimeout(url, options = {}) {
     return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer));
 }
 
-export const processRefund = async (transactionId, amount = null, comments = 'Ride cancelled by customer') => {
-    console.log('💰 Processing refund for transaction:', transactionId);
+// rideId authorizes the caller server-side (that ride's customer OR its
+// assigned driver — see POST /api/payments/refund) and, when given, the
+// server refunds that ride's own stored transactionId rather than trusting
+// whatever's passed here. Omit it only for the orphaned-charge bootstrap
+// case, where no ride document exists yet to check ownership against.
+export const processRefund = async (transactionId, amount = null, comments = 'Ride cancelled', rideId = null) => {
+    console.log('💰 Processing refund for transaction:', transactionId, rideId ? `(ride ${rideId})` : '');
 
     const user = FIREBASE_AUTH.currentUser;
     if (!user) throw new Error('Not authenticated — cannot process refund');
@@ -24,7 +29,7 @@ export const processRefund = async (transactionId, amount = null, comments = 'Ri
             'x-api-key': NOTIFICATION_API_KEY || '',
             'Authorization': `Bearer ${idToken}`,
         },
-        body: JSON.stringify({ transactionId, amount, comments }),
+        body: JSON.stringify({ transactionId, amount, comments, rideId }),
     });
 
     const result = await response.json();
