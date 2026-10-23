@@ -8,8 +8,11 @@ import {
 	TouchableOpacity,
 	StyleSheet,
 	Dimensions,
+	KeyboardAvoidingView,
+	Platform,
 } from "react-native";
 import { AntDesign, Ionicons } from "@expo/vector-icons";
+import DismissKeyboardView from "../DismissKeyboardView";
 import ActiveButton from "../buttons/ActiveButton";
 import { colors } from "../../constants/styling";
 import { sp, fs, br, wp } from "../../constants/responsive";
@@ -108,6 +111,11 @@ const ReportDriverModal = ({ visible, onClose, history }) => {
 
 	return (
 		<Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
+			<KeyboardAvoidingView
+				style={{ flex: 1 }}
+				behavior={Platform.OS === "ios" ? "padding" : "height"}
+			>
+			<DismissKeyboardView>
 			<View style={styles.overlay}>
 				<View style={styles.container}>
 					{}
@@ -187,6 +195,8 @@ const ReportDriverModal = ({ visible, onClose, history }) => {
 					</View>
 				</View>
 			</View>
+			</DismissKeyboardView>
+			</KeyboardAvoidingView>
 		</Modal>
 	);
 };

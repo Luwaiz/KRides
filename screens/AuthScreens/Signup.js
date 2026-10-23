@@ -1,7 +1,8 @@
-import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import React, { useState } from "react";
 import { colors } from "../../constants/styling";
 import { SafeAreaView } from "react-native-safe-area-context";
+import DismissKeyboardView from "../../components/DismissKeyboardView";
 import TextInput1 from "../../components/TextInput1";
 import ActiveButton from "../../components/buttons/ActiveButton";
 import GoogleButton from "../../components/buttons/GoogleButton";
@@ -160,82 +161,89 @@ const Signup = ({ navigation }) => {
 
 	return (
 		<SafeAreaView style={styles.container}>
-			<ScrollView style={{ flex: 1 }}>
-				<View style={styles.topCont}>
-					<BackButton text={<Text style={styles.headText}>Sign Up</Text>} />
-				</View>
-				<View style={styles.bottomCont}>
-					<View style={styles.sheetCont}>
-						<View style={styles.textInputCont}>
-							<TextInput1
-								text={"First Name"}
-								placeholder={"John"}
-								onChangeText={(text) => setFirstName(text)}
-								value={firstName}
-							/>
-							<TextInput1
-								text={"Last Name"}
-								placeholder={"Doe"}
-								onChangeText={(text) => setLastName(text)}
-								value={lastName}
-							/>
-							<TextInput1
-								text={"Email Address"}
-								placeholder={"johndoe22@gmail.com"}
-								onChangeText={(text) => setEmail(text)}
-								value={email}
-								keyboardType="email-address"
-								autoCapitalize="none"
-							/>
-							<TextInput1
-								text={"Phone Number"}
-								placeholder={"08123456789 or +2348123456789"}
-								onChangeText={(text) => setPhone(text)}
-								value={phone}
-								keyboardType="phone-pad"
-							/>
-							<TextInput1
-								text={"Password"}
-								placeholder={"*************"}
-								password
-								onChangeText={(text) => setPassword(text)}
-								value={password}
-							/>
-							<TextInput1
-								text={"Confirm Password"}
-								placeholder={"*************"}
-								password
-								onChangeText={(text) => setConfirmPassword(text)}
-								value={confirmPassword}
-							/>
-							<ActiveButton
-								title={"Sign up"}
-								onPress={handleSignUp}
-								disabled={
-									!email ||
-									!password ||
-									!confirmPassword ||
-									!firstName ||
-									!lastName ||
-									!phone ||
-									loading
-								}
-								loading={loading}
-							/>
-							<View style={styles.OrContainer}>
-								<View style={styles.dash} />
-								<Text style={styles.OrText}>OR</Text>
-								<View style={styles.dash} />
-							</View>
-							<GoogleButton
-								title={googleLoading ? "Signing up..." : "Continue with Google"}
-								onPress={handleGoogleSignUp}
-							/>
+			<KeyboardAvoidingView
+				style={{ flex: 1 }}
+				behavior={Platform.OS === "ios" ? "padding" : "height"}
+			>
+				<DismissKeyboardView>
+					<ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
+						<View style={styles.topCont}>
+							<BackButton text={<Text style={styles.headText}>Sign Up</Text>} />
 						</View>
-					</View>
-					<Terms />
-				</View>
-			</ScrollView>
+						<View style={styles.bottomCont}>
+							<View style={styles.sheetCont}>
+								<View style={styles.textInputCont}>
+									<TextInput1
+										text={"First Name"}
+										placeholder={"John"}
+										onChangeText={(text) => setFirstName(text)}
+										value={firstName}
+									/>
+									<TextInput1
+										text={"Last Name"}
+										placeholder={"Doe"}
+										onChangeText={(text) => setLastName(text)}
+										value={lastName}
+									/>
+									<TextInput1
+										text={"Email Address"}
+										placeholder={"johndoe22@gmail.com"}
+										onChangeText={(text) => setEmail(text)}
+										value={email}
+										keyboardType="email-address"
+										autoCapitalize="none"
+									/>
+									<TextInput1
+										text={"Phone Number"}
+										placeholder={"08123456789 or +2348123456789"}
+										onChangeText={(text) => setPhone(text)}
+										value={phone}
+										keyboardType="phone-pad"
+									/>
+									<TextInput1
+										text={"Password"}
+										placeholder={"*************"}
+										password
+										onChangeText={(text) => setPassword(text)}
+										value={password}
+									/>
+									<TextInput1
+										text={"Confirm Password"}
+										placeholder={"*************"}
+										password
+										onChangeText={(text) => setConfirmPassword(text)}
+										value={confirmPassword}
+									/>
+									<ActiveButton
+										title={"Sign up"}
+										onPress={handleSignUp}
+										disabled={
+											!email ||
+											!password ||
+											!confirmPassword ||
+											!firstName ||
+											!lastName ||
+											!phone ||
+											loading
+										}
+										loading={loading}
+									/>
+									<View style={styles.OrContainer}>
+										<View style={styles.dash} />
+										<Text style={styles.OrText}>OR</Text>
+										<View style={styles.dash} />
+									</View>
+									<GoogleButton
+										title={googleLoading ? "Signing up..." : "Continue with Google"}
+										onPress={handleGoogleSignUp}
+									/>
+								</View>
+							</View>
+							<Terms />
+						</View>
+					</ScrollView>
+				</DismissKeyboardView>
+			</KeyboardAvoidingView>
 		</SafeAreaView>
 	);
 };

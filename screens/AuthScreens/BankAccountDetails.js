@@ -8,9 +8,12 @@ import {
     ActivityIndicator,
     TouchableOpacity,
     Dimensions,
+    KeyboardAvoidingView,
+    Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors } from "../../constants/styling";
+import DismissKeyboardView from "../../components/DismissKeyboardView";
 import TextInput1 from "../../components/TextInput1";
 import ActiveButton from "../../components/buttons/ActiveButton";
 import BackButton from "../../components/buttons/BackButton";
@@ -198,71 +201,78 @@ const BankAccountDetails = ({ navigation, route }) => {
 
     return (
         <SafeAreaView style={styles.container}>
-            <ScrollView style={{ flex: 1 }}>
-                <View style={styles.topCont}>
-                    <View style={styles.headerRow}>
-                        <BackButton text={<Text style={styles.headText}>{isEditing ? "Edit Bank Details" : "Bank Details"}</Text>} />
-                        {!isEditing && (
-                            <TouchableOpacity onPress={handleSkip} disabled={loading}>
-                                <Text style={styles.skipText}>{loading ? "..." : "Skip"}</Text>
-                            </TouchableOpacity>
-                        )}
-                    </View>
-                </View>
-                <View style={styles.bottomCont}>
-                    <View style={styles.sheetCont}>
-                        <Text style={styles.subText}>
-                            {isEditing
-                                ? "Update your bank account details below."
-                                : "Please provide your bank account details to receive payments."}
-                        </Text>
-
-                        <View style={styles.inputContainer}>
-                            <Text style={styles.label}>Select Bank</Text>
-                            <View style={styles.pickerContainer}>
-                                <Picker
-                                    selectedValue={bankCode}
-                                    onValueChange={(itemValue) => setBankCode(itemValue)}
-                                    style={styles.picker}
-                                >
-                                    {NIGERIAN_BANKS.map((bank) => (
-                                        <Picker.Item
-                                            key={bank.value}
-                                            label={bank.label}
-                                            value={bank.value}
-                                        />
-                                    ))}
-                                </Picker>
+            <KeyboardAvoidingView
+                style={{ flex: 1 }}
+                behavior={Platform.OS === "ios" ? "padding" : "height"}
+            >
+                <DismissKeyboardView>
+                    <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
+                        <View style={styles.topCont}>
+                            <View style={styles.headerRow}>
+                                <BackButton text={<Text style={styles.headText}>{isEditing ? "Edit Bank Details" : "Bank Details"}</Text>} />
+                                {!isEditing && (
+                                    <TouchableOpacity onPress={handleSkip} disabled={loading}>
+                                        <Text style={styles.skipText}>{loading ? "..." : "Skip"}</Text>
+                                    </TouchableOpacity>
+                                )}
                             </View>
                         </View>
+                        <View style={styles.bottomCont}>
+                            <View style={styles.sheetCont}>
+                                <Text style={styles.subText}>
+                                    {isEditing
+                                        ? "Update your bank account details below."
+                                        : "Please provide your bank account details to receive payments."}
+                                </Text>
 
-                        <TextInput1
-                            text={"Account Number"}
-                            placeholder={"0123456789"}
-                            keyboardType="numeric"
-                            maxLength={10}
-                            onChangeText={(text) => setAccountNumber(text.replace(/\D/g, ""))}
-                            value={accountNumber}
-                        />
+                                <View style={styles.inputContainer}>
+                                    <Text style={styles.label}>Select Bank</Text>
+                                    <View style={styles.pickerContainer}>
+                                        <Picker
+                                            selectedValue={bankCode}
+                                            onValueChange={(itemValue) => setBankCode(itemValue)}
+                                            style={styles.picker}
+                                        >
+                                            {NIGERIAN_BANKS.map((bank) => (
+                                                <Picker.Item
+                                                    key={bank.value}
+                                                    label={bank.label}
+                                                    value={bank.value}
+                                                />
+                                            ))}
+                                        </Picker>
+                                    </View>
+                                </View>
 
-                        <TextInput1
-                            text={"Account Name"}
-                            placeholder={"John Doe"}
-                            onChangeText={setAccountName}
-                            value={accountName}
-                        />
+                                <TextInput1
+                                    text={"Account Number"}
+                                    placeholder={"0123456789"}
+                                    keyboardType="numeric"
+                                    maxLength={10}
+                                    onChangeText={(text) => setAccountNumber(text.replace(/\D/g, ""))}
+                                    value={accountNumber}
+                                />
 
-                        <View style={{ marginTop: 30 }}>
-                            <ActiveButton
-                                title={loading ? "Processing..." : (isEditing ? "Save Changes" : "Save & Continue")}
-                                onPress={handleSubmit}
-                                disabled={loading}
-                                loading={loading}
-                            />
+                                <TextInput1
+                                    text={"Account Name"}
+                                    placeholder={"John Doe"}
+                                    onChangeText={setAccountName}
+                                    value={accountName}
+                                />
+
+                                <View style={{ marginTop: 30 }}>
+                                    <ActiveButton
+                                        title={loading ? "Processing..." : (isEditing ? "Save Changes" : "Save & Continue")}
+                                        onPress={handleSubmit}
+                                        disabled={loading}
+                                        loading={loading}
+                                    />
+                                </View>
+                            </View>
                         </View>
-                    </View>
-                </View>
-            </ScrollView>
+                    </ScrollView>
+                </DismissKeyboardView>
+            </KeyboardAvoidingView>
         </SafeAreaView>
     );
 };

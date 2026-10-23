@@ -1,8 +1,9 @@
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View, KeyboardAvoidingView, Platform } from "react-native";
 import React, { useState } from "react";
 import { OtpInput } from "react-native-otp-entry";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors } from "../../constants/styling";
+import DismissKeyboardView from "../../components/DismissKeyboardView";
 import BackButton from "../../components/buttons/BackButton";
 import ActiveButton from "../../components/buttons/ActiveButton";
 import TextInput1 from "../../components/TextInput1";
@@ -26,22 +27,31 @@ const Name = ({ navigation }) => {
 	};
 	return (
 		<SafeAreaView style={styles.container}>
-			<View style={styles.topCont}>
-				<BackButton
-					text={<Text style={styles.headText}>What’s your name?</Text>}
-				/>
-			</View>
-			<View style={styles.infoCont}>
-				<Text style={styles.infoText}>Let's know you better!</Text>
-			</View>
-			<View style={styles.bottomCont}>
-				<TextInput1 text={"First Name"} placeholder={"e.g John"} />
-				<TextInput1 text={"Last Name"} placeholder={"e.g Dotun"} />
-				<View style={styles.button}>
-					<ActiveButton title={"Submit1"} onPress={ToHome} />
-					<ActiveButton title={"Submit2"} onPress={ToUpload} />
-				</View>
-			</View>
+			<KeyboardAvoidingView
+				style={{ flex: 1 }}
+				behavior={Platform.OS === "ios" ? "padding" : "height"}
+			>
+				<DismissKeyboardView>
+					<View style={{ flex: 1 }}>
+						<View style={styles.topCont}>
+							<BackButton
+								text={<Text style={styles.headText}>What’s your name?</Text>}
+							/>
+						</View>
+						<View style={styles.infoCont}>
+							<Text style={styles.infoText}>Let's know you better!</Text>
+						</View>
+						<View style={styles.bottomCont}>
+							<TextInput1 text={"First Name"} placeholder={"e.g John"} />
+							<TextInput1 text={"Last Name"} placeholder={"e.g Dotun"} />
+							<View style={styles.button}>
+								<ActiveButton title={"Submit1"} onPress={ToHome} />
+								<ActiveButton title={"Submit2"} onPress={ToUpload} />
+							</View>
+						</View>
+					</View>
+				</DismissKeyboardView>
+			</KeyboardAvoidingView>
 		</SafeAreaView>
 	);
 };
