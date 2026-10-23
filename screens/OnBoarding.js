@@ -16,7 +16,7 @@ configureReanimatedLogger({
 
 const { width, height } = Dimensions.get('window');
 
-const OnBoarding = ({ navigation }) => {
+const OnBoarding = ({ navigation, onFinish }) => {
 	const [currentIndex, setCurrentIndex] = useState(0);
 	const slideRef = useRef(null);
 	const scrollFunction = (e) => {
@@ -33,6 +33,7 @@ const OnBoarding = ({ navigation }) => {
 	};
 	const markSeenAndNavigate = async () => {
 		await AsyncStorage.setItem('has_seen_onboarding', 'true');
+		onFinish?.();
 		navigation.replace("AuthStack", { params: "AuthScreen" });
 	};
 

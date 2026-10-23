@@ -97,90 +97,103 @@ admin.initializeApp({
 
 const db = admin.firestore();
 
-console.log('✅ Firebase Admin SDK initialized for FCM notifications');
+console.log('✅ Firebase Admin SDK initialized (Firestore)');
+console.log('📱 Push notifications sent via Expo Push API');
 
-async function sendFCMNotification(fcmToken, title, body, data = {}) {
-    if (!fcmToken) {
+const EXPO_PUSH_API_URL = 'https://exp.host/--/api/v2/push/send';
+
+function isExpoPushToken(token) {
+    return typeof token === 'string' && /^Expo(nent)?PushToken\[.+\]$/.test(token);
+}
+
+// Despite the name (kept to avoid touching every call site), this sends via
+// Expo's push service, not Firebase Cloud Messaging directly. expo-notifications'
+// getExpoPushTokenAsync() on the client produces tokens in this format, which
+// Expo's own infrastructure routes to APNs (iOS) or FCM (Android) correctly —
+// sending a raw native device token straight through Firebase Admin's
+// messaging().send() doesn't work for iOS, since that's a raw APNs token, not
+// an FCM-registered one.
+async function sendFCMNotification(pushToken, title, body, data = {}) {
+    if (!pushToken) {
         console.warn('No push token provided');
         return { success: false, error: 'No push token' };
     }
 
+    if (!isExpoPushToken(pushToken)) {
+        console.warn(`⚠️ Not a valid Expo push token: ${pushToken.substring(0, 20)}...`);
+        return { success: false, error: 'invalid-token', message: 'Not a valid Expo push token', permanent: true };
+    }
+
     const message = {
-        token: fcmToken,
-        notification: {
-            title: title,
-            body: body,
-        },
+        to: pushToken,
+        title,
+        body,
         data: {
             ...data,
-            title: title,
-            body: body,
+            title,
+            body,
         },
-        android: {
-            priority: 'high',
-            notification: {
-                sound: 'default',
-                channelId: 'default',
-            },
-        },
-        apns: {
-            payload: {
-                aps: {
-                    sound: 'default',
-                    badge: 1,
-                },
-            },
-        },
+        sound: 'default',
+        badge: 1,
+        priority: 'high',
+        channelId: 'default',
     };
 
     const maxRetries = 2;
     const initialDelay = 500;
     const maxDelay = 4000;
     const backoffMultiplier = 2;
-    const FCM_SEND_TIMEOUT_MS = 8000;
+    const SEND_TIMEOUT_MS = 8000;
 
-    const permanentErrors = [
-        'messaging/invalid-registration-token',
-        'messaging/registration-token-not-registered',
-        'messaging/invalid-argument',
-        'messaging/invalid-recipient',
-    ];
+    const permanentErrorCodes = ['DeviceNotRegistered'];
 
     let lastError;
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
-            console.log(`📤 Sending FCM notification to ${fcmToken.substring(0, 20)}...: ${title} (attempt ${attempt + 1}/${maxRetries + 1})`);
+            console.log(`📤 Sending Expo push notification to ${pushToken.substring(0, 25)}...: ${title} (attempt ${attempt + 1}/${maxRetries + 1})`);
 
-            const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('FCM_SEND_TIMEOUT')), FCM_SEND_TIMEOUT_MS)
-            );
+            const response = await axios.post(EXPO_PUSH_API_URL, message, {
+                headers: {
+                    Accept: 'application/json',
+                    'Accept-Encoding': 'gzip, deflate',
+                    'Content-Type': 'application/json',
+                },
+                timeout: SEND_TIMEOUT_MS,
+                validateStatus: () => true,
+            });
 
-            const response = await Promise.race([
-                admin.messaging().send(message),
-                timeoutPromise,
-            ]);
+            if (response.status >= 500) {
+                throw new Error(`Expo push API returned ${response.status}`);
+            }
 
-            console.log('✅ FCM notification sent successfully:', response);
-            return { success: true, messageId: response };
+            const ticket = response.data?.data;
+            if (!ticket) {
+                throw new Error(response.data?.errors?.[0]?.message || 'Expo push API returned no ticket data');
+            }
+
+            if (ticket.status === 'error') {
+                const errorCode = ticket.details?.error;
+                console.log(`   ❌ Expo push error:`, errorCode || ticket.message);
+
+                if (permanentErrorCodes.includes(errorCode)) {
+                    console.warn(`🚫 Permanent error (${errorCode}), not retrying`);
+                    return { success: false, error: errorCode, message: ticket.message, permanent: true };
+                }
+
+                throw new Error(ticket.message || errorCode || 'Unknown Expo push error');
+            }
+
+            console.log('✅ Expo push notification sent successfully:', ticket.id);
+            return { success: true, messageId: ticket.id };
 
         } catch (error) {
             lastError = error;
-            console.log(`   ❌ FCM error:`, error.code || error.message);
-
-            if (error.message === 'FCM_SEND_TIMEOUT') {
-                console.warn('⚠️ FCM send timed out — not retrying to avoid duplicate delivery');
-                return { success: false, error: 'timeout', message: 'Send timed out; message may have been delivered' };
-            }
-
-            if (permanentErrors.includes(error.code)) {
-                console.warn(`🚫 Permanent error (${error.code}), not retrying`);
-                return { success: false, error: error.code, message: error.message, permanent: true };
-            }
+            console.log(`   ❌ Push send error:`, error.message);
 
             if (attempt === maxRetries) {
-                console.error(`❌ FCM notification failed after ${maxRetries + 1} attempts:`, error.message);
-                return { success: false, error: error.code || 'unknown', message: error.message };
+                console.error(`❌ Push notification failed after ${maxRetries + 1} attempts:`, error.message);
+                return { success: false, error: 'unknown', message: error.message };
             }
 
             const delay = Math.min(initialDelay * Math.pow(backoffMultiplier, attempt), maxDelay);
@@ -191,7 +204,7 @@ async function sendFCMNotification(fcmToken, title, body, data = {}) {
 
     return {
         success: false,
-        error: lastError?.code || 'unknown',
+        error: 'unknown',
         message: lastError?.message || 'Unknown error'
     };
 }

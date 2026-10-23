@@ -7,7 +7,6 @@ import {
     Alert,
     ActivityIndicator,
     TouchableOpacity,
-    Dimensions,
     KeyboardAvoidingView,
     Platform,
 } from "react-native";
@@ -23,7 +22,6 @@ import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
 const PAYMENTS_SERVER_URL = 'https://krides.onrender.com/api/payments';
 import { NOTIFICATION_API_KEY } from "@env";
 import { useDriverDetails } from "../../constants/Store";
-const { width, height } = Dimensions.get("window");
 const NIGERIAN_BANKS = [
     { label: "Access Bank", value: "044" },
     { label: "Guaranty Trust Bank", value: "058" },
@@ -285,7 +283,6 @@ const styles = StyleSheet.create({
         backgroundColor: colors.primaryBlue,
     },
     topCont: {
-        flex: 1,
         backgroundColor: colors.primaryBlue,
         paddingTop: 20,
     },
@@ -307,12 +304,12 @@ const styles = StyleSheet.create({
         paddingTop: 10,
     },
     bottomCont: {
+        flex: 1,
         backgroundColor: colors.secondary,
-        width: width,
+        width: "100%",
         marginTop: 20,
         borderTopLeftRadius: 30,
         borderTopRightRadius: 30,
-        height: height - 100,
     },
     sheetCont: {
         flex: 1,

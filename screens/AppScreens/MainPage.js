@@ -1,4 +1,4 @@
-import { PermissionsAndroid, StyleSheet, View, Alert } from "react-native";
+import { PermissionsAndroid, Platform, StyleSheet, View, Alert } from "react-native";
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import HomeTab from "../../components/HomeTab";
 import Passenger from "../../components/Passenger";
@@ -92,6 +92,13 @@ const MainPage = () => {
 		};
 
 	const requestLocationPermissions = async () => {
+		if (Platform.OS !== "android") {
+			// iOS: @react-native-community/geolocation triggers the native
+			// CoreLocation authorization prompt itself on getCurrentPosition —
+			// PermissionsAndroid has no iOS backing and always fails here,
+			// which previously short-circuited before location was ever requested.
+			return true;
+		}
 		try {
 			const permission = await PermissionsAndroid.request(
 				PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
@@ -133,13 +140,23 @@ const MainPage = () => {
 			(error) => {
 				console.warn('⚠️ Error getting current position:', error.message);
 				setLocation(false);
-				Toast.show({
-					type: 'tomatoToast',
-					text1: 'Could Not Get Your Location',
-					text2: "Showing the default map view. Check your GPS signal and try again.",
-					position: 'top',
-					visibilityTime: 5000,
-				});
+				if (error.code === 1) {
+					Toast.show({
+						type: 'tomatoToast',
+						text1: 'Location Access Needed',
+						text2: "Enable location for KRides in your device settings to see your position and get accurate pickups.",
+						position: 'top',
+						visibilityTime: 6000,
+					});
+				} else {
+					Toast.show({
+						type: 'tomatoToast',
+						text1: 'Could Not Get Your Location',
+						text2: "Showing the default map view. Check your GPS signal and try again.",
+						position: 'top',
+						visibilityTime: 5000,
+					});
+				}
 			},
 			{ enableHighAccuracy: false, timeout: 15000 }
 		);

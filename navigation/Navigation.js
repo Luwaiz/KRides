@@ -210,7 +210,13 @@ const Navigation = () => {
 					{}
 					{!user ? (
 						<>
-							{hasSeenOnboarding === false && <Stack.Screen name="OnBoarding" component={OnBoarding} />}
+							{hasSeenOnboarding === false && (
+								<Stack.Screen name="OnBoarding">
+									{(props) => (
+										<OnBoarding {...props} onFinish={() => setHasSeenOnboarding(true)} />
+									)}
+								</Stack.Screen>
+							)}
 							<Stack.Screen name="AuthStack" component={AuthStack} />
 						</>
 					) : storeRole === "driver" ? (

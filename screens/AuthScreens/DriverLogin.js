@@ -1,4 +1,4 @@
-import { Alert, Dimensions, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native";
+import { Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native";
 import React, { useState } from "react";
 import { colors } from "../../constants/styling";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -11,8 +11,6 @@ import { useDriverDetails } from "../../constants/Store";
 import Firebase from "../../hooks/Firebase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { checkRateLimit, recordAttempt, clearAttempts } from "../../helpers/authRateLimiter";
-
-const { height, width } = Dimensions.get('window');
 
 const DriverLogin = ({ navigation }) => {
 	const [phone, set_phone] = useState();
@@ -110,7 +108,9 @@ const DriverLogin = ({ navigation }) => {
 									</View>
 								</View>
 							</View>
-							<Terms />
+							<View style={styles.termsCont}>
+								<Terms />
+							</View>
 						</View>
 					</View>
 				</DismissKeyboardView>
@@ -127,17 +127,19 @@ const styles = StyleSheet.create({
 		backgroundColor: colors.primaryBlue,
 	},
 	topCont: {
-		flex: 1,
 		backgroundColor: colors.primaryBlue,
 		paddingTop: 26,
 	},
 	bottomCont: {
+		flex: 1,
 		backgroundColor: colors.secondary,
-		width: width,
+		width: "100%",
 		marginTop: 20,
 		borderTopLeftRadius: 30,
 		borderTopRightRadius: 30,
-		height: height - 100,
+	},
+	termsCont: {
+		paddingBottom: 24,
 	},
 	headText: {
 		color: colors.secondary,

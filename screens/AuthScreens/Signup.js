@@ -239,7 +239,9 @@ const Signup = ({ navigation }) => {
 									/>
 								</View>
 							</View>
-							<Terms />
+							<View style={styles.termsCont}>
+								<Terms />
+							</View>
 						</View>
 					</ScrollView>
 				</DismissKeyboardView>
@@ -256,7 +258,6 @@ const styles = StyleSheet.create({
 		backgroundColor: colors.primaryBlue,
 	},
 	topCont: {
-		flex: 1,
 		backgroundColor: colors.primaryBlue,
 		paddingTop: 26,
 	},
@@ -293,10 +294,14 @@ const styles = StyleSheet.create({
 		fontWeight: "700",
 	},
 	bottomCont: {
+		flex: 1,
 		backgroundColor: colors.secondary,
 		width: "100%",
 		marginTop: 20,
 		borderTopLeftRadius: 30,
 		borderTopRightRadius: 30,
+	},
+	termsCont: {
+		paddingBottom: 24,
 	},
 });

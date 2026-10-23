@@ -1,5 +1,5 @@
-import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import React, { useState } from "react";
+import { Animated, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, { useRef, useState } from "react";
 import BottomSheet from "@gorhom/bottom-sheet";
 import { colors } from "../../constants/styling";
 import ActiveButton from "../../components/buttons/ActiveButton";
@@ -9,6 +9,26 @@ import KRideLogo from "../../assets/svg/WhiteLogo.svg";
 
 const AuthScreen = ({ navigation }) => {
 	const [activeTab, setActiveTab] = useState("customer");
+	const tabAnim = useRef(new Animated.Value(0)).current;
+
+	const selectTab = (tab) => {
+		if (tab === activeTab) return;
+		setActiveTab(tab);
+		Animated.timing(tabAnim, {
+			toValue: tab === "customer" ? 0 : 1,
+			duration: 260,
+			useNativeDriver: false,
+		}).start();
+	};
+
+	const customerWidth = tabAnim.interpolate({
+		inputRange: [0, 1],
+		outputRange: ["70%", "30%"],
+	});
+	const driverWidth = tabAnim.interpolate({
+		inputRange: [0, 1],
+		outputRange: ["30%", "70%"],
+	});
 
 	const Navigate = (page) => {
 		navigation.navigate(page);
@@ -28,34 +48,40 @@ const AuthScreen = ({ navigation }) => {
 					<Text style={styles.welcome}>Welcome!</Text>
 
 					<View style={styles.tabRow}>
-						<TouchableOpacity
-							style={[styles.tab, activeTab === "customer" && styles.tabActive]}
-							onPress={() => setActiveTab("customer")}
-							activeOpacity={0.7}
-						>
-							<Text
-								style={[
-									styles.tabText,
-									activeTab === "customer" && styles.tabTextActive,
-								]}
+						<Animated.View style={[styles.tabSegment, { width: customerWidth }]}>
+							<TouchableOpacity
+								style={styles.tabTouchable}
+								onPress={() => selectTab("customer")}
+								activeOpacity={0.7}
 							>
-								Customer
-							</Text>
-						</TouchableOpacity>
-						<TouchableOpacity
-							style={[styles.tab, activeTab === "driver" && styles.tabActive]}
-							onPress={() => setActiveTab("driver")}
-							activeOpacity={0.7}
-						>
-							<Text
-								style={[
-									styles.tabText,
-									activeTab === "driver" && styles.tabTextActive,
-								]}
+								<Text
+									style={[
+										styles.tabText,
+										activeTab === "customer" && styles.tabTextActive,
+									]}
+								>
+									Customer
+								</Text>
+								{activeTab === "customer" && <View style={styles.tabUnderline} />}
+							</TouchableOpacity>
+						</Animated.View>
+						<Animated.View style={[styles.tabSegment, { width: driverWidth }]}>
+							<TouchableOpacity
+								style={styles.tabTouchable}
+								onPress={() => selectTab("driver")}
+								activeOpacity={0.7}
 							>
-								Driver
-							</Text>
-						</TouchableOpacity>
+								<Text
+									style={[
+										styles.tabText,
+										activeTab === "driver" && styles.tabTextActive,
+									]}
+								>
+									Driver
+								</Text>
+								{activeTab === "driver" && <View style={styles.tabUnderline} />}
+							</TouchableOpacity>
+						</Animated.View>
 					</View>
 
 					{activeTab === "customer" ? (
@@ -113,29 +139,32 @@ const styles = StyleSheet.create({
 	},
 	tabRow: {
 		flexDirection: "row",
-		backgroundColor: colors.lightGrey2,
-		borderRadius: 12,
-		padding: 4,
-		width: 240,
-		marginBottom: 20,
+		alignSelf: "stretch",
+		marginHorizontal: 28,
+		marginBottom: 24,
 	},
-	tab: {
+	tabSegment: {
+		height: 42,
+	},
+	tabTouchable: {
 		flex: 1,
-		height: 38,
-		borderRadius: 9,
 		alignItems: "center",
 		justifyContent: "center",
 	},
-	tabActive: {
-		backgroundColor: colors.primaryBlue,
-	},
 	tabText: {
-		fontSize: 14,
+		fontSize: 15,
 		fontWeight: "600",
 		color: colors.lightGrey4,
 	},
 	tabTextActive: {
-		color: colors.secondary,
+		color: colors.primaryBlue,
+	},
+	tabUnderline: {
+		marginTop: 8,
+		height: 3,
+		width: 32,
+		borderRadius: 2,
+		backgroundColor: colors.primaryBlue,
 	},
 	termsCont: {
 		paddingBottom: 28,

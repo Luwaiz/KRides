@@ -5,6 +5,7 @@ import {
 	TouchableOpacity,
 	View,
 	PermissionsAndroid,
+	Platform,
 } from "react-native";
 import React, { useEffect, useState, useMemo, useRef } from "react";
 import { colors } from "../../constants/styling";
@@ -34,6 +35,12 @@ const HomePage = () => {
 	const directionsErrorShown = useRef(false);
 
 	const requestLocationPermissions = async () => {
+		if (Platform.OS !== "android") {
+			// iOS: @react-native-community/geolocation triggers its own native
+			// CoreLocation authorization prompt when watchPosition/getCurrentPosition
+			// is called — PermissionsAndroid has no iOS backing.
+			return true;
+		}
 		try {
 			const permission = await PermissionsAndroid.request(
 				PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,

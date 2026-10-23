@@ -1,4 +1,4 @@
-import { Alert, Dimensions, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native";
+import { Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native";
 import React, { useState } from "react";
 import BottomSheet from "@gorhom/bottom-sheet";
 import { colors } from "../../constants/styling";
@@ -14,7 +14,6 @@ import Toast from "react-native-toast-message";
 import { checkRateLimit, recordAttempt, clearAttempts } from "../../helpers/authRateLimiter";
 import { useGoogleAuth } from "../../hooks/useGoogleAuth";
 import useAuthStore from "../../constants/Store";
-const { height, width } = Dimensions.get('window');
 
 const Login = ({ navigation }) => {
 	const [email, setEmail] = useState("");
@@ -143,7 +142,9 @@ const Login = ({ navigation }) => {
 									/>
 								</View>
 							</View>
-							<Terms />
+							<View style={styles.termsCont}>
+								<Terms />
+							</View>
 						</View>
 					</View>
 				</DismissKeyboardView>
@@ -160,17 +161,19 @@ const styles = StyleSheet.create({
 		backgroundColor: colors.primaryBlue,
 	},
 	topCont: {
-		flex: 1,
 		backgroundColor: colors.primaryBlue,
 		paddingTop: 26,
 	},
 	bottomCont: {
+		flex: 1,
 		backgroundColor: colors.secondary,
-		width: width,
+		width: "100%",
 		marginTop: 20,
 		borderTopLeftRadius: 30,
 		borderTopRightRadius: 30,
-		height: height - 100,
+	},
+	termsCont: {
+		paddingBottom: 24,
 	},
 	headText: {
 		color: colors.secondary,

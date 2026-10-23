@@ -73,11 +73,16 @@ class NotificationManager {
             }
 
             try {
-                const fcmTokenData = await Notifications.getDevicePushTokenAsync();
-                token = fcmTokenData.data;
-                console.log('✅ FCM token obtained:', token.substring(0, 30) + '...');
+                const projectId =
+                    Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
+                if (!projectId) {
+                    throw new Error('Missing EAS project ID for Expo push token');
+                }
+                const pushTokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+                token = pushTokenData.data;
+                console.log('✅ Expo push token obtained:', token.substring(0, 30) + '...');
             } catch (error) {
-                console.error('❌ Error getting FCM token:', error);
+                console.error('❌ Error getting Expo push token:', error);
             }
         } else {
             console.log('⚠️ Must use physical device for push notifications');

@@ -233,7 +233,9 @@ const DriverSignup = ({ navigation }) => {
 									/>
 								</View>
 							</View>
-							<Terms />
+							<View style={styles.termsCont}>
+								<Terms />
+							</View>
 						</View>
 					</ScrollView>
 				</DismissKeyboardView>
@@ -250,7 +252,6 @@ const styles = StyleSheet.create({
 		backgroundColor: colors.primaryBlue,
 	},
 	topCont: {
-		flex: 1,
 		backgroundColor: colors.primaryBlue,
 		paddingTop: 26,
 	},
@@ -275,5 +276,8 @@ const styles = StyleSheet.create({
 		borderTopLeftRadius: 30,
 		borderTopRightRadius: 30,
 		flex: 1,
+	},
+	termsCont: {
+		paddingBottom: 24,
 	},
 });

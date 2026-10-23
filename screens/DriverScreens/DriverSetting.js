@@ -1,6 +1,7 @@
-import { Pressable, StyleSheet, Text, View, Image } from "react-native";
+import { Pressable, StyleSheet, Text, View, Image, Linking } from "react-native";
 import React, { useState, useEffect } from "react";
 import { useDriverDetails } from "../../constants/Store";
+import { PRIVACY_POLICY_URL, TERMS_URL } from "../../constants/legal";
 import Avatar from "../../assets/svg/Frame 91profile.svg";
 import Entypo from "@expo/vector-icons/Entypo";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
@@ -98,6 +99,20 @@ const DriverSettings = ({ navigation }) => {
 				>
 					<MaterialIcons name="support-agent" size={20} color="black" />
 					<Text style={styles.optionText}>Support</Text>
+				</Pressable>
+				<Pressable
+					style={styles.options}
+					onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}
+				>
+					<MaterialIcons name="privacy-tip" size={20} color="black" />
+					<Text style={styles.optionText}>Privacy Policy</Text>
+				</Pressable>
+				<Pressable
+					style={styles.options}
+					onPress={() => Linking.openURL(TERMS_URL)}
+				>
+					<MaterialIcons name="gavel" size={20} color="black" />
+					<Text style={styles.optionText}>Terms & Conditions</Text>
 				</Pressable>
 				<Pressable style={styles.options} onPress={() => openModal("Logout")}>
 					<MaterialCommunityIcons name="logout" size={24} color="black" />
