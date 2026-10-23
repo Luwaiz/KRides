@@ -2,48 +2,78 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>KRides Legal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-  :root { --bg: #faf9f6; --fg: #1d1b16; --fg-muted: #6b6559; --accent: #1a5c42; --border: #e4e1d8; }
+  :root {
+    --blue: #0066F5; --blue-deep: #0050c4; --blue-soft: #e8f0ff;
+    --bg: #f4f6fb; --card: #ffffff; --ink: #10131a; --ink-muted: #5c6472; --border: #e7e9f0;
+    color-scheme: light;
+  }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #15140f; --fg: #f1efe6; --fg-muted: #a39d8c; --accent: #5fc996; --border: #332f24; }
+    :root {
+      --blue: #4d94ff; --blue-deep: #0066F5; --blue-soft: #16233a;
+      --bg: #0b0e14; --card: #141821; --ink: #f2f4f8; --ink-muted: #9aa3b2; --border: #232838;
+      color-scheme: dark;
+    }
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
   body {
-    background: var(--bg);
-    color: var(--fg);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
+    background: linear-gradient(180deg, var(--blue-deep), var(--blue) 42%, var(--bg) 42%);
+    color: var(--ink);
+    font-family: "Albert Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: max(36px, env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-left, 0px)) 40px;
+  }
+  .wrap { max-width: 420px; width: 100%; }
+  .brand { display: flex; align-items: center; gap: 2px; margin-bottom: 40px; }
+  .brand-word { font-weight: 800; font-size: 19px; color: #fff; letter-spacing: -0.01em; }
+  h1 { color: #fff; font-size: 30px; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 6px; }
+  .sub { color: rgba(255,255,255,0.78); font-size: 14px; margin: 0 0 28px; font-weight: 500; }
+  a.link {
     display: flex;
     align-items: center;
-    justify-content: center;
-    min-height: 100vh;
-    padding: 24px;
-  }
-  .card { max-width: 420px; width: 100%; }
-  h1 { font-size: 22px; margin: 0 0 8px; }
-  p { color: var(--fg-muted); margin: 0 0 24px; font-size: 14px; }
-  a.link {
-    display: block;
-    padding: 16px 18px;
+    justify-content: space-between;
+    background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 12px;
-    color: var(--fg);
+    border-radius: 16px;
+    padding: 18px 18px;
+    color: var(--ink);
     text-decoration: none;
-    font-weight: 600;
     margin-bottom: 12px;
+    box-shadow: 0 1px 2px rgba(16,19,26,0.04);
   }
-  a.link span { display: block; font-weight: 400; color: var(--fg-muted); font-size: 13px; margin-top: 2px; }
-  a.link:hover { border-color: var(--accent); }
+  a.link .title { font-weight: 700; font-size: 15px; }
+  a.link .desc { display: block; font-weight: 500; color: var(--ink-muted); font-size: 12.5px; margin-top: 3px; }
+  a.link .arrow { color: var(--blue); font-weight: 800; font-size: 18px; flex: 0 0 auto; margin-left: 12px; }
 </style>
 </head>
 <body>
-  <div class="card">
-    <h1>KRides Legal</h1>
-    <p>Krides — Kampus Rides</p>
-    <a class="link" href="/privacy-policy">Privacy Policy<span>How we handle your data</span></a>
-    <a class="link" href="/terms-and-conditions">Terms &amp; Conditions<span>Rules for using the app</span></a>
+  <div class="wrap">
+    <div class="brand">
+      <span class="brand-word">KRides<span style="color:#fff">.</span></span>
+      <svg width="46" height="14" viewBox="0 0 46 14" fill="none">
+        <path d="M2 11C14 2 32 2 44 7" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <h1>Legal</h1>
+    <p class="sub">Krides — Kampus Rides</p>
+
+    <a class="link" href="/privacy-policy">
+      <span><span class="title">Privacy Policy</span><span class="desc">How we handle your data</span></span>
+      <span class="arrow">→</span>
+    </a>
+    <a class="link" href="/terms-and-conditions">
+      <span><span class="title">Terms &amp; Conditions</span><span class="desc">Rules for using the app</span></span>
+      <span class="arrow">→</span>
+    </a>
   </div>
 </body>
 </html>
