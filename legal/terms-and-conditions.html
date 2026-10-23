@@ -7,379 +7,391 @@
 <meta name="description" content="Terms and Conditions for the KRides campus ride-hailing app.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #faf9f6;
-    --surface: #ffffff;
-    --border: #e4e1d8;
-    --fg: #1d1b16;
-    --fg-muted: #6b6559;
-    --accent: #1a5c42;
-    --accent-soft: #e5efe9;
-    --warn: #9a5b12;
-    --warn-soft: #f6ead4;
-    --display: "Fraunces", Georgia, "Times New Roman", serif;
-    --body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --blue: #0066F5;
+    --blue-deep: #0050c4;
+    --blue-soft: #e8f0ff;
+    --bg: #f4f6fb;
+    --card: #ffffff;
+    --ink: #10131a;
+    --ink-muted: #5c6472;
+    --border: #e7e9f0;
+    --warn: #b4600c;
+    --warn-soft: #fdeedd;
     color-scheme: light;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #15140f;
-      --surface: #1c1b15;
-      --border: #332f24;
-      --fg: #f1efe6;
-      --fg-muted: #a39d8c;
-      --accent: #5fc996;
-      --accent-soft: #1f2e26;
+      --blue: #4d94ff;
+      --blue-deep: #0066F5;
+      --blue-soft: #16233a;
+      --bg: #0b0e14;
+      --card: #141821;
+      --ink: #f2f4f8;
+      --ink-muted: #9aa3b2;
+      --border: #232838;
       --warn: #e8ab5b;
       --warn-soft: #2e2416;
       color-scheme: dark;
     }
   }
 
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; padding: 0; }
   body {
     background: var(--bg);
-    color: var(--fg);
-    font-family: var(--body);
+    color: var(--ink);
+    font-family: "Albert Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     line-height: 1.6;
-    padding-left: max(16px, env(safe-area-inset-left, 0px));
-    padding-right: max(16px, env(safe-area-inset-right, 0px));
   }
 
-  .wrap {
-    max-width: 1180px;
-    margin: 0 auto;
-    display: grid;
-    grid-template-columns: 240px minmax(0, 700px);
-    gap: 48px;
-    padding-block: 40px 80px;
-    align-items: start;
+  .band {
+    background: linear-gradient(180deg, var(--blue-deep), var(--blue) 70%);
+    padding: 0 max(20px, env(safe-area-inset-left, 0px)) 56px max(20px, env(safe-area-inset-right, 0px));
+    padding-top: max(36px, env(safe-area-inset-top, 0px));
   }
-  @media (max-width: 860px) {
-    .wrap { grid-template-columns: 1fr; gap: 28px; }
-  }
-
-  header.hero {
-    grid-column: 1 / -1;
-    border-bottom: 1px solid var(--border);
-    padding-bottom: 28px;
-    margin-bottom: 4px;
-  }
-  .eyebrow {
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--accent);
-    margin: 0 0 10px;
-  }
-  h1 {
-    font-family: var(--display);
-    font-weight: 600;
-    font-size: clamp(32px, 5vw, 46px);
-    line-height: 1.12;
-    margin: 0 0 12px;
-    text-wrap: balance;
-  }
-  .meta { color: var(--fg-muted); font-size: 14px; margin: 0; }
-
-  nav.toc {
-    position: sticky;
-    top: 24px;
-    align-self: start;
-  }
-  @media (max-width: 860px) {
-    nav.toc { position: static; order: -1; }
-  }
-  nav.toc .label {
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--fg-muted);
-    margin: 0 0 10px;
-  }
-  nav.toc ol {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    counter-reset: toc;
+  .band-inner { max-width: 640px; margin: 0 auto; }
+  .brand {
     display: flex;
-    flex-direction: column;
+    align-items: center;
     gap: 2px;
+    margin-bottom: 28px;
   }
-  nav.toc li { counter-increment: toc; }
-  nav.toc a {
+  .brand-word {
+    font-weight: 800;
+    font-size: 19px;
+    color: #fff;
+    letter-spacing: -0.01em;
+  }
+  .brand-word .dot { color: #fff; }
+  .swoosh { margin-left: 2px; display: block; }
+  h1 {
+    color: #fff;
+    font-size: clamp(28px, 7vw, 36px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin: 0 0 8px;
+  }
+  .sub { color: rgba(255,255,255,0.78); font-size: 14px; margin: 0; font-weight: 500; }
+
+  .sheet {
+    max-width: 640px;
+    margin: -32px auto 0;
+    background: var(--bg);
+    border-radius: 24px 24px 0 0;
+    position: relative;
+  }
+  .sheet-cap {
+    background: var(--card);
+    border-radius: 24px 24px 0 0;
+    padding-top: 6px;
+  }
+
+  nav.pills {
     display: flex;
-    gap: 10px;
-    padding: 7px 10px;
-    margin-left: -10px;
-    border-radius: 8px;
-    color: var(--fg-muted);
-    text-decoration: none;
-    font-size: 13.5px;
-    line-height: 1.35;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 18px 20px 14px;
+    scrollbar-width: none;
+    position: sticky;
+    top: 0;
+    background: var(--card);
+    z-index: 5;
+    border-bottom: 1px solid var(--border);
   }
-  nav.toc a::before {
-    content: counter(toc, decimal-leading-zero);
-    font-variant-numeric: tabular-nums;
-    color: var(--accent);
-    font-weight: 600;
-    flex-shrink: 0;
-  }
-  nav.toc a:hover { background: var(--accent-soft); color: var(--fg); }
-
-  main { min-width: 0; }
-
-  section { padding-top: 34px; scroll-margin-top: 20px; }
-  section:first-of-type { padding-top: 0; }
-  section + section { border-top: 1px solid var(--border); }
-
-  h2 {
-    font-family: var(--display);
-    font-weight: 600;
-    font-size: 22px;
-    margin: 0 0 14px;
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
-  }
-  h2 .num {
-    font-family: var(--body);
+  nav.pills::-webkit-scrollbar { display: none; }
+  nav.pills a {
+    flex: 0 0 auto;
+    padding: 8px 14px;
+    border-radius: 100px;
+    background: var(--bg);
+    color: var(--ink-muted);
     font-size: 13px;
-    font-weight: 700;
-    color: var(--accent);
-    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    text-decoration: none;
+    border: 1px solid var(--border);
+    white-space: nowrap;
   }
-  h3 { font-size: 15px; font-weight: 700; margin: 20px 0 8px; }
-  p { margin: 0 0 12px; color: var(--fg); max-width: 65ch; }
-  p.muted { color: var(--fg-muted); }
-  ul { margin: 0 0 12px; padding-left: 20px; }
-  li { margin-bottom: 6px; }
-  strong { font-weight: 600; }
-  a.link { color: var(--accent); }
 
-  .callout {
+  main.content { padding: 24px 20px 8px; }
+
+  section.lead p { font-size: 15px; color: var(--ink-muted); }
+  section.lead { margin-bottom: 8px; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 20px;
+    margin-bottom: 14px;
+    scroll-margin-top: 70px;
+  }
+  .card-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .badge {
+    flex: 0 0 auto;
+    width: 28px;
+    height: 28px;
+    border-radius: 9px;
+    background: var(--blue-soft);
+    color: var(--blue);
+    font-weight: 800;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  h2 {
+    font-size: 17px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    margin: 0;
+  }
+  p { margin: 0 0 10px; font-size: 14.5px; color: var(--ink); }
+  p.muted { color: var(--ink-muted); font-size: 13.5px; }
+  ul { margin: 0 0 10px; padding-left: 18px; }
+  li { margin-bottom: 6px; font-size: 14.5px; }
+  strong { font-weight: 700; }
+
+  .warn-card {
     background: var(--warn-soft);
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: 14px;
     padding: 16px 18px;
-    margin: 14px 0 18px;
+    margin-top: 4px;
   }
-  .callout .tag {
+  .warn-card .tag {
     font-size: 11px;
-    font-weight: 700;
+    font-weight: 800;
     letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--warn);
     margin: 0 0 6px;
   }
-  .callout p:last-child { margin-bottom: 0; }
+  .warn-card p:last-child { margin-bottom: 0; }
 
-  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 10px 0 16px; }
-  @media (max-width: 640px) { .split { grid-template-columns: 1fr; } }
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 4px; }
+  @media (max-width: 420px) { .split { grid-template-columns: 1fr; } }
   .split-card {
-    background: var(--surface);
+    background: var(--bg);
     border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 16px 18px;
+    border-radius: 14px;
+    padding: 14px 16px;
     min-width: 0;
   }
   .split-card .tag {
-    font-size: 11px;
-    font-weight: 700;
+    font-size: 10.5px;
+    font-weight: 800;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: var(--accent);
+    color: var(--blue);
     margin: 0 0 8px;
   }
   .split-card ul { margin-bottom: 0; }
 
   .contact-card {
-    background: var(--surface);
+    background: var(--blue-soft);
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: 18px;
     padding: 20px;
-    margin-top: 8px;
+    margin-bottom: 20px;
   }
-  .contact-card .row { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
-  .contact-card .row:last-child { border-bottom: none; }
-  .contact-card .row span:first-child { color: var(--fg-muted); }
+  .contact-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(0,102,245,0.14);
+    font-size: 14px;
+  }
+  .contact-row:last-child { border-bottom: none; }
+  .contact-row span:first-child { color: var(--ink-muted); font-weight: 500; }
+  .contact-row span:last-child { font-weight: 700; }
 
   footer {
-    grid-column: 1 / -1;
-    border-top: 1px solid var(--border);
-    margin-top: 10px;
-    padding-top: 20px;
-    color: var(--fg-muted);
-    font-size: 12.5px;
+    text-align: center;
+    padding: 4px 20px 48px;
+    color: var(--ink-muted);
+    font-size: 12px;
+  }
+
+  @media (min-width: 720px) {
+    .band { padding-bottom: 64px; }
+    .sheet { margin-top: -40px; }
+    .card { padding: 26px 28px; }
+    main.content { padding: 32px 28px 8px; }
   }
 </style>
 </head>
 <body>
 
-<div class="wrap">
-  <header class="hero">
-    <p class="eyebrow">Krides — Kampus Rides</p>
+<div class="band">
+  <div class="band-inner">
+    <div class="brand">
+      <span class="brand-word">KRides<span class="dot">.</span></span>
+      <svg class="swoosh" width="46" height="14" viewBox="0 0 46 14" fill="none">
+        <path d="M2 11C14 2 32 2 44 7" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+      </svg>
+    </div>
     <h1>Terms &amp; Conditions</h1>
-    <p class="meta">Effective 23 October 2026 · Applies to every rider and driver using the KRides app</p>
-  </header>
+    <p class="sub">Effective 23 October 2026 · Krides — Kampus Rides</p>
+  </div>
+</div>
 
-  <nav class="toc" aria-label="Sections">
-    <p class="label">On this page</p>
-    <ol>
-      <li><a href="#acceptance">Acceptance of these terms</a></li>
-      <li><a href="#eligibility">Eligibility</a></li>
-      <li><a href="#the-service">What KRides is</a></li>
-      <li><a href="#accounts">Your account</a></li>
-      <li><a href="#riders">Rider terms</a></li>
-      <li><a href="#drivers">Driver terms</a></li>
-      <li><a href="#payments">Payments, fares &amp; wallet</a></li>
-      <li><a href="#cancellations">Cancellations &amp; refunds</a></li>
-      <li><a href="#conduct">Ratings, reports &amp; conduct</a></li>
-      <li><a href="#safety">Safety disclaimer</a></li>
-      <li><a href="#liability">Liability &amp; indemnity</a></li>
-      <li><a href="#ip">Intellectual property</a></li>
-      <li><a href="#termination">Suspension &amp; termination</a></li>
-      <li><a href="#law">Governing law &amp; disputes</a></li>
-      <li><a href="#changes">Changes to these terms</a></li>
-      <li><a href="#contact">Contact us</a></li>
-    </ol>
-  </nav>
+<div class="sheet">
+  <div class="sheet-cap">
+    <nav class="pills" aria-label="Sections">
+      <a href="#eligibility">Eligibility</a>
+      <a href="#service">What KRides is</a>
+      <a href="#accounts">Account</a>
+      <a href="#riders">Riders</a>
+      <a href="#drivers">Drivers</a>
+      <a href="#payments">Payments</a>
+      <a href="#cancellations">Cancellations</a>
+      <a href="#conduct">Conduct</a>
+      <a href="#safety">Safety</a>
+      <a href="#liability">Liability</a>
+      <a href="#ip">IP</a>
+      <a href="#termination">Termination</a>
+      <a href="#law">Governing law</a>
+      <a href="#changes">Changes</a>
+      <a href="#contact">Contact</a>
+    </nav>
 
-  <main>
-    <section id="acceptance">
-      <p>These Terms &amp; Conditions ("Terms") govern your use of the KRides app, operated by Krides — Kampus Rides ("KRides", "we", "us"). By creating an account or using the app as a rider or driver, you agree to be bound by these Terms. If you don't agree, please don't use the app.</p>
-    </section>
+    <main class="content">
+      <section class="lead">
+        <p>These Terms govern your use of the KRides app, operated by Krides — Kampus Rides ("KRides", "we", "us"). By creating an account or using the app as a rider or driver, you agree to be bound by these Terms. If you don't agree, please don't use the app.</p>
+      </section>
 
-    <section id="eligibility">
-      <h2><span class="num">01</span>Eligibility</h2>
-      <ul>
-        <li>You must be at least <strong>15 years old</strong> to create an account.</li>
-        <li>You must provide accurate, current information when registering and keep it up to date.</li>
-        <li>Each account is for one individual. Sharing your login, or using someone else's account, isn't allowed.</li>
-        <li>Drivers must hold a valid driver's license and meet any vehicle and document requirements set in the app before they can accept rides.</li>
-      </ul>
-    </section>
+      <section id="eligibility" class="card">
+        <div class="card-head"><span class="badge">1</span><h2>Eligibility</h2></div>
+        <ul>
+          <li>You must be at least <strong>15 years old</strong> to create an account.</li>
+          <li>You must provide accurate, current information and keep it up to date.</li>
+          <li>Each account is for one individual — sharing logins isn't allowed.</li>
+          <li>Drivers must hold a valid license and meet any vehicle/document requirements set in the app before accepting rides.</li>
+        </ul>
+      </section>
 
-    <section id="the-service">
-      <h2><span class="num">02</span>What KRides is</h2>
-      <p>KRides is a technology platform that connects riders with independent drivers for trips around campus and nearby areas. <strong>KRides does not own or operate vehicles and does not itself provide transportation.</strong> Drivers using the app are independent individuals, not employees or agents of KRides. We're responsible for operating the platform — matching, payments, and support — not for the manner in which any individual driver operates their vehicle.</p>
-    </section>
+      <section id="service" class="card">
+        <div class="card-head"><span class="badge">2</span><h2>What KRides is</h2></div>
+        <p>KRides is a technology platform connecting riders with independent drivers for trips around campus and nearby areas. <strong>KRides does not own or operate vehicles and does not itself provide transportation.</strong> Drivers are independent individuals, not employees or agents of KRides. We operate the platform — matching, payments, support — not how any individual driver operates their vehicle.</p>
+      </section>
 
-    <section id="accounts">
-      <h2><span class="num">03</span>Your account</h2>
-      <p>You're responsible for all activity under your account and for keeping your password secure. Tell us immediately if you suspect unauthorized access. We may ask you to verify your identity, phone number, or (for drivers) your documents before you can use certain features.</p>
-    </section>
+      <section id="accounts" class="card">
+        <div class="card-head"><span class="badge">3</span><h2>Your account</h2></div>
+        <p>You're responsible for all activity under your account and for keeping your password secure. Tell us immediately if you suspect unauthorized access. We may ask you to verify your identity, phone number, or (for drivers) your documents before using certain features.</p>
+      </section>
 
-    <section id="riders">
-      <h2><span class="num">04</span>Rider terms</h2>
-      <ul>
-        <li>When you request a ride, you'll see the fare before confirming. Fares are flat-rate per passenger and may include a platform fee shown in the breakdown.</li>
-        <li>You agree to be ready at the pickup location you provide and to treat your driver respectfully.</li>
-        <li>You're responsible for paying the fare for any ride you take, by card, wallet balance, or any other payment method offered in the app.</li>
-      </ul>
-    </section>
+      <section id="riders" class="card">
+        <div class="card-head"><span class="badge">4</span><h2>Rider terms</h2></div>
+        <ul>
+          <li>You'll see the fare before confirming — flat-rate per passenger, with any platform fee shown in the breakdown.</li>
+          <li>You agree to be ready at the pickup location and to treat your driver respectfully.</li>
+          <li>You're responsible for paying the fare, by card, wallet balance, or any payment method offered in the app.</li>
+        </ul>
+      </section>
 
-    <section id="drivers">
-      <h2><span class="num">05</span>Driver terms</h2>
-      <ul>
-        <li>Drivers are independent contractors, not KRides employees. You choose when to go online and which ride requests to accept.</li>
-        <li>You're responsible for holding any license, insurance, and vehicle documentation required by law to operate as a driver.</li>
-        <li>Earnings are calculated per ride (fare minus the platform fee) and paid out to the bank account on file, via our payment processor, Flutterwave.</li>
-        <li>You agree to drive safely, follow applicable traffic laws, and treat riders respectfully.</li>
-      </ul>
-    </section>
+      <section id="drivers" class="card">
+        <div class="card-head"><span class="badge">5</span><h2>Driver terms</h2></div>
+        <ul>
+          <li>Drivers are independent contractors, not KRides employees. You choose when to go online and which requests to accept.</li>
+          <li>You're responsible for any license, insurance, and vehicle documentation required by law.</li>
+          <li>Earnings (fare minus platform fee) are paid to your bank account on file, via Flutterwave.</li>
+          <li>You agree to drive safely, follow traffic laws, and treat riders respectfully.</li>
+        </ul>
+      </section>
 
-    <section id="payments">
-      <h2><span class="num">06</span>Payments, fares &amp; wallet</h2>
-      <p>Fares are calculated automatically at the rates set in the app and shown to you before you confirm a ride. Card payments are processed by Flutterwave; we never store your full card number. You may also top up and pay from an in-app wallet balance.</p>
-      <p class="muted">Platform fees fund the operation of the service and are shown in the fare breakdown — we don't publish a fixed rate here because it can be adjusted to keep pricing fair as costs change.</p>
-    </section>
+      <section id="payments" class="card">
+        <div class="card-head"><span class="badge">6</span><h2>Payments, fares &amp; wallet</h2></div>
+        <p>Fares are calculated automatically and shown before you confirm. Card payments are processed by Flutterwave — we never store your full card number. You can also top up and pay from an in-app wallet balance.</p>
+        <p class="muted">Platform fees fund the service and are shown in the fare breakdown — we don't publish a fixed rate here since it can be adjusted to keep pricing fair as costs change.</p>
+      </section>
 
-    <section id="cancellations">
-      <h2><span class="num">07</span>Cancellations &amp; refunds</h2>
-      <div class="split">
-        <div class="split-card">
-          <p class="tag">Rider cancels</p>
-          <ul>
-            <li>You can cancel a ride before it's completed.</li>
-            <li>Where a payment was already taken, an eligible refund is issued automatically back to your card or wallet.</li>
-          </ul>
+      <section id="cancellations" class="card">
+        <div class="card-head"><span class="badge">7</span><h2>Cancellations &amp; refunds</h2></div>
+        <div class="split">
+          <div class="split-card">
+            <p class="tag">Rider cancels</p>
+            <ul>
+              <li>You can cancel before a ride is completed.</li>
+              <li>An eligible refund goes automatically back to your card or wallet.</li>
+            </ul>
+          </div>
+          <div class="split-card">
+            <p class="tag">Driver cancels</p>
+            <ul>
+              <li>A driver can cancel a ride they've accepted.</li>
+              <li>If you already paid, you're refunded automatically and notified.</li>
+            </ul>
+          </div>
         </div>
-        <div class="split-card">
-          <p class="tag">Driver cancels</p>
-          <ul>
-            <li>A driver can cancel a ride they've accepted.</li>
-            <li>If you already paid, you're refunded automatically and notified in the app.</li>
-          </ul>
+        <p class="muted" style="margin-top:10px;">Repeated cancellations by either party may be reviewed and can affect your ability to use the app.</p>
+      </section>
+
+      <section id="conduct" class="card">
+        <div class="card-head"><span class="badge">8</span><h2>Ratings, reports &amp; conduct</h2></div>
+        <p>Riders and drivers can rate each other after a ride, and report a driver during or after one if something went wrong — we review every report. You agree not to:</p>
+        <ul>
+          <li>Harass, threaten, or discriminate against another user.</li>
+          <li>Provide false information, including fake requests or fraudulent payment details.</li>
+          <li>Arrange payment or rides outside the platform.</li>
+          <li>Use the app for any unlawful purpose.</li>
+        </ul>
+        <p class="muted">Violations may lead to a warning, suspension, or permanent removal.</p>
+      </section>
+
+      <section id="safety" class="card">
+        <div class="card-head"><span class="badge">9</span><h2>Safety disclaimer</h2></div>
+        <div class="warn-card">
+          <p class="tag">Please read</p>
+          <p>KRides facilitates connections between riders and independent drivers but does not control, and cannot guarantee, the conduct of any user. Use the app's safety and reporting features if something feels wrong, and always use your own judgment.</p>
         </div>
-      </div>
-      <p class="muted">Repeated cancellations by either party may be reviewed and can affect your ability to use the app.</p>
-    </section>
+      </section>
 
-    <section id="conduct">
-      <h2><span class="num">08</span>Ratings, reports &amp; conduct</h2>
-      <p>Riders and drivers can rate each other after a ride. You can report a driver during or after a ride if something went wrong — we review every report. You agree not to:</p>
-      <ul>
-        <li>Harass, threaten, or discriminate against another user.</li>
-        <li>Provide false information, including fake ride requests or fraudulent payment details.</li>
-        <li>Attempt to circumvent the app to arrange payment or rides outside the platform.</li>
-        <li>Use the app for any unlawful purpose.</li>
-      </ul>
-      <p>Violating these terms may result in a warning, suspension, or permanent removal from the platform.</p>
-    </section>
+      <section id="liability" class="card">
+        <div class="card-head"><span class="badge">10</span><h2>Liability &amp; indemnity</h2></div>
+        <p>The app is provided "as is." To the fullest extent permitted by Nigerian law, KRides isn't liable for indirect, incidental, or consequential damages from your use of the app or another user's actions. You agree to indemnify KRides against claims arising from your own violation of these Terms or applicable law.</p>
+      </section>
 
-    <section id="safety">
-      <h2><span class="num">09</span>Safety disclaimer</h2>
-      <div class="callout">
-        <p class="tag">Please read</p>
-        <p>KRides facilitates connections between riders and independent drivers but does not control, and cannot guarantee, the conduct of any user. Use the app's safety and reporting features if something feels wrong, and always use your own judgment when accepting or giving a ride.</p>
-      </div>
-    </section>
+      <section id="ip" class="card">
+        <div class="card-head"><span class="badge">11</span><h2>Intellectual property</h2></div>
+        <p>The KRides name, logo, app design, and underlying software are owned by Krides — Kampus Rides. You may not copy, modify, or redistribute any part of the app without permission.</p>
+      </section>
 
-    <section id="liability">
-      <h2><span class="num">10</span>Liability &amp; indemnity</h2>
-      <p>The app is provided "as is." To the fullest extent permitted by Nigerian law, KRides isn't liable for indirect, incidental, or consequential damages arising from your use of the app, or from the actions of another user. You agree to indemnify KRides against claims arising from your own violation of these Terms or applicable law.</p>
-    </section>
+      <section id="termination" class="card">
+        <div class="card-head"><span class="badge">12</span><h2>Suspension &amp; termination</h2></div>
+        <p>We may suspend or terminate your account for violating these Terms, fraudulent or unsafe conduct, or where required by law. You can delete your own account any time from within the app.</p>
+      </section>
 
-    <section id="ip">
-      <h2><span class="num">11</span>Intellectual property</h2>
-      <p>The KRides name, logo, app design, and underlying software are owned by Krides — Kampus Rides. You may not copy, modify, or redistribute any part of the app without our permission.</p>
-    </section>
+      <section id="law" class="card">
+        <div class="card-head"><span class="badge">13</span><h2>Governing law &amp; disputes</h2></div>
+        <p>These Terms are governed by the laws of the Federal Republic of Nigeria. Disputes arising from these Terms or your use of the app are subject to the jurisdiction of the courts of Nigeria.</p>
+      </section>
 
-    <section id="termination">
-      <h2><span class="num">12</span>Suspension &amp; termination</h2>
-      <p>We may suspend or terminate your account if you violate these Terms, engage in fraudulent or unsafe conduct, or where required by law. You can delete your own account at any time from within the app.</p>
-    </section>
+      <section id="changes" class="card">
+        <div class="card-head"><span class="badge">14</span><h2>Changes to these terms</h2></div>
+        <p>We'll update the effective date above whenever these Terms change. Continuing to use the app after a change means you accept the update.</p>
+      </section>
 
-    <section id="law">
-      <h2><span class="num">13</span>Governing law &amp; disputes</h2>
-      <p>These Terms are governed by the laws of the Federal Republic of Nigeria. Any dispute arising from these Terms or your use of the app will be subject to the jurisdiction of the courts of Nigeria.</p>
-    </section>
+      <section id="contact">
+        <div class="contact-card">
+          <h2 style="margin-bottom: 14px;">Contact us</h2>
+          <div class="contact-row"><span>Email</span><span>kampusrides24@gmail.com</span></div>
+          <div class="contact-row"><span>Operator</span><span>Krides — Kampus Rides</span></div>
+          <div class="contact-row"><span>Jurisdiction</span><span>Nigeria</span></div>
+        </div>
+      </section>
+    </main>
 
-    <section id="changes">
-      <h2><span class="num">14</span>Changes to these terms</h2>
-      <p>We may update these Terms as KRides evolves. We'll update the "Effective" date at the top of this page when we do. Continuing to use the app after a change means you accept the updated Terms.</p>
-    </section>
-
-    <section id="contact">
-      <h2><span class="num">15</span>Contact us</h2>
-      <p>Questions about these Terms?</p>
-      <div class="contact-card">
-        <div class="row"><span>Email</span><span>kampusrides24@gmail.com</span></div>
-        <div class="row"><span>Operator</span><span>Krides — Kampus Rides</span></div>
-        <div class="row"><span>Jurisdiction</span><span>Nigeria</span></div>
-      </div>
-    </section>
-  </main>
-
-  <footer>
-    <p>© 2026 Krides — Kampus Rides. These Terms apply to the KRides mobile app and are governed by the laws of Nigeria.</p>
-  </footer>
+    <footer>© 2026 Krides — Kampus Rides. Governed by the laws of Nigeria.</footer>
+  </div>
 </div>
 </body>
 </html>
