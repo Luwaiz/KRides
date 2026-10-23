@@ -7,376 +7,362 @@
 <meta name="description" content="Privacy Policy for the KRides campus ride-hailing app.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #faf9f6;
-    --surface: #ffffff;
-    --border: #e4e1d8;
-    --fg: #1d1b16;
-    --fg-muted: #6b6559;
-    --accent: #1a5c42;
-    --accent-soft: #e5efe9;
-    --display: "Fraunces", Georgia, "Times New Roman", serif;
-    --body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --blue: #0066F5;
+    --blue-deep: #0050c4;
+    --blue-soft: #e8f0ff;
+    --bg: #f4f6fb;
+    --card: #ffffff;
+    --ink: #10131a;
+    --ink-muted: #5c6472;
+    --border: #e7e9f0;
     color-scheme: light;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #15140f;
-      --surface: #1c1b15;
-      --border: #332f24;
-      --fg: #f1efe6;
-      --fg-muted: #a39d8c;
-      --accent: #5fc996;
-      --accent-soft: #1f2e26;
+      --blue: #4d94ff;
+      --blue-deep: #0066F5;
+      --blue-soft: #16233a;
+      --bg: #0b0e14;
+      --card: #141821;
+      --ink: #f2f4f8;
+      --ink-muted: #9aa3b2;
+      --border: #232838;
       color-scheme: dark;
     }
   }
 
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; padding: 0; }
   body {
     background: var(--bg);
-    color: var(--fg);
-    font-family: var(--body);
+    color: var(--ink);
+    font-family: "Albert Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     line-height: 1.6;
-    padding-left: max(16px, env(safe-area-inset-left, 0px));
-    padding-right: max(16px, env(safe-area-inset-right, 0px));
   }
 
-  .wrap {
-    max-width: 1180px;
-    margin: 0 auto;
-    display: grid;
-    grid-template-columns: 240px minmax(0, 700px);
-    gap: 48px;
-    padding-block: 40px 80px;
-    align-items: start;
+  /* Hero: mirrors the app's own top-blue / bottom-sheet screen pattern */
+  .band {
+    background: linear-gradient(180deg, var(--blue-deep), var(--blue) 70%);
+    padding: 0 max(20px, env(safe-area-inset-left, 0px)) 56px max(20px, env(safe-area-inset-right, 0px));
+    padding-top: max(36px, env(safe-area-inset-top, 0px));
   }
-  @media (max-width: 860px) {
-    .wrap { grid-template-columns: 1fr; gap: 28px; }
-  }
-
-  header.hero {
-    grid-column: 1 / -1;
-    border-bottom: 1px solid var(--border);
-    padding-bottom: 28px;
-    margin-bottom: 4px;
-  }
-  .eyebrow {
-    font-family: var(--body);
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--accent);
-    margin: 0 0 10px;
-  }
-  h1 {
-    font-family: var(--display);
-    font-weight: 600;
-    font-size: clamp(32px, 5vw, 46px);
-    line-height: 1.12;
-    margin: 0 0 12px;
-    text-wrap: balance;
-  }
-  .meta {
-    color: var(--fg-muted);
-    font-size: 14px;
-    margin: 0;
-  }
-
-  nav.toc {
-    position: sticky;
-    top: 24px;
-    align-self: start;
-  }
-  @media (max-width: 860px) {
-    nav.toc { position: static; order: -1; }
-  }
-  nav.toc .label {
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--fg-muted);
-    margin: 0 0 10px;
-  }
-  nav.toc ol {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    counter-reset: toc;
+  .band-inner { max-width: 640px; margin: 0 auto; }
+  .brand {
     display: flex;
-    flex-direction: column;
+    align-items: center;
     gap: 2px;
+    margin-bottom: 28px;
   }
-  nav.toc li { counter-increment: toc; }
-  nav.toc a {
+  .brand-word {
+    font-weight: 800;
+    font-size: 19px;
+    color: #fff;
+    letter-spacing: -0.01em;
+  }
+  .brand-word .dot { color: #fff; }
+  .swoosh { margin-left: 2px; display: block; }
+  h1 {
+    color: #fff;
+    font-size: clamp(28px, 7vw, 36px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin: 0 0 8px;
+  }
+  .sub { color: rgba(255,255,255,0.78); font-size: 14px; margin: 0; font-weight: 500; }
+
+  /* Sheet: rounded-top card pulled up over the band, like the app's bottomCont */
+  .sheet {
+    max-width: 640px;
+    margin: -32px auto 0;
+    background: var(--bg);
+    border-radius: 24px 24px 0 0;
+    position: relative;
+  }
+  .sheet-cap {
+    background: var(--card);
+    border-radius: 24px 24px 0 0;
+    padding-top: 6px;
+  }
+
+  nav.pills {
     display: flex;
-    gap: 10px;
-    padding: 7px 10px;
-    margin-left: -10px;
-    border-radius: 8px;
-    color: var(--fg-muted);
-    text-decoration: none;
-    font-size: 13.5px;
-    line-height: 1.35;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 18px 20px 14px;
+    scrollbar-width: none;
+    position: sticky;
+    top: 0;
+    background: var(--card);
+    z-index: 5;
+    border-bottom: 1px solid var(--border);
   }
-  nav.toc a::before {
-    content: counter(toc, decimal-leading-zero);
-    font-variant-numeric: tabular-nums;
-    color: var(--accent);
-    font-weight: 600;
-    flex-shrink: 0;
-  }
-  nav.toc a:hover { background: var(--accent-soft); color: var(--fg); }
-
-  main { min-width: 0; }
-
-  section { padding-top: 34px; scroll-margin-top: 20px; }
-  section:first-of-type { padding-top: 0; }
-  section + section { border-top: 1px solid var(--border); }
-
-  h2 {
-    font-family: var(--display);
-    font-weight: 600;
-    font-size: 22px;
-    margin: 0 0 14px;
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
-  }
-  h2 .num {
-    font-family: var(--body);
+  nav.pills::-webkit-scrollbar { display: none; }
+  nav.pills a {
+    flex: 0 0 auto;
+    padding: 8px 14px;
+    border-radius: 100px;
+    background: var(--bg);
+    color: var(--ink-muted);
     font-size: 13px;
-    font-weight: 700;
-    color: var(--accent);
-    font-variant-numeric: tabular-nums;
-  }
-  h3 {
-    font-family: var(--body);
-    font-size: 15px;
-    font-weight: 700;
-    margin: 20px 0 8px;
-  }
-  p { margin: 0 0 12px; color: var(--fg); max-width: 65ch; }
-  p.muted, li.muted { color: var(--fg-muted); }
-  ul, ol.plain { margin: 0 0 12px; padding-left: 20px; }
-  li { margin-bottom: 6px; }
-  strong { font-weight: 600; }
-  a.link { color: var(--accent); }
-
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 10px 0 16px;
-    font-size: 13.5px;
-  }
-  thead td {
-    color: var(--fg-muted);
     font-weight: 600;
-    font-size: 11px;
+    text-decoration: none;
+    border: 1px solid var(--border);
+    white-space: nowrap;
+  }
+
+  main.content { padding: 24px 20px 8px; }
+
+  section.lead p { font-size: 15px; color: var(--ink-muted); }
+  section.lead { margin-bottom: 8px; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 20px;
+    margin-bottom: 14px;
+    scroll-margin-top: 70px;
+  }
+  .card-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .badge {
+    flex: 0 0 auto;
+    width: 28px;
+    height: 28px;
+    border-radius: 9px;
+    background: var(--blue-soft);
+    color: var(--blue);
+    font-weight: 800;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  h2 {
+    font-size: 17px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    margin: 0;
+  }
+  h3 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; color: var(--ink); }
+  p { margin: 0 0 10px; font-size: 14.5px; color: var(--ink); }
+  p.muted { color: var(--ink-muted); font-size: 13.5px; }
+  ul { margin: 0 0 10px; padding-left: 18px; }
+  li { margin-bottom: 6px; font-size: 14.5px; }
+  strong { font-weight: 700; }
+  a.link { color: var(--blue); font-weight: 600; text-decoration: none; }
+
+  .tbl-wrap { overflow-x: auto; margin: 4px 0 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 460px; }
+  thead td {
+    color: var(--ink-muted);
+    font-weight: 700;
+    font-size: 10.5px;
     letter-spacing: 0.04em;
     text-transform: uppercase;
     padding-bottom: 8px;
     border-bottom: 1px solid var(--border);
   }
-  tbody td {
-    padding: 10px 10px 10px 0;
-    border-bottom: 1px solid var(--border);
-    vertical-align: top;
-  }
+  tbody td { padding: 10px 10px 10px 0; border-bottom: 1px solid var(--border); vertical-align: top; }
   tbody tr:last-child td { border-bottom: none; }
-  .tbl-wrap { overflow-x: auto; }
-
-  .callout {
-    background: var(--accent-soft);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 16px 18px;
-    margin: 14px 0 18px;
-  }
-  .callout p:last-child { margin-bottom: 0; }
 
   .contact-card {
-    background: var(--surface);
+    background: var(--blue-soft);
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: 18px;
     padding: 20px;
-    margin-top: 8px;
+    margin-bottom: 20px;
   }
-  .contact-card .row { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
-  .contact-card .row:last-child { border-bottom: none; }
-  .contact-card .row span:first-child { color: var(--fg-muted); }
+  .contact-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(0,102,245,0.14);
+    font-size: 14px;
+  }
+  .contact-row:last-child { border-bottom: none; }
+  .contact-row span:first-child { color: var(--ink-muted); font-weight: 500; }
+  .contact-row span:last-child { font-weight: 700; }
 
   footer {
-    grid-column: 1 / -1;
-    border-top: 1px solid var(--border);
-    margin-top: 10px;
-    padding-top: 20px;
-    color: var(--fg-muted);
-    font-size: 12.5px;
+    text-align: center;
+    padding: 4px 20px 48px;
+    color: var(--ink-muted);
+    font-size: 12px;
+  }
+
+  @media (min-width: 720px) {
+    .band { padding-bottom: 64px; }
+    .sheet { margin-top: -40px; }
+    .card { padding: 26px 28px; }
+    main.content { padding: 32px 28px 8px; }
   }
 </style>
 </head>
 <body>
 
-<div class="wrap">
-  <header class="hero">
-    <p class="eyebrow">Krides — Kampus Rides</p>
+<div class="band">
+  <div class="band-inner">
+    <div class="brand">
+      <span class="brand-word">KRides<span class="dot">.</span></span>
+      <svg class="swoosh" width="46" height="14" viewBox="0 0 46 14" fill="none">
+        <path d="M2 11C14 2 32 2 44 7" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+      </svg>
+    </div>
     <h1>Privacy Policy</h1>
-    <p class="meta">Effective 23 October 2026 · Applies to the KRides app for riders and drivers</p>
-  </header>
+    <p class="sub">Effective 23 October 2026 · Krides — Kampus Rides</p>
+  </div>
+</div>
 
-  <nav class="toc" aria-label="Sections">
-    <p class="label">On this page</p>
-    <ol>
-      <li><a href="#information-we-collect">Information we collect</a></li>
-      <li><a href="#location-data">Location data</a></li>
-      <li><a href="#how-we-use-it">How we use it</a></li>
-      <li><a href="#sharing">Who we share it with</a></li>
-      <li><a href="#payments">Payments &amp; your wallet</a></li>
-      <li><a href="#notifications">Push notifications</a></li>
-      <li><a href="#retention">How long we keep it</a></li>
-      <li><a href="#your-rights">Your rights &amp; choices</a></li>
-      <li><a href="#security">Security</a></li>
-      <li><a href="#children">Children's privacy</a></li>
-      <li><a href="#transfers">International transfers</a></li>
-      <li><a href="#changes">Changes to this policy</a></li>
-      <li><a href="#contact">Contact us</a></li>
-    </ol>
-  </nav>
+<div class="sheet">
+  <div class="sheet-cap">
+    <nav class="pills" aria-label="Sections">
+      <a href="#info">Your data</a>
+      <a href="#location">Location</a>
+      <a href="#usage">How we use it</a>
+      <a href="#sharing">Sharing</a>
+      <a href="#payments">Payments</a>
+      <a href="#notifications">Notifications</a>
+      <a href="#retention">Retention</a>
+      <a href="#rights">Your rights</a>
+      <a href="#security">Security</a>
+      <a href="#children">Age limit</a>
+      <a href="#transfers">Transfers</a>
+      <a href="#changes">Changes</a>
+      <a href="#contact">Contact</a>
+    </nav>
 
-  <main>
-    <section id="intro">
-      <p>KRides ("Krides", "we", "us", "our") operates the KRides mobile app, a platform that connects student riders with independent drivers for rides around campus and the surrounding area. This policy explains what we collect through the app, why we collect it, and the choices you have — written for both riders and drivers, since one app serves both.</p>
-      <p>By creating an account or using KRides, you agree to the collection and use of information as described here. If anything is unclear, email us — the address is at the bottom of this page.</p>
-    </section>
+    <main class="content">
+      <section class="lead">
+        <p>KRides ("Krides", "we", "us", "our") operates the KRides mobile app, connecting student riders with independent drivers for rides around campus and the surrounding area. This explains what we collect, why, and the choices you have — written for riders and drivers alike, since one app serves both. By using KRides, you agree to this policy.</p>
+      </section>
 
-    <section id="information-we-collect">
-      <h2><span class="num">01</span>Information we collect</h2>
-      <h3>What you give us directly</h3>
-      <ul>
-        <li><strong>Account details</strong> — full name, phone number, email address, and password (or Google account details, if you sign in with Google).</li>
-        <li><strong>Driver details</strong> — vehicle information, identification/verification documents, and bank account details used to pay you for completed rides.</li>
-        <li><strong>Ride content</strong> — pickup and destination addresses, ratings you give or receive, and anything you write in a driver report or support message.</li>
-      </ul>
-      <h3>What we collect automatically</h3>
-      <ul>
-        <li><strong>Location</strong> — see <a class="link" href="#location-data">Location data</a> below.</li>
-        <li><strong>Ride history</strong> — fares, timestamps, payment method, and which driver and rider were matched.</li>
-        <li><strong>Device data</strong> — a push-notification token tied to your device, and basic technical data (app version, device type) used for debugging.</li>
-      </ul>
-      <h3>What we don't store</h3>
-      <p>We never see or store your full card number. Card payments are tokenized and processed directly by our payment processor, Flutterwave — see <a class="link" href="#payments">Payments</a>.</p>
-    </section>
+      <section id="info" class="card">
+        <div class="card-head"><span class="badge">1</span><h2>Information we collect</h2></div>
+        <h3>What you give us</h3>
+        <ul>
+          <li><strong>Account details</strong> — name, phone number, email, and password (or your Google account, if you sign in with Google).</li>
+          <li><strong>Driver details</strong> — vehicle info, verification documents, and bank account details for payouts.</li>
+          <li><strong>Ride content</strong> — pickup/destination, ratings, and anything written in a report or support message.</li>
+        </ul>
+        <h3>What we collect automatically</h3>
+        <ul>
+          <li>Location — see <a class="link" href="#location">Location data</a>.</li>
+          <li>Ride history — fares, timestamps, payment method, driver/rider pairing.</li>
+          <li>A push-notification token tied to your device, plus basic technical data (app version, device type).</li>
+        </ul>
+        <h3>What we don't store</h3>
+        <p class="muted">We never see your full card number — card payments are tokenized and processed directly by Flutterwave.</p>
+      </section>
 
-    <section id="location-data">
-      <h2><span class="num">02</span>Location data</h2>
-      <p>KRides needs your location to function: to find nearby drivers, calculate a route, and let riders and drivers track each other during an active ride.</p>
-      <ul>
-        <li><strong>Riders</strong> — your location is used to set your pickup point and to show your driver's live position while a ride is in progress.</li>
-        <li><strong>Drivers</strong> — your location is shared with a matched rider for the duration of that ride, and used while you're marked "online" to match you with nearby ride requests.</li>
-      </ul>
-      <p>You can disable location access in your device settings at any time, but the app won't be able to match rides or track trips without it. We don't collect or sell your location data for advertising.</p>
-    </section>
+      <section id="location" class="card">
+        <div class="card-head"><span class="badge">2</span><h2>Location data</h2></div>
+        <p>KRides needs your location to find nearby drivers, calculate a route, and let riders and drivers track each other during a ride.</p>
+        <ul>
+          <li><strong>Riders</strong> — used for your pickup point and to show your driver's live position mid-ride.</li>
+          <li><strong>Drivers</strong> — shared with a matched rider for that ride, and used while "online" to match you with nearby requests.</li>
+        </ul>
+        <p class="muted">You can turn off location access in your device settings, though the app can't match or track rides without it. We never sell location data.</p>
+      </section>
 
-    <section id="how-we-use-it">
-      <h2><span class="num">03</span>How we use it</h2>
-      <ul>
-        <li>To create and secure your account, and verify driver eligibility.</li>
-        <li>To match riders with nearby drivers and calculate fares.</li>
-        <li>To process payments, wallet top-ups, driver payouts, and refunds.</li>
-        <li>To send ride updates, receipts, and account notifications.</li>
-        <li>To respond to support requests and investigate reports filed against a driver or rider.</li>
-        <li>To keep the platform safe — detecting fraud, abuse, and policy violations.</li>
-      </ul>
-    </section>
+      <section id="usage" class="card">
+        <div class="card-head"><span class="badge">3</span><h2>How we use it</h2></div>
+        <ul>
+          <li>Creating and securing your account, and verifying driver eligibility.</li>
+          <li>Matching riders with nearby drivers and calculating fares.</li>
+          <li>Processing payments, wallet top-ups, driver payouts, and refunds.</li>
+          <li>Sending ride updates, receipts, and account notifications.</li>
+          <li>Responding to support requests and investigating reports.</li>
+          <li>Keeping the platform safe — detecting fraud and abuse.</li>
+        </ul>
+      </section>
 
-    <section id="sharing">
-      <h2><span class="num">04</span>Who we share it with</h2>
-      <p>We don't sell your personal data. We share it only where the app needs a specialist service to function:</p>
-      <div class="tbl-wrap">
-        <table>
-          <thead>
-            <tr><td>Service</td><td>What it handles</td></tr>
-          </thead>
-          <tbody>
-            <tr><td>Firebase (Google)</td><td>Account sign-in and our app database — stores your profile, rides, and ratings securely.</td></tr>
-            <tr><td>Google Sign-In</td><td>Optional one-tap login using your Google account.</td></tr>
-            <tr><td>Google Maps Platform</td><td>Maps, addresses, and route/direction calculations.</td></tr>
-            <tr><td>Flutterwave</td><td>Card payments, wallet top-ups, and driver bank transfers. Flutterwave is PCI-DSS compliant; we never receive your full card number.</td></tr>
-            <tr><td>Expo (push notifications)</td><td>Delivers ride and account notifications to your device.</td></tr>
-            <tr><td>Cloudinary</td><td>Stores uploaded images, such as profile photos or driver documents.</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p class="muted">We may also share information where required by law, to enforce our Terms &amp; Conditions, or to protect the safety of our users.</p>
-    </section>
+      <section id="sharing" class="card">
+        <div class="card-head"><span class="badge">4</span><h2>Who we share it with</h2></div>
+        <p>We don't sell your data. We share it only where the app needs a specialist service to function:</p>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><td>Service</td><td>What it handles</td></tr></thead>
+            <tbody>
+              <tr><td>Firebase (Google)</td><td>Sign-in and our app database — profile, rides, ratings.</td></tr>
+              <tr><td>Google Sign-In</td><td>Optional one-tap login.</td></tr>
+              <tr><td>Google Maps Platform</td><td>Maps, addresses, route calculations.</td></tr>
+              <tr><td>Flutterwave</td><td>Card payments, top-ups, driver transfers. PCI-DSS compliant; we never see your full card number.</td></tr>
+              <tr><td>Expo (push)</td><td>Delivers ride and account notifications.</td></tr>
+              <tr><td>Cloudinary</td><td>Stores uploaded images — profile photos, driver documents.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="muted">We may also share information where required by law, or to protect user safety.</p>
+      </section>
 
-    <section id="payments">
-      <h2><span class="num">05</span>Payments &amp; your wallet</h2>
-      <p>All card payments are processed by Flutterwave, a licensed payment processor. KRides stores your transaction history and wallet balance, but your card details are handled entirely by Flutterwave's secure systems.</p>
-      <p>Drivers' bank account details are shared with Flutterwave solely to send ride earnings via bank transfer. We retain the minimum driver banking information needed to initiate and reconcile those payouts.</p>
-    </section>
+      <section id="payments" class="card">
+        <div class="card-head"><span class="badge">5</span><h2>Payments &amp; your wallet</h2></div>
+        <p>Card payments are processed by Flutterwave, a licensed payment processor. We store your transaction history and wallet balance; your card details stay with Flutterwave's secure systems.</p>
+        <p class="muted">Drivers' bank details are shared with Flutterwave solely to send ride earnings by transfer — we keep only what's needed to initiate and reconcile payouts.</p>
+      </section>
 
-    <section id="notifications">
-      <h2><span class="num">06</span>Push notifications</h2>
-      <p>We use your device's push-notification token to send ride status updates, driver/rider matches, and account alerts. This token is cleared from our systems when you sign out, and a fresh one is registered when you sign in again — so notifications always follow the account you're currently signed into, never a previous one on the same device.</p>
-      <p>You can turn off push notifications at any time in your device settings.</p>
-    </section>
+      <section id="notifications" class="card">
+        <div class="card-head"><span class="badge">6</span><h2>Push notifications</h2></div>
+        <p>Your device's push token is used for ride status, matches, and account alerts. It's cleared on sign-out and re-registered on sign-in, so notifications always follow the account currently signed in — never a previous one on the same device.</p>
+        <p class="muted">Turn these off any time in your device settings.</p>
+      </section>
 
-    <section id="retention">
-      <h2><span class="num">07</span>How long we keep it</h2>
-      <p>We keep your account and ride data for as long as your account is active. If you delete your account, we remove your profile, ride history, and stored documents from our systems, except where we're required to retain certain records — such as payment and transaction records — for legal, tax, or fraud-prevention purposes.</p>
-    </section>
+      <section id="retention" class="card">
+        <div class="card-head"><span class="badge">7</span><h2>How long we keep it</h2></div>
+        <p>We keep your data while your account is active. Deleting your account removes your profile, ride history, and documents — except records we must retain for legal, tax, or fraud-prevention reasons.</p>
+      </section>
 
-    <section id="your-rights">
-      <h2><span class="num">08</span>Your rights &amp; choices</h2>
-      <ul>
-        <li><strong>Access &amp; correct</strong> — update your profile details directly in the app.</li>
-        <li><strong>Delete your account</strong> — available in-app under account settings. This permanently removes your profile and driver details, including stored bank information, subject to the legal retention note above.</li>
-        <li><strong>Location &amp; notifications</strong> — controlled through your device's permission settings.</li>
-        <li><strong>Questions or requests</strong> — email us at the address in <a class="link" href="#contact">Contact us</a> and we'll respond.</li>
-      </ul>
-    </section>
+      <section id="rights" class="card">
+        <div class="card-head"><span class="badge">8</span><h2>Your rights &amp; choices</h2></div>
+        <ul>
+          <li><strong>Access &amp; correct</strong> — update your profile in the app.</li>
+          <li><strong>Delete your account</strong> — in-app, under account settings. Removes your profile and driver details, including bank information, subject to the retention note above.</li>
+          <li><strong>Location &amp; notifications</strong> — controlled in device settings.</li>
+          <li><strong>Questions</strong> — email us, see <a class="link" href="#contact">Contact</a>.</li>
+        </ul>
+      </section>
 
-    <section id="security">
-      <h2><span class="num">09</span>Security</h2>
-      <p>Data in transit between the app and our servers is encrypted (HTTPS/TLS). Our database applies access rules so that, for example, one user's account cannot read or modify another's. No system is perfectly secure, but we take reasonable technical and organizational steps to protect your information.</p>
-    </section>
+      <section id="security" class="card">
+        <div class="card-head"><span class="badge">9</span><h2>Security</h2></div>
+        <p>Data in transit is encrypted (HTTPS/TLS). Our database enforces access rules so one user's account can't read or modify another's. No system is perfectly secure, but we take reasonable steps to protect your data.</p>
+      </section>
 
-    <section id="children">
-      <h2><span class="num">10</span>Children's privacy</h2>
-      <p>KRides is intended for users aged 15 and over. We don't knowingly collect personal information from anyone younger. If you believe a younger person has created an account, contact us and we'll remove it.</p>
-    </section>
+      <section id="children" class="card">
+        <div class="card-head"><span class="badge">10</span><h2>Children's privacy</h2></div>
+        <p>KRides is for users aged 15 and over. We don't knowingly collect data from anyone younger — contact us if you believe a younger person has an account and we'll remove it.</p>
+      </section>
 
-    <section id="transfers">
-      <h2><span class="num">11</span>International transfers</h2>
-      <p>KRides operates primarily in Nigeria, but some of the services we rely on — such as Firebase/Google Cloud and our hosting provider — process data on servers located outside Nigeria. Where that happens, those providers maintain their own security and compliance standards for handling your data.</p>
-    </section>
+      <section id="transfers" class="card">
+        <div class="card-head"><span class="badge">11</span><h2>International transfers</h2></div>
+        <p>We operate primarily in Nigeria, but some providers we rely on — like Firebase/Google Cloud — process data outside Nigeria, under their own security and compliance standards.</p>
+      </section>
 
-    <section id="changes">
-      <h2><span class="num">12</span>Changes to this policy</h2>
-      <p>We may update this policy as the app evolves. We'll update the "Effective" date at the top of this page when we do. Continuing to use KRides after a change means you accept the updated policy.</p>
-    </section>
+      <section id="changes" class="card">
+        <div class="card-head"><span class="badge">12</span><h2>Changes to this policy</h2></div>
+        <p>We'll update the effective date above whenever this policy changes. Continuing to use KRides after a change means you accept the update.</p>
+      </section>
 
-    <section id="contact">
-      <h2><span class="num">13</span>Contact us</h2>
-      <p>Questions about this policy, or a request about your data?</p>
-      <div class="contact-card">
-        <div class="row"><span>Email</span><span>kampusrides24@gmail.com</span></div>
-        <div class="row"><span>Operator</span><span>Krides — Kampus Rides</span></div>
-        <div class="row"><span>Jurisdiction</span><span>Nigeria</span></div>
-      </div>
-    </section>
-  </main>
+      <section id="contact">
+        <div class="contact-card">
+          <h2 style="margin-bottom: 14px;">Contact us</h2>
+          <div class="contact-row"><span>Email</span><span>kampusrides24@gmail.com</span></div>
+          <div class="contact-row"><span>Operator</span><span>Krides — Kampus Rides</span></div>
+          <div class="contact-row"><span>Jurisdiction</span><span>Nigeria</span></div>
+        </div>
+      </section>
+    </main>
 
-  <footer>
-    <p>© 2026 Krides — Kampus Rides. This policy is written for the KRides mobile app and governed by the laws of Nigeria.</p>
-  </footer>
+    <footer>© 2026 Krides — Kampus Rides. Governed by the laws of Nigeria.</footer>
+  </div>
 </div>
 </body>
 </html>
