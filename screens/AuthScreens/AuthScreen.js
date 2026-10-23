@@ -1,5 +1,5 @@
-import { Image, StyleSheet, Text, View } from "react-native";
-import React from "react";
+import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, { useState } from "react";
 import BottomSheet from "@gorhom/bottom-sheet";
 import { colors } from "../../constants/styling";
 import ActiveButton from "../../components/buttons/ActiveButton";
@@ -8,6 +8,8 @@ import Terms from "../../components/Terms";
 import KRideLogo from "../../assets/svg/WhiteLogo.svg";
 
 const AuthScreen = ({ navigation }) => {
+	const [activeTab, setActiveTab] = useState("customer");
+
 	const Navigate = (page) => {
 		navigation.navigate(page);
 	};
@@ -24,18 +26,59 @@ const AuthScreen = ({ navigation }) => {
 			>
 				<View style={styles.sheet}>
 					<Text style={styles.welcome}>Welcome!</Text>
-					<ActiveButton title={"Sign up"} onPress={() => Navigate("Signup")} />
-					<LoginButton title={"Log in"} onPress={() => Navigate("Login")} />
-					<LoginButton
-						title={"Driver Sign up"}
-						onPress={() => Navigate("DriverSignup")}
-					/>
-					<LoginButton
-						title={"Driver Log in"}
-						onPress={() => Navigate("DriverLogin")}
-					/>
+
+					<View style={styles.tabRow}>
+						<TouchableOpacity
+							style={[styles.tab, activeTab === "customer" && styles.tabActive]}
+							onPress={() => setActiveTab("customer")}
+							activeOpacity={0.7}
+						>
+							<Text
+								style={[
+									styles.tabText,
+									activeTab === "customer" && styles.tabTextActive,
+								]}
+							>
+								Customer
+							</Text>
+						</TouchableOpacity>
+						<TouchableOpacity
+							style={[styles.tab, activeTab === "driver" && styles.tabActive]}
+							onPress={() => setActiveTab("driver")}
+							activeOpacity={0.7}
+						>
+							<Text
+								style={[
+									styles.tabText,
+									activeTab === "driver" && styles.tabTextActive,
+								]}
+							>
+								Driver
+							</Text>
+						</TouchableOpacity>
+					</View>
+
+					{activeTab === "customer" ? (
+						<>
+							<ActiveButton title={"Sign up"} onPress={() => Navigate("Signup")} />
+							<LoginButton title={"Log in"} onPress={() => Navigate("Login")} />
+						</>
+					) : (
+						<>
+							<ActiveButton
+								title={"Sign up"}
+								onPress={() => Navigate("DriverSignup")}
+							/>
+							<LoginButton
+								title={"Log in"}
+								onPress={() => Navigate("DriverLogin")}
+							/>
+						</>
+					)}
 				</View>
-				<Terms />
+				<View style={styles.termsCont}>
+					<Terms />
+				</View>
 			</BottomSheet>
 		</View>
 	);
@@ -67,5 +110,34 @@ const styles = StyleSheet.create({
 		marginBottom: 20,
 		marginTop: 20,
 		textAlign: "center",
+	},
+	tabRow: {
+		flexDirection: "row",
+		backgroundColor: colors.lightGrey2,
+		borderRadius: 12,
+		padding: 4,
+		width: 240,
+		marginBottom: 20,
+	},
+	tab: {
+		flex: 1,
+		height: 38,
+		borderRadius: 9,
+		alignItems: "center",
+		justifyContent: "center",
+	},
+	tabActive: {
+		backgroundColor: colors.primaryBlue,
+	},
+	tabText: {
+		fontSize: 14,
+		fontWeight: "600",
+		color: colors.lightGrey4,
+	},
+	tabTextActive: {
+		color: colors.secondary,
+	},
+	termsCont: {
+		paddingBottom: 28,
 	},
 });

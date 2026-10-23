@@ -1,7 +1,8 @@
-import { ScrollView, StyleSheet, Text, View, Alert } from "react-native";
+import { ScrollView, StyleSheet, Text, View, Alert, KeyboardAvoidingView, Platform } from "react-native";
 import React, { useState } from "react";
 import { colors } from "../../constants/styling";
 import { SafeAreaView } from "react-native-safe-area-context";
+import DismissKeyboardView from "../../components/DismissKeyboardView";
 import TextInput1 from "../../components/TextInput1";
 import ActiveButton from "../../components/buttons/ActiveButton";
 import Terms from "../../components/Terms";
@@ -168,67 +169,75 @@ const DriverSignup = ({ navigation }) => {
 
 	return (
 		<SafeAreaView style={styles.container}>
-			<ScrollView
+			<KeyboardAvoidingView
 				style={{ flex: 1 }}
-				contentContainerStyle={{ flexGrow: 1 }}
+				behavior={Platform.OS === "ios" ? "padding" : "height"}
 			>
-				<View style={styles.topCont}>
-					<BackButton text={<Text style={styles.headText}>Sign Up</Text>} />
-				</View>
-				<View style={styles.bottomCont}>
-					<View style={styles.sheetCont}>
-						<View style={styles.textInputCont}>
-							<TextInput1
-								text={"Full Name"}
-								placeholder={"John Doe"}
-								onChangeText={(text) => setFull(text)}
-								value={fullName}
-							/>
-							<TextInput1
-								text={"Vehicle Id"}
-								placeholder={"e.g Z9"}
-								onChangeText={(text) => setVehicle_id(text)}
-								value={vehicle_id}
-							/>
-							<TextInput1
-								text={"Phone Number"}
-								placeholder={"08123456789"}
-								onChangeText={(text) => setPhoneNumber(text)}
-								value={phone}
-							/>
-							<TextInput1
-								text={"Email Address"}
-								placeholder={"johndoe@gmail.com"}
-								onChangeText={(text) => setEmail(text)}
-								value={email}
-								keyboardType="email-address"
-								autoCapitalize="none"
-							/>
-							<TextInput1
-								text={"Password"}
-								placeholder={"*************"}
-								password
-								onChangeText={(text) => setPass(text)}
-								value={password}
-							/>
-							<TextInput1
-								text={"Confirm Password"}
-								placeholder={"*************"}
-								password
-								onChangeText={(text) => setConfirmPassword(text)}
-								value={confirmPassword}
-							/>
-							<ActiveButton
-								title={"Sign up"}
-								onPress={() => handleSignUp(password, confirmPassword)}
-								disabled={loading}
-								loading={loading}
-							/>
+				<DismissKeyboardView>
+					<ScrollView
+						style={{ flex: 1 }}
+						contentContainerStyle={{ flexGrow: 1 }}
+						keyboardShouldPersistTaps="handled"
+					>
+						<View style={styles.topCont}>
+							<BackButton text={<Text style={styles.headText}>Sign Up</Text>} />
 						</View>
-					</View>
-					<Terms />
-				</View>
-			</ScrollView>
+						<View style={styles.bottomCont}>
+							<View style={styles.sheetCont}>
+								<View style={styles.textInputCont}>
+									<TextInput1
+										text={"Full Name"}
+										placeholder={"John Doe"}
+										onChangeText={(text) => setFull(text)}
+										value={fullName}
+									/>
+									<TextInput1
+										text={"Vehicle Id"}
+										placeholder={"e.g Z9"}
+										onChangeText={(text) => setVehicle_id(text)}
+										value={vehicle_id}
+									/>
+									<TextInput1
+										text={"Phone Number"}
+										placeholder={"08123456789"}
+										onChangeText={(text) => setPhoneNumber(text)}
+										value={phone}
+									/>
+									<TextInput1
+										text={"Email Address"}
+										placeholder={"johndoe@gmail.com"}
+										onChangeText={(text) => setEmail(text)}
+										value={email}
+										keyboardType="email-address"
+										autoCapitalize="none"
+									/>
+									<TextInput1
+										text={"Password"}
+										placeholder={"*************"}
+										password
+										onChangeText={(text) => setPass(text)}
+										value={password}
+									/>
+									<TextInput1
+										text={"Confirm Password"}
+										placeholder={"*************"}
+										password
+										onChangeText={(text) => setConfirmPassword(text)}
+										value={confirmPassword}
+									/>
+									<ActiveButton
+										title={"Sign up"}
+										onPress={() => handleSignUp(password, confirmPassword)}
+										disabled={loading}
+										loading={loading}
+									/>
+								</View>
+							</View>
+							<Terms />
+						</View>
+					</ScrollView>
+				</DismissKeyboardView>
+			</KeyboardAvoidingView>
 		</SafeAreaView>
 	);
 };

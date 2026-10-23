@@ -12,6 +12,7 @@ import Direction from "../assets/svg/Frame 34direction.svg";
 import Naira from "../assets/svg/Naira.svg";
 import RideConfirm from "./modals/RideConfirm";
 import RatingModal from "./modals/RatingModal";
+import ReportDriverModal from "./modals/ReportDriverModal";
 import { sp, fs, br, ms } from "../constants/responsive";
 import Toast from "react-native-toast-message";
 import {
@@ -42,6 +43,7 @@ const ConfirmRide = () => {
 	const [rideId, setRideId] = useState(null);
 	const [acceptedDriverName, setAcceptedDriverName] = useState("");
 	const [showRatingModal, setShowRatingModal] = useState(false);
+	const [showReportModal, setShowReportModal] = useState(false);
 	const [walletBalance, setWalletBalance] = useState(null);
 	const [paymentMethod, setPaymentMethod] = useState('flutterwave');
 	const bookingInFlight = useRef(false);
@@ -536,7 +538,21 @@ const ConfirmRide = () => {
 									disabled={true}
 								/>
 							</View>
-						) : (
+						) : null}
+
+						{}
+						{activeRide?.driverId && (
+							<TouchableOpacity
+								onPress={() => setShowReportModal(true)}
+								style={{ alignSelf: "center", marginTop: sp(10) }}
+							>
+								<Text style={{ color: colors.lightGrey3, fontSize: fs(13), textDecorationLine: "underline" }}>
+									Report an issue with this ride
+								</Text>
+							</TouchableOpacity>
+						)}
+
+						{!activeRide && (
 							<>
 								{}
 								<View style={styles.payMethodRow}>
@@ -618,6 +634,22 @@ const ConfirmRide = () => {
 					rideId={rideId}
 					driverId={activeRide?.driverId || null}
 					driverName={acceptedDriverName || rider || "Driver"}
+					pickupLocation={location}
+					destination={destination}
+					amount={Price}
+				/>
+			)}
+
+			{showReportModal && (
+				<ReportDriverModal
+					visible={showReportModal}
+					onClose={() => setShowReportModal(false)}
+					history={{
+						rideId: activeRide?.rideId || rideId,
+						driverName: rider || "Driver",
+						pickupLocation: location,
+						destination: destination,
+					}}
 				/>
 			)}
 		</>

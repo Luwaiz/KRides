@@ -170,3 +170,29 @@ index 8407662..6b0df1a 100644
      }
    });
  }
+diff --git a/node_modules/react-native/third-party-podspecs/fmt.podspec b/node_modules/react-native/third-party-podspecs/fmt.podspec
+index 121be50..c1eb06d 100644
+--- a/node_modules/react-native/third-party-podspecs/fmt.podspec
++++ b/node_modules/react-native/third-party-podspecs/fmt.podspec
+@@ -17,6 +17,21 @@ Pod::Spec.new do |spec|
+     :git => fmt_git_url,
+     :tag => "11.0.2"
+   }
++  # fmt 11.0.2 gates its consteval-based format-string checking on an Apple
++  # Clang version check (__apple_build_version__ < 14000029L) meant to detect
++  # "too old to support consteval properly". Newer Xcode/Apple Clang builds
++  # (e.g. Xcode 26's Apple Clang 21) have build version numbers well above
++  # that bound, so fmt wrongly concludes consteval is safe to use there too —
++  # it isn't yet, and the archive fails with "call to consteval function ...
++  # is not a constant expression" in fmt/format-inl.h. A compiler define
++  # (FMT_USE_CONSTEVAL=0) can't override this: fmt 11.0.2's macro chain has
++  # no #ifndef guard for it (added only in fmt 12.1.0). The only fix that
++  # actually takes effect is patching the source after CocoaPods checks it
++  # out, before it's compiled — same workaround used upstream in
++  # microsoft/react-native-macos#2961 for the identical failure.
++  spec.prepare_command = <<-CMD
++    /usr/bin/sed -i.bak 's|defined(__apple_build_version__) && __apple_build_version__ < 14000029L|defined(__apple_build_version__)|' include/fmt/base.h
++  CMD
+   spec.pod_target_xcconfig = {
+     "CLANG_CXX_LANGUAGE_STANDARD" => rct_cxx_language_standard(),
+   }

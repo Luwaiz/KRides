@@ -11,6 +11,7 @@ import {
 	Alert
 } from "react-native";
 import { AntDesign, Ionicons } from "@expo/vector-icons";
+import DismissKeyboardView from "./DismissKeyboardView";
 import { colors } from "../constants/styling";
 import { FIREBASE_DB } from "../firebaseConfig";
 import { collection, getDocs, query, where } from "firebase/firestore";
@@ -188,6 +189,7 @@ const LocationPicker = ({
 			transparent={false}
 			onRequestClose={onClose}
 		>
+			<DismissKeyboardView>
 			<View style={styles.container}>
 				{}
 				<View style={styles.header}>
@@ -247,9 +249,11 @@ const LocationPicker = ({
 						contentContainerStyle={styles.listContainer}
 						ListEmptyComponent={renderEmptyState}
 						showsVerticalScrollIndicator={false}
+						keyboardShouldPersistTaps="handled"
 					/>
 				)}
 			</View>
+			</DismissKeyboardView>
 		</Modal>
 	);
 };

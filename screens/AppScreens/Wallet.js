@@ -13,6 +13,7 @@ import {
   Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import DismissKeyboardView from "../../components/DismissKeyboardView";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import {
   doc,
@@ -228,6 +229,7 @@ const Wallet = () => {
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
+        <DismissKeyboardView>
         <ScrollView
           contentContainerStyle={styles.scroll}
           showsVerticalScrollIndicator={false}
@@ -478,6 +480,7 @@ const Wallet = () => {
             )}
           </View>
         </ScrollView>
+        </DismissKeyboardView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

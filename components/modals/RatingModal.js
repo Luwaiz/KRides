@@ -8,8 +8,11 @@ import {
 	TouchableOpacity,
 	StyleSheet,
 	Dimensions,
+	KeyboardAvoidingView,
+	Platform,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import DismissKeyboardView from "../DismissKeyboardView";
 
 export const PENDING_RATINGS_KEY = "pending_customer_ratings";
 
@@ -57,6 +60,7 @@ import { colors } from "../../constants/styling";
 import { sp, fs, br, wp, ms } from "../../constants/responsive";
 import { FIREBASE_AUTH } from "../../firebaseConfig";
 import { NOTIFICATION_API_KEY } from "@env";
+import ReportDriverModal from "./ReportDriverModal";
 
 const RATINGS_URL = 'https://krides.onrender.com/api/rides/rate';
 
@@ -66,6 +70,7 @@ const RatingModal = ({ visible, onClose, rideId, driverId, driverName, pickupLoc
 	const [rating, setRating] = useState(0);
 	const [feedback, setFeedback] = useState("");
 	const [loading, setLoading] = useState(false);
+	const [showReportModal, setShowReportModal] = useState(false);
 
 	const handleSubmitRating = async () => {
 		if (rating === 0) {
@@ -158,12 +163,18 @@ const RatingModal = ({ visible, onClose, rideId, driverId, driverName, pickupLoc
 	};
 
 	return (
+		<>
 		<Modal
 			visible={visible}
 			transparent
 			animationType="fade"
 			onRequestClose={handleRateLater}
 		>
+			<KeyboardAvoidingView
+				style={{ flex: 1 }}
+				behavior={Platform.OS === "ios" ? "padding" : "height"}
+			>
+			<DismissKeyboardView>
 			<View style={styles.overlay}>
 				<View style={styles.container}>
 					<Text style={styles.title}>Rate Your Ride</Text>
@@ -251,9 +262,30 @@ const RatingModal = ({ visible, onClose, rideId, driverId, driverName, pickupLoc
 							/>
 						</View>
 					</View>
+
+					{}
+					<TouchableOpacity
+						onPress={() => setShowReportModal(true)}
+						disabled={loading}
+						style={{ marginTop: sp(14) }}
+					>
+						<Text style={styles.reportLink}>Had a problem? Report this ride</Text>
+					</TouchableOpacity>
 				</View>
 			</View>
+			</DismissKeyboardView>
+			</KeyboardAvoidingView>
 		</Modal>
+
+		{}
+		{showReportModal && (
+			<ReportDriverModal
+				visible={showReportModal}
+				onClose={() => setShowReportModal(false)}
+				history={{ rideId, driverName, pickupLocation, destination }}
+			/>
+		)}
+		</>
 	);
 };
 
@@ -362,6 +394,13 @@ const styles = StyleSheet.create({
 		fontSize: fs(16),
 		fontFamily: "Albert-SemiBold",
 		color: colors.textGrey,
+	},
+	reportLink: {
+		fontSize: fs(13),
+		fontFamily: "Albert-Regular",
+		color: colors.lightGrey3,
+		textDecorationLine: "underline",
+		textAlign: "center",
 	},
 	submitButton: {
 		flex: 2,

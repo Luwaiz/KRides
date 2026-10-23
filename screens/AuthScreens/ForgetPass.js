@@ -1,7 +1,8 @@
-import { StyleSheet, Text, View, Alert } from "react-native";
+import { StyleSheet, Text, View, Alert, KeyboardAvoidingView, Platform } from "react-native";
 import React, { useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors } from "../../constants/styling";
+import DismissKeyboardView from "../../components/DismissKeyboardView";
 import BackButton from "../../components/buttons/BackButton";
 import ActiveButton from "../../components/buttons/ActiveButton";
 import SuccessNo from "../../components/modals/SuccessNo";
@@ -80,36 +81,45 @@ const ForgetPass = ({ navigation }) => {
 	};
 	return (
 		<SafeAreaView style={styles.container}>
-			<View style={styles.topCont}>
-				<BackButton
-					text={<Text style={styles.headText}>Reset Password</Text>}
-				/>
-			</View>
-			<View style={styles.infoCont}>
-				<Text style={styles.infoText1}>
-					Enter your registered email to receive a password reset link
-				</Text>
-				<Text style={styles.infoText2}>
-					Note: Check your spam/junk folder if you don't see the email in your inbox.
-				</Text>
-			</View>
-			<View style={styles.bottomCont}>
-				<TextInput1
-					onChangeText={(text) => setEmail(text)}
-					value={email}
-					placeholder="johndoe22@gmail.com"
-					keyboardType="email-address"
-					autoCapitalize="none"
-					text="Email Address"
-				/>
-				<View style={styles.button}>
-					<ActiveButton
-						title={"Send Reset Link"}
-						onPress={() => requestCode()}
-						loading={loading}
-					/>
-				</View>
-			</View>
+			<KeyboardAvoidingView
+				style={{ flex: 1 }}
+				behavior={Platform.OS === "ios" ? "padding" : "height"}
+			>
+				<DismissKeyboardView>
+					<View style={{ flex: 1 }}>
+						<View style={styles.topCont}>
+							<BackButton
+								text={<Text style={styles.headText}>Reset Password</Text>}
+							/>
+						</View>
+						<View style={styles.infoCont}>
+							<Text style={styles.infoText1}>
+								Enter your registered email to receive a password reset link
+							</Text>
+							<Text style={styles.infoText2}>
+								Note: Check your spam/junk folder if you don't see the email in your inbox.
+							</Text>
+						</View>
+						<View style={styles.bottomCont}>
+							<TextInput1
+								onChangeText={(text) => setEmail(text)}
+								value={email}
+								placeholder="johndoe22@gmail.com"
+								keyboardType="email-address"
+								autoCapitalize="none"
+								text="Email Address"
+							/>
+							<View style={styles.button}>
+								<ActiveButton
+									title={"Send Reset Link"}
+									onPress={() => requestCode()}
+									loading={loading}
+								/>
+							</View>
+						</View>
+					</View>
+				</DismissKeyboardView>
+			</KeyboardAvoidingView>
 		</SafeAreaView>
 	);
 };

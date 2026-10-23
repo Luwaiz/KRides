@@ -1,7 +1,8 @@
-import { StyleSheet, Text, View, Alert } from "react-native";
+import { StyleSheet, Text, View, Alert, KeyboardAvoidingView, Platform } from "react-native";
 import React, { useState } from "react";
 import { colors } from "../../constants/styling";
 import { SafeAreaView } from "react-native-safe-area-context";
+import DismissKeyboardView from "../../components/DismissKeyboardView";
 import BackButton from "../../components/buttons/BackButton";
 import TextInput1 from "../../components/TextInput1";
 import ActiveButton from "../../components/buttons/ActiveButton";
@@ -21,24 +22,33 @@ const Promo = () => {
 
 	return (
 		<SafeAreaView style={styles.container}>
-			<View style={styles.topCont}>
-				<BackButton
-					text={<Text style={styles.headText}>Enter promo code</Text>}
-				/>
-			</View>
-			<View style={styles.bottomCont}>
-				<TextInput1
-					placeholder={"e.g PTY204"}
-					text={<Text>Enter the code to claim your voucher</Text>}
-					value={code}
-					onChangeText={setCode}
-					autoCapitalize="characters"
-				/>
+			<KeyboardAvoidingView
+				style={{ flex: 1 }}
+				behavior={Platform.OS === "ios" ? "padding" : "height"}
+			>
+				<DismissKeyboardView>
+					<View style={{ flex: 1 }}>
+						<View style={styles.topCont}>
+							<BackButton
+								text={<Text style={styles.headText}>Enter promo code</Text>}
+							/>
+						</View>
+						<View style={styles.bottomCont}>
+							<TextInput1
+								placeholder={"e.g PTY204"}
+								text={<Text>Enter the code to claim your voucher</Text>}
+								value={code}
+								onChangeText={setCode}
+								autoCapitalize="characters"
+							/>
 
-				<View style={styles.button}>
-					<ActiveButton title={"Submit"} onPress={submitCode}/>
-				</View>
-			</View>
+							<View style={styles.button}>
+								<ActiveButton title={"Submit"} onPress={submitCode}/>
+							</View>
+						</View>
+					</View>
+				</DismissKeyboardView>
+			</KeyboardAvoidingView>
 		</SafeAreaView>
 	);
 };

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KRides Legal</title>
+<style>
+  :root { --bg: #faf9f6; --fg: #1d1b16; --fg-muted: #6b6559; --accent: #1a5c42; --border: #e4e1d8; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #15140f; --fg: #f1efe6; --fg-muted: #a39d8c; --accent: #5fc996; --border: #332f24; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 24px;
+  }
+  .card { max-width: 420px; width: 100%; }
+  h1 { font-size: 22px; margin: 0 0 8px; }
+  p { color: var(--fg-muted); margin: 0 0 24px; font-size: 14px; }
+  a.link {
+    display: block;
+    padding: 16px 18px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--fg);
+    text-decoration: none;
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+  a.link span { display: block; font-weight: 400; color: var(--fg-muted); font-size: 13px; margin-top: 2px; }
+  a.link:hover { border-color: var(--accent); }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>KRides Legal</h1>
+    <p>Krides — Kampus Rides</p>
+    <a class="link" href="/privacy-policy">Privacy Policy<span>How we handle your data</span></a>
+    <a class="link" href="/terms-and-conditions">Terms &amp; Conditions<span>Rules for using the app</span></a>
+  </div>
+</body>
+</html>

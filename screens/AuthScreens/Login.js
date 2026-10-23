@@ -1,8 +1,9 @@
-import { Alert, Dimensions, StyleSheet, Text, View } from "react-native";
+import { Alert, Dimensions, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native";
 import React, { useState } from "react";
 import BottomSheet from "@gorhom/bottom-sheet";
 import { colors } from "../../constants/styling";
 import { SafeAreaView } from "react-native-safe-area-context";
+import DismissKeyboardView from "../../components/DismissKeyboardView";
 import TextInput1 from "../../components/TextInput1";
 import ActiveButton from "../../components/buttons/ActiveButton";
 import GoogleButton from "../../components/buttons/GoogleButton";
@@ -89,55 +90,64 @@ const Login = ({ navigation }) => {
 
 	return (
 		<SafeAreaView style={styles.container}>
-			<View style={styles.topCont}>
-				<BackButton text={<Text style={styles.headText}>Login</Text>} />
-			</View>
-			<View style={styles.bottomCont}>
-				<View style={styles.sheetCont}>
-					<View style={styles.textInputCont}>
-						<TextInput1
-							text={"Email Address"}
-							placeholder={"johndoe22@gmail.com"}
-							onChangeText={(text) => setEmail(text)}
-							value={email}
-							keyboardType="email-address"
-							autoCapitalize="none"
-						/>
-						<TextInput1
-							text={"Password"}
-							placeholder={"*************"}
-							password
-							onChangeText={(text) => setPassword(text)}
-							value={password}
-						/>
-						<Text
-							style={styles.forgot}
-							onPress={() => navigation.navigate("ForgetPass")}
-						>
-							Forgot password?
-						</Text>
-						<View style={styles.buttons}>
-							<View style={styles.logInButton}>
-								<ActiveButton
-									title={"Login"}
-									loading={loading}
-									onPress={handleLogin}
-								/>
+			<KeyboardAvoidingView
+				style={{ flex: 1 }}
+				behavior={Platform.OS === "ios" ? "padding" : "height"}
+			>
+				<DismissKeyboardView>
+					<View style={{ flex: 1 }}>
+						<View style={styles.topCont}>
+							<BackButton text={<Text style={styles.headText}>Login</Text>} />
+						</View>
+						<View style={styles.bottomCont}>
+							<View style={styles.sheetCont}>
+								<View style={styles.textInputCont}>
+									<TextInput1
+										text={"Email Address"}
+										placeholder={"johndoe22@gmail.com"}
+										onChangeText={(text) => setEmail(text)}
+										value={email}
+										keyboardType="email-address"
+										autoCapitalize="none"
+									/>
+									<TextInput1
+										text={"Password"}
+										placeholder={"*************"}
+										password
+										onChangeText={(text) => setPassword(text)}
+										value={password}
+									/>
+									<Text
+										style={styles.forgot}
+										onPress={() => navigation.navigate("ForgetPass")}
+									>
+										Forgot password?
+									</Text>
+									<View style={styles.buttons}>
+										<View style={styles.logInButton}>
+											<ActiveButton
+												title={"Login"}
+												loading={loading}
+												onPress={handleLogin}
+											/>
+										</View>
+									</View>
+									<View style={styles.OrContainer}>
+										<View style={styles.dash} />
+										<Text style={styles.OrText}>OR</Text>
+										<View style={styles.dash} />
+									</View>
+									<GoogleButton
+										title={googleLoading ? "Signing in..." : "Continue with Google"}
+										onPress={handleGoogleSignIn}
+									/>
+								</View>
 							</View>
+							<Terms />
 						</View>
-						<View style={styles.OrContainer}>
-							<View style={styles.dash} />
-							<Text style={styles.OrText}>OR</Text>
-							<View style={styles.dash} />
-						</View>
-						<GoogleButton
-							title={googleLoading ? "Signing in..." : "Continue with Google"}
-							onPress={handleGoogleSignIn}
-						/>
 					</View>
-				</View>
-				<Terms />
-			</View>
+				</DismissKeyboardView>
+			</KeyboardAvoidingView>
 		</SafeAreaView>
 	);
 };

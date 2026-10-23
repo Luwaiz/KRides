@@ -1,7 +1,8 @@
-import { Alert, Dimensions, StyleSheet, Text, View } from "react-native";
+import { Alert, Dimensions, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native";
 import React, { useState } from "react";
 import { colors } from "../../constants/styling";
 import { SafeAreaView } from "react-native-safe-area-context";
+import DismissKeyboardView from "../../components/DismissKeyboardView";
 import TextInput1 from "../../components/TextInput1";
 import ActiveButton from "../../components/buttons/ActiveButton";
 import Terms from "../../components/Terms";
@@ -69,42 +70,51 @@ const DriverLogin = ({ navigation }) => {
 
 	return (
 		<SafeAreaView style={styles.container}>
-			<View style={styles.topCont}>
-				<BackButton text={<Text style={styles.headText}>Login</Text>} />
-			</View>
-			<View style={styles.bottomCont}>
-				<View style={styles.sheetCont}>
-					<View style={styles.textInputCont}>
-						<TextInput1
-							text={"Phone number"}
-							placeholder={"08123456789 or +2348123456789"}
-							onChangeText={(text) => set_phone(text)}
-						/>
-						<TextInput1
-							text={"Password"}
-							placeholder={"*************"}
-							password
-							onChangeText={(text) => set_password(text)}
-						/>
-						<Text
-							style={styles.forgot}
-							onPress={() => navigation.navigate("ForgetPass")}
-						>
-							Forgot password?
-						</Text>
-						<View style={styles.buttons}>
-							<View style={styles.logInButton}>
-								<ActiveButton
-									title={"Login"}
-									loading={loading}
-									onPress={() => handleLogin()}
-								/>
+			<KeyboardAvoidingView
+				style={{ flex: 1 }}
+				behavior={Platform.OS === "ios" ? "padding" : "height"}
+			>
+				<DismissKeyboardView>
+					<View style={{ flex: 1 }}>
+						<View style={styles.topCont}>
+							<BackButton text={<Text style={styles.headText}>Login</Text>} />
+						</View>
+						<View style={styles.bottomCont}>
+							<View style={styles.sheetCont}>
+								<View style={styles.textInputCont}>
+									<TextInput1
+										text={"Phone number"}
+										placeholder={"08123456789 or +2348123456789"}
+										onChangeText={(text) => set_phone(text)}
+									/>
+									<TextInput1
+										text={"Password"}
+										placeholder={"*************"}
+										password
+										onChangeText={(text) => set_password(text)}
+									/>
+									<Text
+										style={styles.forgot}
+										onPress={() => navigation.navigate("ForgetPass")}
+									>
+										Forgot password?
+									</Text>
+									<View style={styles.buttons}>
+										<View style={styles.logInButton}>
+											<ActiveButton
+												title={"Login"}
+												loading={loading}
+												onPress={() => handleLogin()}
+											/>
+										</View>
+									</View>
+								</View>
 							</View>
+							<Terms />
 						</View>
 					</View>
-				</View>
-				<Terms />
-			</View>
+				</DismissKeyboardView>
+			</KeyboardAvoidingView>
 		</SafeAreaView>
 	);
 };

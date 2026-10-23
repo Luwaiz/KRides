@@ -35,6 +35,7 @@
         }
       ],
       "@react-native-google-signin/google-signin",
+      "./plugins/with-modular-headers",
       [
         "expo-notifications",
         {
@@ -68,6 +69,7 @@
     },
     "ios": {
       "bundleIdentifier": "com.eluwaiz.KRides",
+      "deploymentTarget": "15.0",
       "buildNumber": "1.0.0",
       "supportsTablet": true,
       "googleServicesFile": "./GoogleService-Info.plist",
