@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Animated, Vibration, StatusBar, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Animated, Vibration, TouchableOpacity } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../constants/styling';
 import { sp, fs, br } from '../../constants/responsive';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,6 +14,7 @@ const RideRequestModal = ({ visible, ride, onAccept, onDecline, onTimeout }) => 
     const [pulseAnim] = useState(new Animated.Value(1));
     const [slideAnim] = useState(new Animated.Value(-200));
     const timerRef = React.useRef(null);
+    const insets = useSafeAreaInsets();
 
     useEffect(() => {
         if (visible) {
@@ -107,7 +109,12 @@ const RideRequestModal = ({ visible, ride, onAccept, onDecline, onTimeout }) => 
     const earnings = calculateDriverEarnings(ride.amount || 0, ride.numberOfPassengers || 1);
 
     return (
-        <Animated.View style={[styles.card, { transform: [{ translateY: slideAnim }] }]}>
+        <Animated.View
+            style={[
+                styles.card,
+                { top: insets.top + 152, transform: [{ translateY: slideAnim }] },
+            ]}
+        >
             {}
             <View style={styles.topRow}>
                 <View style={styles.titleRow}>
@@ -162,7 +169,6 @@ const RideRequestModal = ({ visible, ride, onAccept, onDecline, onTimeout }) => 
 const styles = StyleSheet.create({
     card: {
         position: 'absolute',
-        top: (StatusBar.currentHeight || 24) + 152,
         left: sp(12),
         right: sp(12),
         zIndex: 999,

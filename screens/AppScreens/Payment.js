@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { FLUTTERWAVE_PUBLIC_KEY } from "@env";
 import Toast from "react-native-toast-message";
 
-const generateTransactionRef = (length = 12) => {
+const generateTransactionRef = (customerId, length = 12) => {
 	const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 	let result = "";
 	try {
@@ -16,11 +16,15 @@ const generateTransactionRef = (length = 12) => {
 			result += chars.charAt(Math.floor(Math.random() * chars.length));
 		}
 	}
-	return `flw_tx_ref_${result}_${Date.now()}`;
+	// Embeds customerId so the server can confirm, when verifying this charge
+	// before trusting it as ride payment, that it's really this customer's own
+	// transaction and not a successful charge/transfer reference belonging to
+	// someone else (same ownership-binding pattern as the wallet top-up tx_ref).
+	return `krides_ride_${customerId || "anon"}_${result}_${Date.now()}`;
 };
 
-const Payment = ({ email, amount, name, phoneNumber, BookRide, loading = false }) => {
-	const [txRef, setTxRef] = useState(() => generateTransactionRef(10));
+const Payment = ({ email, amount, name, phoneNumber, customerId, BookRide, loading = false }) => {
+	const [txRef, setTxRef] = useState(() => generateTransactionRef(customerId, 10));
 
 	if (!amount || amount <= 0) {
 		console.error("❌ Invalid amount for payment:", amount);
@@ -36,7 +40,7 @@ const Payment = ({ email, amount, name, phoneNumber, BookRide, loading = false }
 			if (data.status === "completed" || data.status === "successful") {
 				const transactionId = data.transaction_id || data.flw_ref || data.tx_ref;
 				if (!transactionId) {
-					setTxRef(generateTransactionRef(10));
+					setTxRef(generateTransactionRef(customerId, 10));
 					Toast.show({
 						type: 'tomatoToast',
 						text1: 'Payment Reference Missing',
@@ -48,7 +52,7 @@ const Payment = ({ email, amount, name, phoneNumber, BookRide, loading = false }
 				}
 				BookRide(transactionId);
 			} else if (data.status === "cancelled") {
-				setTxRef(generateTransactionRef(10));
+				setTxRef(generateTransactionRef(customerId, 10));
 				Toast.show({
 					type: 'tomatoToast',
 					text1: 'Payment Cancelled',
@@ -57,7 +61,7 @@ const Payment = ({ email, amount, name, phoneNumber, BookRide, loading = false }
 					visibilityTime: 4000,
 				});
 			} else {
-				setTxRef(generateTransactionRef(10));
+				setTxRef(generateTransactionRef(customerId, 10));
 				Toast.show({
 					type: 'tomatoToast',
 					text1: 'Payment Failed',
@@ -71,7 +75,7 @@ const Payment = ({ email, amount, name, phoneNumber, BookRide, loading = false }
 
 	const handleOnAbort = () => {
 		setTimeout(() => {
-			setTxRef(generateTransactionRef(10));
+			setTxRef(generateTransactionRef(customerId, 10));
 			Toast.show({
 				type: 'tomatoToast',
 				text1: 'Payment Cancelled',

@@ -191,13 +191,6 @@ const AcceptTab = () => {
 		}
 	};
 
-	// Previously, once a driver accepted a ride, there was no way for them to
-	// back out of it — only the customer could cancel. A driver who couldn't
-	// actually complete it (breakdown, change of plans) had no path forward,
-	// and the customer's payment had no way to get refunded. This reuses the
-	// exact same cancelRideWithRefund the customer side uses, just with
-	// cancelledBy: 'driver' — same refund handling (card, wallet, or
-	// needs-manual-review), same atomic claim against a double-cancel race.
 	const handleCancelRide = () => {
 		if (!acceptedRide?.rideId) return;
 

@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View, Image, Linking } from "react-native";
+import { Pressable, StyleSheet, Text, View, Image, Linking, ScrollView } from "react-native";
 import React, { useState, useEffect } from "react";
 import { useDriverDetails } from "../../constants/Store";
 import { PRIVACY_POLICY_URL, TERMS_URL } from "../../constants/legal";
@@ -47,6 +47,7 @@ const DriverSettings = ({ navigation }) => {
 	};
 	return (
 		<SafeAreaView style={styles.container}>
+			<ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 			<View style={styles.topContainer}>
 				<Text style={styles.name}>{fullName || "Driver"}</Text>
 				{profileUrl ? (
@@ -126,6 +127,7 @@ const DriverSettings = ({ navigation }) => {
 					<Text style={styles.optionText}>Delete Account</Text>
 				</Pressable>
 			</View>
+			</ScrollView>
 			{modal && (
 				<Confirmation1 modal={modal} setModal={setModal} title={modalTitle} />
 			)}
@@ -139,8 +141,10 @@ const styles = StyleSheet.create({
 	container: {
 		flex: 1,
 		backgroundColor: "white",
-
+	},
+	scrollContent: {
 		padding: 16,
+		paddingBottom: 32,
 	},
 	topContainer: {
 		flexDirection: "row",

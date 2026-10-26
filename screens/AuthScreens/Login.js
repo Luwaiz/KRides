@@ -1,4 +1,4 @@
-import { Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native";
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import React, { useState } from "react";
 import BottomSheet from "@gorhom/bottom-sheet";
 import { colors } from "../../constants/styling";
@@ -64,7 +64,7 @@ const Login = ({ navigation }) => {
 	const handleGoogleSignIn = async () => {
 		try {
 			console.log('🔐 Starting Google Sign-In for customer...');
-			const result = await signInWithGoogle('customer');
+			const result = await signInWithGoogle();
 
 			if (result && result.user) {
 				console.log('✅ Google Sign-In successful:', result.user.email);
@@ -88,13 +88,17 @@ const Login = ({ navigation }) => {
 	};
 
 	return (
-		<SafeAreaView style={styles.container}>
+		<SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
 			<KeyboardAvoidingView
 				style={{ flex: 1 }}
 				behavior={Platform.OS === "ios" ? "padding" : "height"}
 			>
 				<DismissKeyboardView>
-					<View style={{ flex: 1 }}>
+					<ScrollView
+						style={{ flex: 1 }}
+						contentContainerStyle={{ flexGrow: 1 }}
+						keyboardShouldPersistTaps="handled"
+					>
 						<View style={styles.topCont}>
 							<BackButton text={<Text style={styles.headText}>Login</Text>} />
 						</View>
@@ -146,7 +150,7 @@ const Login = ({ navigation }) => {
 								<Terms />
 							</View>
 						</View>
-					</View>
+					</ScrollView>
 				</DismissKeyboardView>
 			</KeyboardAvoidingView>
 		</SafeAreaView>
@@ -168,7 +172,7 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: colors.secondary,
 		width: "100%",
-		marginTop: 20,
+		marginTop: 32,
 		borderTopLeftRadius: 30,
 		borderTopRightRadius: 30,
 	},

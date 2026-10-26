@@ -81,10 +81,6 @@ export default function Payouts() {
         }
     };
 
-    // A failed load leaves `drivers` null forever (it's only ever set on
-    // success) — showing the error here instead of just "Loading…" is what
-    // actually surfaces a failure instead of it looking identical to a slow
-    // network for however long someone's willing to wait.
     if (!drivers) {
         return error ? (
             <div>

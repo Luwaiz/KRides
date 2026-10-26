@@ -1,14 +1,5 @@
 const { withPodfile } = require('@expo/config-plugins');
 
-// Pods pulled in transitively by @react-native-google-signin/google-signin's
-// Firebase App Check / reCAPTCHA Enterprise verification chain. They aren't
-// covered by Expo's own per-pod modular-headers autolinking (which only
-// covers RN/Expo module pods + GoogleSignIn itself), and they aren't pods
-// React Native's react_native_pods.rb manages (ReactCommon/RCT-Folly/etc),
-// so they need to be listed explicitly. AppCheckCore is a Swift pod and
-// Swift can only import modules, not plain headers, so its ObjC
-// dependencies below must define modules too or `pod install` refuses to
-// proceed ("Swift pods cannot yet be integrated as static libraries").
 const MODULAR_HEADER_PODS = [
     'GoogleUtilities',
     'RecaptchaInterop',
@@ -24,14 +15,6 @@ module.exports = function withModularHeaders(config) {
     return withPodfile(config, (config) => {
         let contents = config.modResults.contents;
 
-        // We previously set a blanket `use_modular_headers!` directive here.
-        // That collided with React Native's own react_native_pods.rb, which
-        // already applies `:modular_headers => true` to ReactCommon/RCT-Folly
-        // directly — the blanket directive made CocoaPods generate
-        // ReactCommon's modulemap twice ("Redefinition of module
-        // 'ReactCommon'"). Scoping modular headers to just the pods listed
-        // above avoids that collision while still satisfying CocoaPods'
-        // Swift-static-library check for AppCheckCore's dependency chain.
         const missingPods = MODULAR_HEADER_PODS.filter(
             (pod) => !contents.includes(`pod '${pod}', :modular_headers => true`)
         );

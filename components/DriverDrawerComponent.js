@@ -75,10 +75,7 @@ const DriverDrawerItem = ({ icon, title, navigateTo }) => {
 				label={title}
 				onPress={onPress}
 			/>
-			{/* Confirmation1 doesn't take an onConfirm prop — it owns Logout/
-			    Delete itself internally (and does the push-token cleanup that
-			    a duplicate signOut() here would skip). An onConfirm here used
-			    to look live but was dead code, never actually called. */}
+			{ }
 			<Confirmation1
 				modal={modal}
 				setModal={setModal}

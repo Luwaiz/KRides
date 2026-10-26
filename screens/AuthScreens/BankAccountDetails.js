@@ -198,7 +198,7 @@ const BankAccountDetails = ({ navigation, route }) => {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
             <KeyboardAvoidingView
                 style={{ flex: 1 }}
                 behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -307,7 +307,7 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: colors.secondary,
         width: "100%",
-        marginTop: 20,
+        marginTop: 32,
         borderTopLeftRadius: 30,
         borderTopRightRadius: 30,
     },

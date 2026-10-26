@@ -17,7 +17,7 @@ export function useGoogleAuth() {
         console.log('✅ Google Sign-In configured');
     }, []);
 
-    const signInWithGoogle = async (role = 'customer') => {
+    const signInWithGoogle = async () => {
         setLoading(true);
         setError(null);
 
@@ -50,20 +50,15 @@ export function useGoogleAuth() {
 
             const googleCredential = GoogleAuthProvider.credential(idToken);
 
-            await AsyncStorage.setItem('pending_role', role);
+            await AsyncStorage.setItem('pending_role', 'customer');
 
             console.log('🔥 Signing in to Firebase...');
             const userCredential = await signInWithCredential(FIREBASE_AUTH, googleCredential);
             console.log('✅ Firebase sign-in successful:', userCredential.user.uid);
 
-
-
-            const needsPhone = role === 'driver' && !googleUser?.phoneNumber;
-
             return {
                 user: userCredential.user,
                 googleUser: googleUser,
-                needsPhone,
             };
         } catch (err) {
             console.error('❌ Google Sign-In Error:', err);

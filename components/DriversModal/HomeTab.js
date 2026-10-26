@@ -101,8 +101,6 @@ const HomeTab = () => {
 	useEffect(() => {
 		if (!bankDetailsVerified) return;
 
-		const isOnline = useDriverAvailability.getState().isOnline;
-
 		if (!isOnline) {
 			setShowRideModal(false);
 			setCurrentRideRequest(null);
@@ -117,7 +115,7 @@ const HomeTab = () => {
 				setShowRideModal(true);
 			}
 		}
-	}, [rides, showRideModal, currentRideRequest, accepting, bankDetailsVerified]);
+	}, [rides, showRideModal, currentRideRequest, accepting, bankDetailsVerified, isOnline]);
 
 	const onRefresh = () => {
 		console.log("🔄 Manual refresh - Firestore listeners auto-update");

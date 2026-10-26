@@ -10,11 +10,6 @@ function fetchWithTimeout(url, options = {}) {
     return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer));
 }
 
-// rideId authorizes the caller server-side (that ride's customer OR its
-// assigned driver — see POST /api/payments/refund) and, when given, the
-// server refunds that ride's own stored transactionId rather than trusting
-// whatever's passed here. Omit it only for the orphaned-charge bootstrap
-// case, where no ride document exists yet to check ownership against.
 export const processRefund = async (transactionId, amount = null, comments = 'Ride cancelled', rideId = null) => {
     console.log('💰 Processing refund for transaction:', transactionId, rideId ? `(ride ${rideId})` : '');
 
@@ -46,6 +41,32 @@ export const processRefund = async (transactionId, amount = null, comments = 'Ri
         message: result.message,
         data: result.data,
     };
+};
+
+export const verifyRideCharge = async (transactionId, expectedAmount) => {
+    console.log('🔍 Verifying ride charge:', transactionId, `expected ₦${expectedAmount}`);
+
+    const user = FIREBASE_AUTH.currentUser;
+    if (!user) throw new Error('Not authenticated — cannot verify payment');
+    const idToken = await user.getIdToken();
+
+    const response = await fetchWithTimeout(`${PAYMENTS_SERVER_URL}/verify-ride-charge`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': NOTIFICATION_API_KEY || '',
+            'Authorization': `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ transactionId, expectedAmount }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Payment verification failed');
+    }
+
+    return { success: true, amount: result.amount };
 };
 
 export const checkRefundStatus = async (refundId) => {

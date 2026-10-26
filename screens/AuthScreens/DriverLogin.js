@@ -1,4 +1,4 @@
-import { Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native";
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import React, { useState } from "react";
 import { colors } from "../../constants/styling";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -67,13 +67,17 @@ const DriverLogin = ({ navigation }) => {
 	};
 
 	return (
-		<SafeAreaView style={styles.container}>
+		<SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
 			<KeyboardAvoidingView
 				style={{ flex: 1 }}
 				behavior={Platform.OS === "ios" ? "padding" : "height"}
 			>
 				<DismissKeyboardView>
-					<View style={{ flex: 1 }}>
+					<ScrollView
+						style={{ flex: 1 }}
+						contentContainerStyle={{ flexGrow: 1 }}
+						keyboardShouldPersistTaps="handled"
+					>
 						<View style={styles.topCont}>
 							<BackButton text={<Text style={styles.headText}>Login</Text>} />
 						</View>
@@ -112,7 +116,7 @@ const DriverLogin = ({ navigation }) => {
 								<Terms />
 							</View>
 						</View>
-					</View>
+					</ScrollView>
 				</DismissKeyboardView>
 			</KeyboardAvoidingView>
 		</SafeAreaView>
@@ -134,7 +138,7 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: colors.secondary,
 		width: "100%",
-		marginTop: 20,
+		marginTop: 32,
 		borderTopLeftRadius: 30,
 		borderTopRightRadius: 30,
 	},

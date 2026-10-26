@@ -40,13 +40,6 @@ const Confirmation1 = ({ modal, setModal, title }) => {
 		setModal(false);
 	};
 
-	// The actual delete — of the Firestore doc, any driver bank/Flutterwave
-	// data, and the Firebase Auth account itself — happens server-side via
-	// POST /api/account/delete (Admin SDK; firestore.rules blocks a client
-	// from ever deleting its own doc directly, deliberately). That also
-	// means no client-side re-authentication step is needed here: the
-	// "requires recent login" restriction is specific to the client SDK's
-	// own deleteUser() call, which this no longer makes.
 	const performDeletion = async () => {
 		setLoading(true);
 		try {

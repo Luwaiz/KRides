@@ -36,9 +36,6 @@ const HomePage = () => {
 
 	const requestLocationPermissions = async () => {
 		if (Platform.OS !== "android") {
-			// iOS: @react-native-community/geolocation triggers its own native
-			// CoreLocation authorization prompt when watchPosition/getCurrentPosition
-			// is called — PermissionsAndroid has no iOS backing.
 			return true;
 		}
 		try {

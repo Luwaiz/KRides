@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View, Image, TouchableOpacity, ActivityIndicator, Alert, Linking } from "react-native";
+import { Pressable, StyleSheet, Text, View, Image, TouchableOpacity, ActivityIndicator, Alert, Linking, ScrollView } from "react-native";
 import React, { useEffect, useState } from "react";
 import useAuthStore, { useUserDetails } from "../../constants/Store";
 import { PRIVACY_POLICY_URL, TERMS_URL } from "../../constants/legal";
@@ -164,6 +164,7 @@ const Settings = ({ navigation }) => {
 
 	return (
 		<SafeAreaView style={styles.container}>
+			<ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 			<View style={styles.topContainer}>
 				<Text style={styles.name}>{name}</Text>
 				<TouchableOpacity onPress={pickImage} disabled={uploadingImage}>
@@ -253,6 +254,7 @@ const Settings = ({ navigation }) => {
 					<Text style={styles.optionText}>Delete Account</Text>
 				</Pressable>
 			</View>
+			</ScrollView>
 			{modal && (
 				<Confirmation1 modal={modal} setModal={setModal} title={modalTitle} />
 			)}
@@ -266,8 +268,10 @@ const styles = StyleSheet.create({
 	container: {
 		flex: 1,
 		backgroundColor: "white",
-
+	},
+	scrollContent: {
 		padding: 16,
+		paddingBottom: 32,
 	},
 	topContainer: {
 		flexDirection: "row",

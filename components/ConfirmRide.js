@@ -33,7 +33,7 @@ import { signOut } from "firebase/auth";
 import useAuthStore from "../constants/Store";
 import { notifyDriversAboutNewRide, notifyDriverRideCancelled } from "../helpers/notificationHelpers";
 import { payWithWallet } from "../helpers/walletHelpers";
-import { processRefund } from "../helpers/flutterwaveRefund";
+import { processRefund, verifyRideCharge } from "../helpers/flutterwaveRefund";
 import notificationManager from "../helpers/notificationManager";
 
 const ConfirmRide = () => {
@@ -159,26 +159,59 @@ const ConfirmRide = () => {
 		}
 	};
 
+	const refundOrRecordOrphanedCharge = async (transactionId, reasonForLog) => {
+		try {
+			await processRefund(transactionId, Price, reasonForLog);
+			Toast.show({
+				type: 'tomatoToast',
+				text1: 'Payment Refunded',
+				text2: "We couldn't complete your booking, so we refunded your payment.",
+				position: 'top',
+				visibilityTime: 6000,
+			});
+		} catch (refundError) {
+			console.error("❌ Auto-refund failed for orphaned charge:", refundError);
+			try {
+				await addDoc(collection(FIREBASE_DB, "orphanedCharges"), {
+					customerId: UserId,
+					transactionId,
+					amount: Price,
+					rideCreationError: reasonForLog,
+					refundError: refundError.message || String(refundError),
+					status: "unresolved",
+					createdAt: serverTimestamp(),
+				});
+			} catch (logError) {
+				console.error("❌ Failed to record orphaned charge for reconciliation:", logError);
+			}
+			Toast.show({
+				type: 'tomatoToast',
+				text1: 'Payment Received, Booking Failed',
+				text2: `You were charged but the ride wasn't created. Support has been notified — reference ${transactionId}.`,
+				position: 'top',
+				visibilityTime: 6000,
+			});
+		}
+	};
+
 	const BookRide = async (transactionId = null) => {
 		setLoading(true);
 		const currentUser = FIREBASE_AUTH.currentUser;
 
 		if (!UserId) {
 			setLoading(false);
-			Toast.show({
-				type: 'tomatoToast',
-				text1: 'Session Expired',
-				text2: 'Please log in again to book a ride.',
-				position: 'top',
-			});
+			if (transactionId) {
+				await refundOrRecordOrphanedCharge(transactionId, 'Booking aborted: UserId missing (stale session)');
+			} else {
+				Toast.show({
+					type: 'tomatoToast',
+					text1: 'Session Expired',
+					text2: 'Please log in again to book a ride.',
+					position: 'top',
+				});
+			}
 			setTimeout(async () => {
 				try {
-					// Clear this device's push token off the account being
-					// signed out of first — skipping this is how a signed-out
-					// account keeps "receiving" notifications on this device:
-					// the token sitting on its Firestore doc still points here
-					// until something nulls it out, same fix as Confirmation1's
-					// normal logout flow.
 					if (currentUser?.uid) {
 						await notificationManager.cleanup(currentUser.uid, 'customer');
 					}
@@ -194,12 +227,16 @@ const ConfirmRide = () => {
 
 		if (!currentUser || currentUser.uid !== UserId) {
 			setLoading(false);
-			Toast.show({
-				type: 'tomatoToast',
-				text1: 'Authentication Error',
-				text2: 'Your session is out of sync. Please log in again.',
-				position: 'top',
-			});
+			if (transactionId) {
+				await refundOrRecordOrphanedCharge(transactionId, 'Booking aborted: session UID mismatch');
+			} else {
+				Toast.show({
+					type: 'tomatoToast',
+					text1: 'Authentication Error',
+					text2: 'Your session is out of sync. Please log in again.',
+					position: 'top',
+				});
+			}
 			setTimeout(async () => {
 				try {
 					if (currentUser?.uid) {
@@ -217,36 +254,48 @@ const ConfirmRide = () => {
 
 		if (!pickupLocation || !destinationCoords) {
 			setLoading(false);
-			Toast.show({
-				type: 'tomatoToast',
-				text1: 'Missing Info',
-				text2: "Pickup or destination not found. Please try again.",
-				position: 'top',
-			});
+			if (transactionId) {
+				await refundOrRecordOrphanedCharge(transactionId, 'Booking aborted: pickup/destination missing');
+			} else {
+				Toast.show({
+					type: 'tomatoToast',
+					text1: 'Missing Info',
+					text2: "Pickup or destination not found. Please try again.",
+					position: 'top',
+				});
+			}
 			return;
 		}
 
 		if (!numberOfPassenger) {
 			setLoading(false);
-			Toast.show({
-				type: 'tomatoToast',
-				text1: 'Missing Info',
-				text2: "Please select number of passengers.",
-				position: 'top',
-			});
+			if (transactionId) {
+				await refundOrRecordOrphanedCharge(transactionId, 'Booking aborted: passenger count missing');
+			} else {
+				Toast.show({
+					type: 'tomatoToast',
+					text1: 'Missing Info',
+					text2: "Please select number of passengers.",
+					position: 'top',
+				});
+			}
 			return;
 		}
 
 		if (!phone) {
 			setLoading(false);
-			Alert.alert(
-				"Phone Number Required",
-				"Add a phone number to your profile so your driver can reach you.",
-				[
-					{ text: "Not Now", style: "cancel" },
-					{ text: "Add Phone Number", onPress: () => navigation.navigate("Profile") },
-				]
-			);
+			if (transactionId) {
+				await refundOrRecordOrphanedCharge(transactionId, 'Booking aborted: phone number missing');
+			} else {
+				Alert.alert(
+					"Phone Number Required",
+					"Add a phone number to your profile so your driver can reach you.",
+					[
+						{ text: "Not Now", style: "cancel" },
+						{ text: "Add Phone Number", onPress: () => navigation.navigate("Profile") },
+					]
+				);
+			}
 			return;
 		}
 
@@ -271,6 +320,14 @@ const ConfirmRide = () => {
 		bookingInFlight.current = true;
 		setLoading(true);
 		try {
+			if (transactionId) {
+				// Payment.js's checkout allows bank transfer/USSD alongside card, so the
+				// amount actually paid isn't guaranteed to match Price just because
+				// Flutterwave's redirect reported "completed" — re-verify the real
+				// charge server-side before trusting it as payment for this ride.
+				await verifyRideCharge(transactionId, Price);
+			}
+
 			const rideData = {
 				customerId: UserId,
 				customerName:
@@ -604,6 +661,7 @@ const ConfirmRide = () => {
 										email={email}
 										phoneNumber={phone}
 										name={`${firstName} ${lastName}`}
+										customerId={UserId}
 										BookRide={BookRide}
 										loading={loading}
 									/>

@@ -1,8 +1,9 @@
-import { StatusBar, StyleSheet, Text, View, Switch, Alert } from "react-native";
+import { StyleSheet, Text, View, Switch, Alert } from "react-native";
 import React, { useEffect, useState } from "react";
 import { Octicons } from "@expo/vector-icons";
 import { DrawerActions, useNavigation } from "@react-navigation/native";
 import { TouchableOpacity } from "react-native-gesture-handler";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors } from "../../constants/styling";
 import Cash from "../../assets/svg/Cash.svg";
 import Calendar from "../../assets/svg/Calendar.svg";
@@ -13,6 +14,7 @@ import { FIREBASE_DB } from "../../firebaseConfig";
 
 const HomeHeader = () => {
 	const navigation = useNavigation();
+	const insets = useSafeAreaInsets();
 	const [completedTrips, setCompletedTrips] = useState(0);
 	const [earnedToday, setEarnedToday] = useState(0);
 	const [togglingOnline, setTogglingOnline] = useState(false);
@@ -73,7 +75,7 @@ const HomeHeader = () => {
 		fetchDriverStats();
 	}, [driverId]);
 	return (
-		<View style={styles.container}>
+		<View style={[styles.container, { paddingTop: insets.top + 12 }]}>
 			{}
 			<View style={styles.topRow}>
 				<TouchableOpacity
@@ -129,7 +131,6 @@ const styles = StyleSheet.create({
 		width: "100%",
 		minHeight: 140,
 		backgroundColor: colors.primary,
-		paddingTop: StatusBar.currentHeight + 12,
 		paddingHorizontal: 16,
 		paddingBottom: 12,
 	},

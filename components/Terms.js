@@ -26,6 +26,7 @@ const styles = StyleSheet.create({
     terms: {
 		textAlign: "center",
 		marginBottom: 16,
+		paddingHorizontal: 32,
 		color: colors.lightGrey,
 		fontWeight: "200",
 	},

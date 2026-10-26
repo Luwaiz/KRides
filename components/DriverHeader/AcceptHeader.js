@@ -3,16 +3,18 @@ import React from "react";
 import { Octicons } from "@expo/vector-icons";
 import { DrawerActions, useNavigation } from "@react-navigation/native";
 import { TouchableOpacity } from "react-native-gesture-handler";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors } from "../../constants/styling";
 
 const AcceptHeader = () => {
 	const navigation = useNavigation();
+	const insets = useSafeAreaInsets();
 	const OpenDrawer = () => {
 		navigation.dispatch(DrawerActions.openDrawer());
 	};
 	return (
 		<TouchableOpacity
-			style={styles.drawerNav}
+			style={[styles.drawerNav, { top: insets.top + 8 }]}
 			activeOpacity={0.7}
 			onPress={OpenDrawer}
 		>
@@ -34,7 +36,6 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 		borderRadius: 24,
 		position: "absolute",
-		top: 40,
 		left: 16,
 		zIndex: 1000,
 		elevation: 5,

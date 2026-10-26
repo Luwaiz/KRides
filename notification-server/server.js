@@ -106,13 +106,6 @@ function isExpoPushToken(token) {
     return typeof token === 'string' && /^Expo(nent)?PushToken\[.+\]$/.test(token);
 }
 
-// Despite the name (kept to avoid touching every call site), this sends via
-// Expo's push service, not Firebase Cloud Messaging directly. expo-notifications'
-// getExpoPushTokenAsync() on the client produces tokens in this format, which
-// Expo's own infrastructure routes to APNs (iOS) or FCM (Android) correctly —
-// sending a raw native device token straight through Firebase Admin's
-// messaging().send() doesn't work for iOS, since that's a raw APNs token, not
-// an FCM-registered one.
 async function sendFCMNotification(pushToken, title, body, data = {}) {
     if (!pushToken) {
         console.warn('No push token provided');
@@ -585,6 +578,73 @@ async function verifyFirebaseToken(req) {
     }
 }
 
+app.post('/api/payments/verify-ride-charge', async (req, res) => {
+    const decoded = await verifyFirebaseToken(req);
+    if (!decoded) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { transactionId, expectedAmount } = req.body;
+
+    if (!transactionId || !expectedAmount) {
+        return res.status(400).json({ error: 'transactionId and expectedAmount are required' });
+    }
+
+    const secretKey = process.env.FLUTTERWAVE_SECRET_KEY;
+    if (!secretKey) {
+        return res.status(500).json({ error: 'Payment service not configured' });
+    }
+
+    try {
+        const existingRide = await db.collection('rides')
+            .where('transactionId', '==', String(transactionId))
+            .limit(1)
+            .get();
+
+        if (!existingRide.empty) {
+            return res.status(409).json({ error: 'This payment has already been used for a ride' });
+        }
+
+        const result = await flutterwaveRequest(
+            `https://api.flutterwave.com/v3/transactions/${transactionId}/verify`,
+            { headers: { Authorization: `Bearer ${secretKey}` } }
+        );
+
+        if (result.status !== 'success' || !result.data) {
+            return res.status(402).json({ error: 'Could not verify this payment with Flutterwave' });
+        }
+
+        const payment = result.data;
+
+        // tx_ref is generated client-side as krides_ride_{customerId}_... (Payment.js) —
+        // without this, any authenticated user could "pay" for their own ride with any
+        // other successful, sufficiently-funded transactionId they happened to learn of,
+        // since nothing else in this response ties a Flutterwave transaction to a
+        // Firebase UID.
+        if (!payment.tx_ref || !payment.tx_ref.startsWith(`krides_ride_${decoded.uid}_`)) {
+            return res.status(403).json({ error: 'This payment does not belong to you' });
+        }
+
+        if (payment.status !== 'successful') {
+            return res.status(402).json({ error: `Payment is not successful (status: ${payment.status})` });
+        }
+
+        if (payment.currency !== 'NGN') {
+            return res.status(402).json({ error: `Unexpected currency: ${payment.currency}` });
+        }
+
+        const paidAmount = Number(payment.amount);
+        if (!paidAmount || paidAmount < Number(expectedAmount)) {
+            return res.status(402).json({
+                error: `Amount paid (₦${paidAmount}) is less than the fare (₦${expectedAmount})`,
+            });
+        }
+
+        return res.json({ success: true, verified: true, amount: paidAmount });
+    } catch (error) {
+        console.error('❌ verify-ride-charge error:', error.message);
+        return res.status(500).json({ error: 'Could not verify payment. Please try again.' });
+    }
+});
+
 app.post('/api/payments/refund', async (req, res) => {
     const decoded = await verifyFirebaseToken(req);
     if (!decoded) return res.status(401).json({ error: 'Unauthorized' });
@@ -600,17 +660,6 @@ app.post('/api/payments/refund', async (req, res) => {
         return res.status(500).json({ error: 'Payment service not configured' });
     }
 
-    // rideId is how the caller is authorized: only that ride's own customer
-    // or its assigned driver may trigger its refund (covers both
-    // customer-initiated and driver-initiated cancellation). When it's
-    // omitted entirely — only the orphaned-charge bootstrap path does this,
-    // where a card charge succeeded but the ride document itself was never
-    // created, so there's nothing to check ownership against — this falls
-    // back to the narrower pre-existing trust model (any authenticated
-    // caller). Prefer ride.transactionId (server-trusted) over whatever the
-    // client sent whenever a ride is available, so a mismatched or spoofed
-    // client-supplied transactionId can't be refunded under a real ride's
-    // authorization.
     let refundTransactionId = transactionId;
     if (rideId) {
         const rideSnap = await db.collection('rides').doc(rideId).get();
@@ -759,13 +808,6 @@ app.post('/api/payments/create-subaccount', async (req, res) => {
                 data: createPayload,
             });
 
-        // A stored subaccountId can go stale (e.g. it was created under a
-        // different Flutterwave key/mode than what's live now) and the
-        // update then fails on a lookup that will never succeed no matter
-        // how many times it's retried — "Merchant not found" from Flutterwave
-        // is exactly this. Rather than leave the driver stuck re-submitting
-        // the same failing update, fall back to creating a fresh subaccount
-        // once, which is the actual fix for a reference that's gone bad.
         if (result.status !== 'success' && isUpdate) {
             console.warn(`⚠️ Subaccount update failed for driver ${decoded.uid} (${result.message}) — retrying as a fresh create`);
             isUpdate = false;
@@ -791,18 +833,6 @@ app.post('/api/payments/create-subaccount', async (req, res) => {
     }
 });
 
-// POST /api/account/delete
-// firestore.rules deliberately sets `allow delete: if false` on both
-// users/{id} and drivers/{id} — a client can never delete its own doc
-// directly, so the client-side deleteDoc() call this used to make was
-// silently failing every single time (swallowed by an empty catch), leaving
-// full name, phone, ride history references, and for drivers, bank details
-// and a live Flutterwave subaccount, sitting in Firestore forever after
-// "successful" deletion. This does the real cleanup server-side via the
-// Admin SDK, which bypasses those rules, then deletes the Firebase Auth
-// account last — the Admin SDK's deleteUser doesn't have the client SDK's
-// "requires recent login" restriction, so no re-authentication step is
-// needed here at all.
 app.post('/api/account/delete', async (req, res) => {
     const decoded = await verifyFirebaseToken(req);
     if (!decoded) return res.status(401).json({ error: 'Unauthorized' });
@@ -817,9 +847,6 @@ app.post('/api/account/delete', async (req, res) => {
         if (driverSnap.exists) {
             const driver = driverSnap.data();
 
-            // Best-effort: Flutterwave's subaccounts API has no documented
-            // delete endpoint (only create/update/fetch) — this at least
-            // attempts to strip it. Never blocks account deletion either way.
             if (driver?.subaccountId) {
                 const secretKey = process.env.FLUTTERWAVE_SECRET_KEY;
                 if (secretKey) {
@@ -847,10 +874,6 @@ app.post('/api/account/delete', async (req, res) => {
             await userRef.delete();
         }
 
-        // Ride history is intentionally kept, for both roles — it's a
-        // shared record with the other party on each ride, and for a
-        // driver, the record of payouts already made. Deleting it here
-        // would corrupt someone else's history, not just this account's.
 
         await admin.auth().deleteUser(uid).catch((err) => {
             console.warn(`⚠️ Could not delete Firebase Auth user ${uid}:`, err.message);
@@ -1069,15 +1092,6 @@ app.post('/api/wallet/create-topup-account', async (req, res) => {
     }
 });
 
-// Resolves a driver-payout Transfer's actual settlement outcome, delivered
-// by Flutterwave as its own webhook event (see the 'transfer.completed'
-// branch in POST /api/wallet/webhook). SUCCESSFUL is folded into the exact
-// same terminal state a manual admin "Mark Paid" produces — same status
-// value, same totalPaidOut increment — so every existing admin surface
-// (Payouts page, paidTotal, "recently paid" query) picks it up with no
-// separate handling needed. FAILED re-enters the existing failed-payout
-// retry sweep the same way a synchronous rejection from transferToDriver
-// already does.
 async function handleTransferWebhook(data, res) {
     if (!data) return res.sendStatus(200);
 
@@ -1087,8 +1101,6 @@ async function handleTransferWebhook(data, res) {
         return res.sendStatus(200);
     }
 
-    // Reference format: krides_payout_{rideId} or, for a retried transfer,
-    // krides_payout_{rideId}_retry{n} — see transferToDriver/retryFailedPayout.
     const withoutPrefix = reference.replace('krides_payout_', '');
     const retryIdx = withoutPrefix.indexOf('_retry');
     const rideId = retryIdx > -1 ? withoutPrefix.slice(0, retryIdx) : withoutPrefix;
@@ -1097,7 +1109,7 @@ async function handleTransferWebhook(data, res) {
         return res.sendStatus(200);
     }
 
-    const status = data.status; // Flutterwave transfer lifecycle: NEW, SUCCESSFUL, FAILED
+    const status = data.status;  
     if (status !== 'SUCCESSFUL' && status !== 'FAILED') {
         console.log(`ℹ️ Ignoring non-terminal transfer status '${status}' for ride ${rideId}`);
         return res.sendStatus(200);
@@ -1116,12 +1128,6 @@ async function handleTransferWebhook(data, res) {
             }
 
             const ride = rideSnap.data();
-            // The ride's own payoutStatus is the idempotency lock here (no
-            // separate ledger doc like the wallet-topup webhook uses) — a
-            // duplicate delivery of this same event, or the admin having
-            // already resolved it manually in between, both leave
-            // payoutStatus no longer 'initiated', so this becomes a no-op
-            // instead of double-crediting totalPaidOut.
             if (ride.payoutStatus !== 'initiated') {
                 console.log(`ℹ️ Transfer webhook: ride ${rideId} payoutStatus is '${ride.payoutStatus}', not 'initiated' — skipping`);
                 return;
@@ -1153,7 +1159,7 @@ async function handleTransferWebhook(data, res) {
         return res.sendStatus(200);
     } catch (error) {
         console.error('❌ Transfer webhook processing error:', error);
-        return res.sendStatus(500); // let Flutterwave retry
+        return res.sendStatus(500);  
     }
 }
 
@@ -1172,11 +1178,6 @@ app.post('/api/wallet/webhook', async (req, res) => {
 
     const { event, data } = req.body || {};
 
-    // 'initiated' (see transferToDriver) only ever meant "Flutterwave accepted
-    // the request" — the actual outcome (money landed, or the bank rejected
-    // it) arrives later as this separate event, sent to the same webhook URL
-    // as everything else. Without handling it, a ride sits at 'initiated'
-    // forever regardless of what actually happened to the transfer.
     if (event === 'transfer.completed') {
         return handleTransferWebhook(data, res);
     }
@@ -1494,35 +1495,58 @@ app.post('/api/payments/complete-ride', async (req, res) => {
         return res.status(500).json({ error: 'Payment service not configured' });
     }
 
-    try {
-        const rideRef = db.collection('rides').doc(rideId);
-        const rideSnap = await rideRef.get();
+    const rideRef = db.collection('rides').doc(rideId);
+    let ride;
 
-        if (!rideSnap.exists) {
+    try {
+        ride = await db.runTransaction(async (txn) => {
+            const rideSnap = await txn.get(rideRef);
+
+            if (!rideSnap.exists) {
+                throw new Error('RIDE_NOT_FOUND');
+            }
+
+            const data = rideSnap.data();
+
+            if (data.driverId !== driverId) {
+                throw new Error('NOT_YOUR_RIDE');
+            }
+
+            if (data.status === 'completed') {
+                throw new Error('ALREADY_COMPLETED');
+            }
+
+            if (!['accepted', 'in_progress'].includes(data.status)) {
+                throw new Error(`INVALID_STATUS:${data.status}`);
+            }
+
+            txn.update(rideRef, {
+                status: 'completed',
+                completedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+            return data;
+        });
+    } catch (error) {
+        if (error.message === 'RIDE_NOT_FOUND') {
             return res.status(404).json({ error: 'Ride not found' });
         }
-
-        const ride = rideSnap.data();
-
-        if (ride.driverId !== driverId) {
+        if (error.message === 'NOT_YOUR_RIDE') {
             return res.status(403).json({ error: 'You are not the driver for this ride' });
         }
-
-        if (ride.status === 'completed') {
+        if (error.message === 'ALREADY_COMPLETED') {
             return res.json({ success: true, alreadyCompleted: true });
         }
-
-        if (!['accepted', 'in_progress'].includes(ride.status)) {
-            return res.status(400).json({ error: `Cannot complete a ride with status: ${ride.status}` });
+        if (error.message?.startsWith('INVALID_STATUS:')) {
+            return res.status(400).json({ error: `Cannot complete a ride with status: ${error.message.split(':')[1]}` });
         }
+        console.error('❌ complete-ride transaction error:', error);
+        return res.status(500).json({ error: 'Could not complete ride. Please try again.' });
+    }
 
-        await rideRef.update({
-            status: 'completed',
-            completedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
+    console.log(`✅ Ride ${rideId} marked as completed by driver ${driverId}`);
 
-        console.log(`✅ Ride ${rideId} marked as completed by driver ${driverId}`);
-
+    try {
         const totalAmount = Number(ride.amount) || 0;
         const passengers = Number(ride.numberOfPassengers) || 1;
         const pricing = await getPricingConfig();
@@ -1640,10 +1664,6 @@ app.post('/api/payments/wallet-refund', async (req, res) => {
 
         const ride = rideSnap.data();
 
-        // Either party to this specific ride may trigger its refund — the
-        // customer cancelling, or the driver cancelling (see cancelRideWithRefund
-        // and AcceptTab's "Cancel Ride"). The money always goes back to
-        // ride.customerId regardless of which of them called this.
         if (ride.customerId !== callerId && ride.driverId !== callerId) {
             return res.status(403).json({ error: 'This ride does not belong to you' });
         }
@@ -2178,12 +2198,6 @@ app.get('/admin-api/payouts/overview', async (req, res) => {
 
         const [owedSnap, paidSnap, driversSnap] = await Promise.all([
             db.collection('rides')
-                // 'initiated' = a Transfer was accepted by Flutterwave and is
-                // awaiting the transfer.completed webhook to resolve it one
-                // way or the other (see handleTransferWebhook) — included
-                // here so a payout mid-flight is visible as still-owed
-                // rather than vanishing from the admin panel for however
-                // long settlement takes.
                 .where('payoutStatus', 'in', ['pending_manual', 'failed', 'awaiting_bank_details', 'needs_review', 'initiated'])
                 .get(),
             db.collection('rides')

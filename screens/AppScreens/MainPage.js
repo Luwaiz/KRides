@@ -10,7 +10,7 @@ import PassengerHeader from "../../components/homeHeader/PassengerHeader";
 import ConfirmHeader from "../../components/homeHeader/ConfirmHeader";
 import { useBottomTabStore, useActiveRideStore, useUserDetails, useRideStore, useRideDetailsStore } from "../../constants/Store";
 import { GOOGLE_MAPS_API_KEY } from "@env";
-import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
+import MapView, { Marker, MarkerAnimated, AnimatedRegion, PROVIDER_GOOGLE } from "react-native-maps";
 import MapViewDirections from "react-native-maps-directions";
 import Geolocation from "@react-native-community/geolocation";
 import { useShallow } from "zustand/react/shallow";
@@ -93,10 +93,6 @@ const MainPage = () => {
 
 	const requestLocationPermissions = async () => {
 		if (Platform.OS !== "android") {
-			// iOS: @react-native-community/geolocation triggers the native
-			// CoreLocation authorization prompt itself on getCurrentPosition —
-			// PermissionsAndroid has no iOS backing and always fails here,
-			// which previously short-circuited before location was ever requested.
 			return true;
 		}
 		try {
@@ -289,11 +285,17 @@ const MainPage = () => {
 	}, [activeRide?.rideId]);
 
 	const [driverLocation, setDriverLocation] = useState(null);
+	const driverAnimatedRegion = useRef(
+		new AnimatedRegion({ latitude: 0, longitude: 0, latitudeDelta: 0, longitudeDelta: 0 })
+	).current;
+	const hasPlacedDriverMarker = useRef(false);
+
 	useEffect(() => {
 		const driverId = activeRide?.driverId;
 		const canTrack = driverId && (rideStatus === 'accepted' || rideStatus === 'in_progress');
 		if (!canTrack) {
 			setDriverLocation(null);
+			hasPlacedDriverMarker.current = false;
 			return;
 		}
 
@@ -302,13 +304,25 @@ const MainPage = () => {
 			(snap) => {
 				const data = snap.data();
 				if (data?.location) {
+					const { latitude, longitude } = data.location;
+
+					if (!hasPlacedDriverMarker.current) {
+						driverAnimatedRegion.setValue({ latitude, longitude, latitudeDelta: 0, longitudeDelta: 0 });
+						hasPlacedDriverMarker.current = true;
+					} else {
+						driverAnimatedRegion
+							.timing({ latitude, longitude, duration: 3000, useNativeDriver: false })
+							.start();
+					}
+
 					setDriverLocation({
-						latitude: data.location.latitude,
-						longitude: data.location.longitude,
+						latitude,
+						longitude,
 						updatedAt: data.locationUpdatedAt?.toMillis ? data.locationUpdatedAt.toMillis() : null,
 					});
 				} else {
 					setDriverLocation(null);
+					hasPlacedDriverMarker.current = false;
 				}
 			},
 			(error) => {
@@ -316,6 +330,7 @@ const MainPage = () => {
 					console.warn('⚠️ Driver location listener error:', error.message);
 				}
 				setDriverLocation(null);
+				hasPlacedDriverMarker.current = false;
 			}
 		);
 
@@ -495,8 +510,8 @@ const MainPage = () => {
 				)}
 
 				{driverLocationIsFresh && (
-					<Marker
-						coordinate={{ latitude: driverLocation.latitude, longitude: driverLocation.longitude }}
+					<MarkerAnimated
+						coordinate={driverAnimatedRegion}
 						title={activeRide?.driverName || "Your driver"}
 						description="Live location"
 						pinColor="#FF9500"

@@ -7,8 +7,12 @@ import LoginButton from "../../components/buttons/LoginButton";
 import Terms from "../../components/Terms";
 import KRideLogo from "../../assets/svg/WhiteLogo.svg";
 
+const TAB_EDGE_INSET = 6;
+const TAB_LABEL_WIDTH = 120;
+
 const AuthScreen = ({ navigation }) => {
 	const [activeTab, setActiveTab] = useState("customer");
+	const [tabRowWidth, setTabRowWidth] = useState(0);
 	const tabAnim = useRef(new Animated.Value(0)).current;
 
 	const selectTab = (tab) => {
@@ -17,17 +21,21 @@ const AuthScreen = ({ navigation }) => {
 		Animated.timing(tabAnim, {
 			toValue: tab === "customer" ? 0 : 1,
 			duration: 260,
-			useNativeDriver: false,
+			useNativeDriver: true,
 		}).start();
 	};
 
-	const customerWidth = tabAnim.interpolate({
+	const baseLeft = Math.max((tabRowWidth - TAB_LABEL_WIDTH) / 2, 0);
+	const leftEdgeOffset = TAB_EDGE_INSET - baseLeft;
+	const rightEdgeOffset = Math.max(tabRowWidth - TAB_LABEL_WIDTH - TAB_EDGE_INSET, 0) - baseLeft;
+
+	const customerOffset = tabAnim.interpolate({
 		inputRange: [0, 1],
-		outputRange: ["70%", "30%"],
+		outputRange: [0, leftEdgeOffset],
 	});
-	const driverWidth = tabAnim.interpolate({
+	const driverOffset = tabAnim.interpolate({
 		inputRange: [0, 1],
-		outputRange: ["30%", "70%"],
+		outputRange: [rightEdgeOffset, 0],
 	});
 
 	const Navigate = (page) => {
@@ -47,8 +55,16 @@ const AuthScreen = ({ navigation }) => {
 				<View style={styles.sheet}>
 					<Text style={styles.welcome}>Welcome!</Text>
 
-					<View style={styles.tabRow}>
-						<Animated.View style={[styles.tabSegment, { width: customerWidth }]}>
+					<View
+						style={styles.tabRow}
+						onLayout={(e) => setTabRowWidth(e.nativeEvent.layout.width)}
+					>
+						<Animated.View
+							style={[
+								styles.tabLabelWrap,
+								{ left: baseLeft, transform: [{ translateX: customerOffset }] },
+							]}
+						>
 							<TouchableOpacity
 								style={styles.tabTouchable}
 								onPress={() => selectTab("customer")}
@@ -65,7 +81,12 @@ const AuthScreen = ({ navigation }) => {
 								{activeTab === "customer" && <View style={styles.tabUnderline} />}
 							</TouchableOpacity>
 						</Animated.View>
-						<Animated.View style={[styles.tabSegment, { width: driverWidth }]}>
+						<Animated.View
+							style={[
+								styles.tabLabelWrap,
+								{ left: baseLeft, transform: [{ translateX: driverOffset }] },
+							]}
+						>
 							<TouchableOpacity
 								style={styles.tabTouchable}
 								onPress={() => selectTab("driver")}
@@ -138,16 +159,20 @@ const styles = StyleSheet.create({
 		textAlign: "center",
 	},
 	tabRow: {
-		flexDirection: "row",
 		alignSelf: "stretch",
 		marginHorizontal: 28,
 		marginBottom: 24,
+		height: 44,
 	},
-	tabSegment: {
-		height: 42,
+	tabLabelWrap: {
+		position: "absolute",
+		top: 0,
+		width: TAB_LABEL_WIDTH,
+		height: 44,
+		alignItems: "center",
+		justifyContent: "center",
 	},
 	tabTouchable: {
-		flex: 1,
 		alignItems: "center",
 		justifyContent: "center",
 	},

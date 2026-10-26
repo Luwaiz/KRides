@@ -11,6 +11,7 @@ import {
 	Alert
 } from "react-native";
 import { AntDesign, Ionicons } from "@expo/vector-icons";
+import { SafeAreaView } from "react-native-safe-area-context";
 import DismissKeyboardView from "./DismissKeyboardView";
 import { colors } from "../constants/styling";
 import { FIREBASE_DB } from "../firebaseConfig";
@@ -190,7 +191,7 @@ const LocationPicker = ({
 			onRequestClose={onClose}
 		>
 			<DismissKeyboardView>
-			<View style={styles.container}>
+			<SafeAreaView style={styles.container}>
 				{}
 				<View style={styles.header}>
 					<TouchableOpacity onPress={onClose} style={styles.backButton}>
@@ -252,7 +253,7 @@ const LocationPicker = ({
 						keyboardShouldPersistTaps="handled"
 					/>
 				)}
-			</View>
+			</SafeAreaView>
 			</DismissKeyboardView>
 		</Modal>
 	);

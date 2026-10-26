@@ -12,12 +12,20 @@ import Promo from "../screens/AppScreens/Promo";
 import HomePageNav from "./HomePageNav";
 import Settings from "../screens/AppScreens/Settings";
 import Wallet from "../screens/AppScreens/Wallet";
+import CompletePhoneNumber from "../screens/AuthScreens/CompletePhoneNumber";
+import useAuthStore from "../constants/Store";
 
 const Stack = createNativeStackNavigator();
 const AppStack = () => {
+	const hasPhone = useAuthStore((state) => !!state.profile?.phone);
+
 	return (
-		<Stack.Navigator screenOptions={{ headerShown: false }}>
+		<Stack.Navigator
+			screenOptions={{ headerShown: false }}
+			initialRouteName={hasPhone ? "Home" : "CompletePhoneNumber"}
+		>
 			<Stack.Screen name="Home" component={MainPage} />
+			<Stack.Screen name="CompletePhoneNumber" component={CompletePhoneNumber} />
 			<Stack.Screen name="Wallet" component={Wallet} />
 			<Stack.Screen
 				name="Settings"

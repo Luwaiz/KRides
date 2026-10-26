@@ -1,6 +1,7 @@
 import { FlatList, Image, StyleSheet, Text, View, Dimensions } from "react-native";
 import React, { useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { OnBoard } from "../constants/OnBoardData";
 import BottomSheet from "@gorhom/bottom-sheet";
 import Footer from "../components/Footer";
@@ -41,7 +42,7 @@ const OnBoarding = ({ navigation, onFinish }) => {
 	const navigateToHome = () => markSeenAndNavigate();
 
 	return (
-		<View style={styles.container}>
+		<SafeAreaView style={styles.container}>
 			<FlatList
 				ref={slideRef}
 				data={OnBoard}
@@ -82,7 +83,7 @@ const OnBoarding = ({ navigation, onFinish }) => {
 				SkipPage={SkipPage}
 				navigateToHome={navigateToHome}
 			/>
-		</View>
+		</SafeAreaView>
 	);
 };
 

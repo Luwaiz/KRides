@@ -168,7 +168,7 @@ const DriverSignup = ({ navigation }) => {
 	};
 
 	return (
-		<SafeAreaView style={styles.container}>
+		<SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
 			<KeyboardAvoidingView
 				style={{ flex: 1 }}
 				behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -273,6 +273,7 @@ const styles = StyleSheet.create({
 	bottomCont: {
 		backgroundColor: colors.secondary,
 		width: "100%",
+		marginTop: 32,
 		borderTopLeftRadius: 30,
 		borderTopRightRadius: 30,
 		flex: 1,

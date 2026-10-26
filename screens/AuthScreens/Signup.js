@@ -45,7 +45,7 @@ const Signup = ({ navigation }) => {
 
 	const handleGoogleSignUp = async () => {
 		try {
-			const result = await signInWithGoogle('customer');
+			const result = await signInWithGoogle();
 			if (result && result.user) {
 				const { data: profile } = await Firebase.handleGoogleSignIn(result.user, result.googleUser, 'customer');
 				setAuthData(result.user, profile, 'customer');
@@ -160,7 +160,7 @@ const Signup = ({ navigation }) => {
 	};
 
 	return (
-		<SafeAreaView style={styles.container}>
+		<SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
 			<KeyboardAvoidingView
 				style={{ flex: 1 }}
 				behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -297,7 +297,7 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: colors.secondary,
 		width: "100%",
-		marginTop: 20,
+		marginTop: 32,
 		borderTopLeftRadius: 30,
 		borderTopRightRadius: 30,
 	},

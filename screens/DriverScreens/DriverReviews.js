@@ -6,7 +6,6 @@ import {
     ScrollView,
     TouchableOpacity,
     ActivityIndicator,
-    StatusBar,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AntDesign } from "@expo/vector-icons";
@@ -249,7 +248,6 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: colors.secondary,
-        paddingTop: StatusBar.currentHeight,
     },
     headText: {
         color: "black",
