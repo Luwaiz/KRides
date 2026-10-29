@@ -3,6 +3,7 @@ import {
 	getAuth,
 	createUserWithEmailAndPassword,
 	signInWithEmailAndPassword,
+	signInWithCustomToken,
 	signOut as firebaseSignOut,
 	onAuthStateChanged as firebaseOnAuthStateChanged,
 	sendPasswordResetEmail,
@@ -199,41 +200,40 @@ export function normalizeNigerianPhone(raw) {
 	return null;
 }
 
-export async function getDriverEmailByPhone(phone) {
-	if (!phone) throw new Error("Phone number is required");
+// The server checks the phone + password and returns a Firebase custom token, so the
+// driver's email is never sent to the device. Error codes mirror Firebase's so the
+// login screen's existing messages apply.
+export async function signInDriverWithPhone(phone, password) {
+	if (!phone || !password) throw new Error("Phone number and password are required");
 
 	let response;
 	try {
-		const currentUser = FIREBASE_AUTH.currentUser;
-		const idToken = currentUser ? await currentUser.getIdToken().catch(() => null) : null;
-
-		response = await fetch(`${NOTIFICATION_SERVER}/api/auth/driver-email`, {
+		response = await fetch(`${NOTIFICATION_SERVER}/api/auth/driver-login`, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
 				'x-api-key': NOTIFICATION_API_KEY || '',
-				...(idToken ? { 'Authorization': `Bearer ${idToken}` } : {}),
 			},
-			body: JSON.stringify({ phone }),
+			body: JSON.stringify({ phone, password }),
 		});
 	} catch (networkError) {
-		console.error("Driver email lookup — network error:", networkError);
+		console.error("Driver login — network error:", networkError);
 		throw new Error("Unable to reach the server. Please check your internet connection.");
 	}
 
-	const data = await response.json();
+	const data = await response.json().catch(() => ({}));
 
-	if (!response.ok) {
-		if (response.status === 429) {
-			const waitMin = Math.ceil((data.retryAfterSeconds || 900) / 60);
-			throw new Error(`Too many attempts. Please wait ${waitMin} minute${waitMin === 1 ? '' : 's'} before trying again.`);
-		}
-		if (response.status === 404) throw new Error("No driver found with this phone number");
-		throw new Error(data.error || "Driver lookup failed. Please try again.");
+	if (!response.ok || !data.token) {
+		const error = new Error(data.error || "Login failed. Please try again.");
+		if (response.status === 429) error.code = "auth/too-many-requests";
+		else if (data.code === "invalid-phone") error.code = "auth/invalid-email";
+		else if (data.code === "user-disabled") error.code = "auth/user-disabled";
+		else if (data.code === "invalid-credentials") error.code = "auth/invalid-credential";
+		throw error;
 	}
 
-	console.log('✅ Driver email resolved');
-	return data.email;
+	const credential = await signInWithCustomToken(FIREBASE_AUTH, data.token);
+	return credential.user;
 }
 
 export async function checkPhoneAvailable(phone) {
@@ -353,7 +353,7 @@ export default {
 	onAuthStateChanged,
 	resetPassword,
 	normalizeNigerianPhone,
-	getDriverEmailByPhone,
+	signInDriverWithPhone,
 	getUserDoc,
 	handleGoogleSignIn,
 };

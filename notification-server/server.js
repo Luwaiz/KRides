@@ -1313,7 +1313,14 @@ setInterval(() => {
     }
 }, 30 * 60 * 1000);
 
+// Superseded by /api/auth/driver-login, which never reveals the email. Kept only so app
+// builds released before that route keep working; set DISABLE_LEGACY_DRIVER_EMAIL_LOOKUP=true
+// on the server once every install has the update.
 app.post('/api/auth/driver-email', lookupLimiter.middleware, async (req, res) => {
+    if (process.env.DISABLE_LEGACY_DRIVER_EMAIL_LOOKUP === 'true') {
+        return res.status(410).json({ error: 'Please update the app to log in.' });
+    }
+
     const { phone } = req.body;
     if (!phone || typeof phone !== 'string' || !phone.trim()) {
         return res.status(400).json({ error: 'phone is required' });
@@ -1354,6 +1361,84 @@ app.post('/api/auth/driver-email', lookupLimiter.middleware, async (req, res) =>
     } catch (error) {
         console.error('❌ Driver email lookup error:', error);
         return res.status(500).json({ error: 'Lookup failed. Please try again.' });
+    }
+});
+
+const INVALID_LOGIN_RESPONSE = { error: 'Invalid phone number or password', code: 'invalid-credentials' };
+const FIREBASE_BAD_CREDENTIAL_ERRORS = ['INVALID_LOGIN_CREDENTIALS', 'EMAIL_NOT_FOUND', 'INVALID_PASSWORD', 'INVALID_EMAIL'];
+
+// Drivers log in with phone + password, but Firebase Auth only knows emails. The server
+// resolves the email, checks the password with Firebase, and returns a custom sign-in
+// token — so the email never reaches the client, and an unknown phone number and a
+// wrong password produce the same response.
+app.post('/api/auth/driver-login', lookupLimiter.middleware, async (req, res) => {
+    const { phone, password } = req.body || {};
+    if (typeof phone !== 'string' || !phone.trim() || typeof password !== 'string' || !password) {
+        return res.status(400).json({ error: 'Phone number and password are required', code: 'missing-fields' });
+    }
+
+    const normalized = normalizeNigerianPhone(phone);
+    if (!normalized) {
+        return res.status(400).json({ error: 'Invalid Nigerian phone number format', code: 'invalid-phone' });
+    }
+
+    const rateCheck = checkDriverEmailRateLimit(normalized);
+    if (rateCheck.blocked) {
+        return res.status(429).json({
+            error: 'Too many attempts. Please wait before trying again.',
+            code: 'too-many-requests',
+            retryAfterSeconds: rateCheck.retryAfterSec,
+        });
+    }
+
+    const webApiKey = process.env.FIREBASE_WEB_API_KEY;
+    if (!webApiKey) {
+        console.error('❌ FIREBASE_WEB_API_KEY is not set — driver login unavailable');
+        return res.status(503).json({ error: 'Login is temporarily unavailable. Please try again later.' });
+    }
+
+    try {
+        const snapshot = await db.collection('drivers').where('phone', '==', normalized).limit(1).get();
+        if (snapshot.empty) return res.status(401).json(INVALID_LOGIN_RESPONSE);
+
+        const driverId = snapshot.docs[0].id;
+        const email = snapshot.docs[0].data().email;
+        if (!email) {
+            console.error('⚠️ Driver document has no email field:', driverId);
+            return res.status(401).json(INVALID_LOGIN_RESPONSE);
+        }
+
+        const signIn = await axios.post(
+            `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${encodeURIComponent(webApiKey)}`,
+            { email, password, returnSecureToken: true },
+            { timeout: 10000, validateStatus: () => true }
+        );
+
+        if (signIn.status !== 200) {
+            const reason = signIn.data?.error?.message || '';
+            if (FIREBASE_BAD_CREDENTIAL_ERRORS.some((code) => reason.startsWith(code))) {
+                return res.status(401).json(INVALID_LOGIN_RESPONSE);
+            }
+            if (reason.startsWith('TOO_MANY_ATTEMPTS_TRY_LATER')) {
+                return res.status(429).json({ error: 'Too many attempts. Please wait before trying again.', code: 'too-many-requests' });
+            }
+            if (reason.startsWith('USER_DISABLED')) {
+                return res.status(403).json({ error: 'This account has been disabled. Contact support.', code: 'user-disabled' });
+            }
+            console.error(`❌ Firebase password check failed (${signIn.status}): ${reason}`);
+            return res.status(502).json({ error: 'Login failed. Please try again.' });
+        }
+
+        if (signIn.data.localId !== driverId) {
+            console.error(`❌ Driver login UID mismatch: doc ${driverId} vs auth ${signIn.data.localId}`);
+            return res.status(401).json(INVALID_LOGIN_RESPONSE);
+        }
+
+        const token = await admin.auth().createCustomToken(driverId);
+        return res.json({ success: true, token });
+    } catch (error) {
+        console.error('❌ driver-login error:', error.message);
+        return res.status(500).json({ error: 'Login failed. Please try again.' });
     }
 });
 

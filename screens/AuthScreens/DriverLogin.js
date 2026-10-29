@@ -41,11 +41,9 @@ const DriverLogin = ({ navigation }) => {
 
 		setLoading(true);
 		try {
-			const email = await Firebase.getDriverEmailByPhone(phone);
-
 			await AsyncStorage.setItem('pending_role', JSON.stringify({ role: 'driver', expiresAt: Date.now() + 5 * 60 * 1000 }));
 
-			await Firebase.signInWithEmail(email, password);
+			await Firebase.signInDriverWithPhone(phone, password);
 
 			clearAttempts(identifier);
 			console.log("✅ Driver logged in successfully");
@@ -59,6 +57,8 @@ const DriverLogin = ({ navigation }) => {
 				errorMessage = "Too many failed attempts. Please wait a few minutes and try again.";
 			} else if (error.code === "auth/invalid-email") {
 				errorMessage = "The phone number format is not recognised. Try 08123456789 or +2348123456789.";
+			} else if (error.code === "auth/user-disabled") {
+				errorMessage = "This account has been disabled. Please contact support.";
 			} else if (error.message?.includes("internet") || error.message?.includes("network")) {
 				errorMessage = "Connection error. Please check your internet and try again.";
 			}
