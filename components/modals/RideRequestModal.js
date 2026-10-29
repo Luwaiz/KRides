@@ -3,7 +3,9 @@ import { View, Text, StyleSheet, Animated, Vibration, TouchableOpacity } from 'r
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../constants/styling';
-import { sp, fs, br } from '../../constants/responsive';
+import { sp, fs, br, screen, maxContentWidth } from '../../constants/responsive';
+
+const CARD_WIDTH = Math.min(screen.width - sp(24), maxContentWidth);
 import { Ionicons } from '@expo/vector-icons';
 import { calculateDriverEarnings } from '../../constants/commission';
 
@@ -169,8 +171,9 @@ const RideRequestModal = ({ visible, ride, onAccept, onDecline, onTimeout }) => 
 const styles = StyleSheet.create({
     card: {
         position: 'absolute',
-        left: sp(12),
-        right: sp(12),
+        left: '50%',
+        width: CARD_WIDTH,
+        marginLeft: -CARD_WIDTH / 2,
         zIndex: 999,
         backgroundColor: 'white',
         borderRadius: br(16),

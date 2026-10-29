@@ -14,6 +14,7 @@ import { AntDesign, Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import DismissKeyboardView from "./DismissKeyboardView";
 import { colors } from "../constants/styling";
+import { maxContentWidth } from "../constants/responsive";
 import { FIREBASE_DB } from "../firebaseConfig";
 import { collection, getDocs, query, where } from "firebase/firestore";
 
@@ -272,6 +273,9 @@ const styles = StyleSheet.create({
 		paddingVertical: 16,
 		borderBottomWidth: 1,
 		borderBottomColor: colors.lightGrey2,
+		width: "100%",
+		maxWidth: maxContentWidth,
+		alignSelf: "center",
 	},
 	backButton: {
 		padding: 4,
@@ -289,6 +293,8 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 12,
 		paddingVertical: 10,
 		margin: 16,
+		maxWidth: maxContentWidth - 32,
+		alignSelf: "center",
 	},
 	searchInput: {
 		flex: 1,
@@ -299,6 +305,9 @@ const styles = StyleSheet.create({
 	popularSection: {
 		paddingHorizontal: 16,
 		paddingVertical: 8,
+		width: "100%",
+		maxWidth: maxContentWidth,
+		alignSelf: "center",
 	},
 	sectionTitle: {
 		fontSize: 14,
@@ -309,6 +318,9 @@ const styles = StyleSheet.create({
 	listContainer: {
 		paddingHorizontal: 16,
 		paddingBottom: 20,
+		width: "100%",
+		maxWidth: maxContentWidth,
+		alignSelf: "center",
 	},
 	locationItem: {
 		flexDirection: "row",

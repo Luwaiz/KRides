@@ -12,7 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons, FontAwesome5, Ionicons } from "@expo/vector-icons";
 import BackButton from "../../components/buttons/BackButton";
 import { colors } from "../../constants/styling";
-import { sp, fs, br, ms } from "../../constants/responsive";
+import { sp, fs, br, ms, maxContentWidth } from "../../constants/responsive";
 import { getDriverEarnings, formatCurrency } from "../../helpers/driverEarnings";
 import { calculateDriverEarnings } from "../../constants/commission";
 import { useDriverDetails } from "../../constants/Store";
@@ -330,6 +330,9 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     scrollContent: {
+        width: "100%",
+        maxWidth: maxContentWidth,
+        alignSelf: "center",
         paddingBottom: sp(24),
     },
     yearRow: {

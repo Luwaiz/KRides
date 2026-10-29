@@ -20,6 +20,7 @@ import Toast from "react-native-toast-message";
 import { colors } from "../../constants/styling";
 import notificationManager from "../../helpers/notificationManager";
 import { NOTIFICATION_API_KEY } from "@env";
+import { wp } from "../../constants/responsive";
 
 const SERVER_URL = 'https://krides.onrender.com/api';
 
@@ -183,7 +184,7 @@ const styles = StyleSheet.create({
 	},
 	container: {
 		backgroundColor: "white",
-		width: "75%",
+		width: wp(281),
 		borderRadius: 5,
 		alignItems: "center",
 		paddingVertical: 64,

@@ -2,6 +2,7 @@ import { Image, Modal, StyleSheet, Text, View } from "react-native";
 import React from "react";
 import ActiveButton from "../buttons/ActiveButton";
 import { useNavigation } from "@react-navigation/native";
+import { wp } from "../../constants/responsive";
 
 const SuccessNo = ({ modal, setModal }) => {
 	const navigation = useNavigation();
@@ -57,7 +58,7 @@ const styles = StyleSheet.create({
 	},
 	container: {
 		backgroundColor: "white",
-		width: "75%",
+		width: wp(281),
 		borderRadius: 5,
 		alignItems: "center",
 		padding: 24,

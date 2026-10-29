@@ -2,7 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated, ActivityIndicator, Linking, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../constants/styling';
-import { sp, fs, br } from '../constants/responsive';
+import { sp, fs, br, screen, maxContentWidth } from '../constants/responsive';
+
+const CARD_WIDTH = Math.min(screen.width - sp(32), maxContentWidth);
 
 const NO_DRIVER_TIMEOUT_MS = 3 * 60 * 1000;
 const STILL_SEARCHING_TIMEOUT_MS = 90 * 1000;
@@ -193,8 +195,9 @@ const styles = StyleSheet.create({
     container: {
         position: 'absolute',
         top: sp(70),
-        left: sp(16),
-        right: sp(16),
+        left: '50%',
+        width: CARD_WIDTH,
+        marginLeft: -CARD_WIDTH / 2,
         backgroundColor: 'white',
         borderRadius: br(12),
         shadowColor: '#000',

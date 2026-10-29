@@ -10,6 +10,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import React, { useState, useEffect } from "react";
 import { colors } from "../../constants/styling";
+import { maxContentWidth } from "../../constants/responsive";
 import BackButton from "../../components/buttons/BackButton";
 import Avatar from "../../assets/svg/Frame 91profile.svg";
 import EditableInput from "../../components/EditableInput";
@@ -357,6 +358,9 @@ const styles = StyleSheet.create({
 		fontFamily: "Albert-SemiBold",
 	},
 	infoCont: {
+		width: "100%",
+		maxWidth: maxContentWidth,
+		alignSelf: "center",
 		paddingHorizontal: 16,
 		justifyContent: "center",
 	},

@@ -4,6 +4,7 @@ import ActiveButton from "../buttons/ActiveButton";
 import Keke from "../../assets/svg/Keke.svg";
 import Toast from "react-native-toast-message";
 import { useBottomTabStore, useRideStore } from "../../constants/Store";
+import { wp } from "../../constants/responsive";
 
 const RideConfirm = ({ modal, setModal, driverName }) => {
 	const [cancel, setCancel] = useState(false);
@@ -75,7 +76,7 @@ const styles = StyleSheet.create({
 	},
 	container: {
 		backgroundColor: "white",
-		width: "75%",
+		width: wp(281),
 		borderRadius: 5,
 		alignItems: "center",
 		paddingVertical: 64,

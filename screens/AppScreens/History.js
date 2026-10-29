@@ -1,7 +1,8 @@
-import { FlatList, StyleSheet, Text, View, Dimensions, TouchableOpacity, ScrollView } from "react-native";
+import { FlatList, StyleSheet, Text, View, TouchableOpacity, ScrollView } from "react-native";
 import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import { colors } from "../../constants/styling";
+import { maxContentWidth } from "../../constants/responsive";
 import { SafeAreaView } from "react-native-safe-area-context";
 import BackButton from "../../components/buttons/BackButton";
 import HistoryCard from "../../components/HistoryCard";
@@ -10,7 +11,6 @@ import { ActivityIndicator } from "react-native-paper";
 import { getCustomerHistoryPaginated, getDriverHistoryPaginated } from "../../helpers/firebaseRides";
 import { Ionicons } from "@expo/vector-icons";
 
-const { width } = Dimensions.get("window");
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 const History = () => {
@@ -225,7 +225,7 @@ const History = () => {
 						) : null
 					}
 					contentContainerStyle={styles.contentContainer}
-					style={{ width, flex: 1 }}
+					style={{ width: "100%", maxWidth: maxContentWidth, alignSelf: "center", flex: 1 }}
 				/>
 			)}
 		</SafeAreaView>

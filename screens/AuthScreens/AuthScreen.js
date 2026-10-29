@@ -2,6 +2,7 @@ import { Animated, Image, StyleSheet, Text, TouchableOpacity, View } from "react
 import React, { useRef, useState } from "react";
 import BottomSheet from "@gorhom/bottom-sheet";
 import { colors } from "../../constants/styling";
+import { maxContentWidth } from "../../constants/responsive";
 import ActiveButton from "../../components/buttons/ActiveButton";
 import LoginButton from "../../components/buttons/LoginButton";
 import Terms from "../../components/Terms";
@@ -147,6 +148,9 @@ const styles = StyleSheet.create({
 	},
 	sheet: {
 		flex: 1,
+		width: "100%",
+		maxWidth: maxContentWidth,
+		alignSelf: "center",
 		alignItems: "center",
 		paddingVertical: 30,
 	},

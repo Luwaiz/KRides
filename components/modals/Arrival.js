@@ -2,6 +2,7 @@ import { Image, Modal, StyleSheet, Text, View } from "react-native";
 import React from "react";
 import ActiveButton from "../buttons/ActiveButton";
 import Keke from "../../assets/svg/Keke.svg";
+import { wp } from "../../constants/responsive";
 
 const Arrival = ({ modal, setModal, onDismiss }) => {
 	const handleOK = () => {
@@ -37,7 +38,7 @@ const styles = StyleSheet.create({
 	cont: {
 		flex: 1,
 		backgroundColor: "white",
-		width: "75%",
+		width: wp(281),
 		borderRadius: 5,
 		alignItems: "center",
 		paddingVertical: 64,
@@ -63,7 +64,7 @@ const styles = StyleSheet.create({
 	},
 	container: {
 		backgroundColor: "white",
-		width: "75%",
+		width: wp(281),
 		borderRadius: 5,
 		alignItems: "center",
 		paddingVertical: 64,

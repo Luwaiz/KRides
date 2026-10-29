@@ -2,6 +2,7 @@ import { Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "r
 import React, { useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors } from "../../constants/styling";
+import { maxContentWidth } from "../../constants/responsive";
 import DismissKeyboardView from "../../components/DismissKeyboardView";
 import TextInput1 from "../../components/TextInput1";
 import ActiveButton from "../../components/buttons/ActiveButton";
@@ -64,22 +65,24 @@ const CompletePhoneNumber = ({ navigation }) => {
 							<Text style={styles.headText}>One last thing</Text>
 						</View>
 						<View style={styles.bottomCont}>
-							<Text style={styles.infoText}>
-								We need your phone number so drivers can reach you about your ride.
-							</Text>
-							<TextInput1
-								text={"Phone Number"}
-								placeholder={"08123456789 or +2348123456789"}
-								onChangeText={setPhone}
-								value={phone}
-								keyboardType="phone-pad"
-							/>
-							<View style={styles.button}>
-								<ActiveButton
-									title={"Continue"}
-									loading={loading}
-									onPress={handleContinue}
+							<View style={styles.sheetCont}>
+								<Text style={styles.infoText}>
+									We need your phone number so drivers can reach you about your ride.
+								</Text>
+								<TextInput1
+									text={"Phone Number"}
+									placeholder={"08123456789 or +2348123456789"}
+									onChangeText={setPhone}
+									value={phone}
+									keyboardType="phone-pad"
 								/>
+								<View style={styles.button}>
+									<ActiveButton
+										title={"Continue"}
+										loading={loading}
+										onPress={handleContinue}
+									/>
+								</View>
 							</View>
 						</View>
 					</View>
@@ -114,6 +117,12 @@ const styles = StyleSheet.create({
 		marginTop: 32,
 		borderTopLeftRadius: 30,
 		borderTopRightRadius: 30,
+	},
+	sheetCont: {
+		flex: 1,
+		width: "100%",
+		maxWidth: maxContentWidth,
+		alignSelf: "center",
 		paddingHorizontal: 16,
 		paddingTop: 30,
 	},

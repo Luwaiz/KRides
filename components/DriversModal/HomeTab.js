@@ -34,7 +34,7 @@ import { calculateDriverEarnings } from "../../constants/commission";
 import { notifyCustomerRideAccepted } from "../../helpers/notificationHelpers";
 import { doc, updateDoc, runTransaction, serverTimestamp } from "firebase/firestore";
 import { FIREBASE_DB } from "../../firebaseConfig";
-import { sp, fs, br, ms } from "../../constants/responsive";
+import { sp, fs, br, ms, maxContentWidth } from "../../constants/responsive";
 import { useNavigation } from "@react-navigation/native";
 
 const HomeTab = () => {
@@ -392,6 +392,9 @@ export default HomeTab;
 const styles = StyleSheet.create({
 	sheetCont: {
 		flex: 1,
+		width: "100%",
+		maxWidth: maxContentWidth,
+		alignSelf: "center",
 		paddingBottom: sp(16),
 		paddingTop: sp(30),
 		paddingHorizontal: sp(16),

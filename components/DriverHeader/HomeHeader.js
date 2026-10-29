@@ -5,6 +5,7 @@ import { DrawerActions, useNavigation } from "@react-navigation/native";
 import { TouchableOpacity } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors } from "../../constants/styling";
+import { maxContentWidth } from "../../constants/responsive";
 import Cash from "../../assets/svg/Cash.svg";
 import Calendar from "../../assets/svg/Calendar.svg";
 import { getDriverTodayStats } from "../../helpers/driverStats";
@@ -133,18 +134,23 @@ const styles = StyleSheet.create({
 		backgroundColor: colors.primary,
 		paddingHorizontal: 16,
 		paddingBottom: 12,
+		alignItems: "center",
 	},
 	topRow: {
 		flexDirection: "row",
 		alignItems: "center",
 		marginBottom: 10,
 		gap: 10,
+		width: "100%",
+		maxWidth: maxContentWidth,
 	},
 	statsRow: {
 		flexDirection: "row",
 		alignItems: "center",
 		gap: 10,
 		flex: 1,
+		width: "100%",
+		maxWidth: maxContentWidth,
 	},
 	drawerNav: {
 		width: 48,

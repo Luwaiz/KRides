@@ -12,6 +12,7 @@ import React, { useState } from "react";
 import { AntDesign } from "@expo/vector-icons";
 import { Fontisto } from "@expo/vector-icons";
 import { colors } from "../../constants/styling";
+import { maxContentWidth } from "../../constants/responsive";
 import { SafeAreaView } from "react-native-safe-area-context";
 import DismissKeyboardView from "../../components/DismissKeyboardView";
 import DestinationPick from "../../components/destinationPick";
@@ -57,6 +58,9 @@ const styles = StyleSheet.create({
 		backgroundColor: colors.secondary,
 		padding: 16,
 		marginBottom: 10,
+		width: "100%",
+		maxWidth: maxContentWidth,
+		alignSelf: "center",
 	},
 	headCont: {
 		flexDirection: "row",

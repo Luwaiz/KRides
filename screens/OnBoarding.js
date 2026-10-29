@@ -3,6 +3,7 @@ import React, { useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { OnBoard } from "../constants/OnBoardData";
+import { maxContentWidth } from "../constants/responsive";
 import BottomSheet from "@gorhom/bottom-sheet";
 import Footer from "../components/Footer";
 import {
@@ -106,6 +107,9 @@ const styles = StyleSheet.create({
 		flex: 1,
 		alignItems: "center",
 		paddingVertical: 40,
+		width: "100%",
+		maxWidth: maxContentWidth,
+		alignSelf: "center",
 	},
 	title: {
 		fontSize: 24,

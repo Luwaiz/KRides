@@ -9,7 +9,7 @@ const DrawerNavigator = () => {
 	return (
 		<Drawer.Navigator
 			drawerContent={(props) => <DrawerComponent {...props} />}
-			screenOptions={{ headerShown: false }}
+			screenOptions={{ headerShown: false, drawerStyle: { width: 320 } }}
 		>
 			<Drawer.Screen component={AppStack} name="Main" />
 		</Drawer.Navigator>

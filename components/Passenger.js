@@ -5,7 +5,7 @@ import React, { useState, useEffect } from "react";
 import WhereTo from "./WhereTo";
 import ActiveButton from "./buttons/ActiveButton";
 import { colors } from "../constants/styling";
-import { sp, fs, br } from "../constants/responsive";
+import { sp, fs, br, maxContentWidth } from "../constants/responsive";
 import { RadioButton } from "react-native-paper";
 import { useNavigation } from "@react-navigation/native";
 import {
@@ -202,6 +202,9 @@ export default Passenger;
 const styles = StyleSheet.create({
 	sheetCont: {
 		flex: 1,
+		width: "100%",
+		maxWidth: maxContentWidth,
+		alignSelf: "center",
 		paddingBottom: sp(16),
 		paddingTop: sp(30),
 		paddingHorizontal: sp(16),

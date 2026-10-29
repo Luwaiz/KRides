@@ -2,6 +2,7 @@ import { ScrollView, StyleSheet, Text, View, Linking, Pressable } from 'react-na
 import React from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../../constants/styling';
+import { maxContentWidth } from '../../constants/responsive';
 import BackButton from '../../components/buttons/BackButton';
 import { getPricingConfig } from '../../constants/pricingState';
 
@@ -176,6 +177,9 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   contentContainer: {
+    width: "100%",
+    maxWidth: maxContentWidth,
+    alignSelf: "center",
     padding: 24,
     paddingBottom: 40,
   },

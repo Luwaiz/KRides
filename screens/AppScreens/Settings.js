@@ -10,6 +10,7 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors } from "../../constants/styling";
+import { maxContentWidth } from "../../constants/responsive";
 import Confirmation1 from "../../components/modals/Confirmation1";
 import { FIREBASE_AUTH, FIREBASE_DB } from "../../firebaseConfig";
 import { doc, onSnapshot, updateDoc } from "firebase/firestore";
@@ -270,6 +271,9 @@ const styles = StyleSheet.create({
 		backgroundColor: "white",
 	},
 	scrollContent: {
+		width: "100%",
+		maxWidth: maxContentWidth,
+		alignSelf: "center",
 		padding: 16,
 		paddingBottom: 32,
 	},

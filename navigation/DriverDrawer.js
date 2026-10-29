@@ -9,7 +9,7 @@ const DriverDrawer = () => {
 	return (
 		<Drawer.Navigator
 			drawerContent={(props) => <DriverDrawerComponent {...props} />}
-			screenOptions={{ headerShown: false }}
+			screenOptions={{ headerShown: false, drawerStyle: { width: 320 } }}
 		>
 			<Drawer.Screen name="Driver" component={DriverStack} />
 		</Drawer.Navigator>

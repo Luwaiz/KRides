@@ -2,6 +2,7 @@ import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, Vi
 import React, { useState } from "react";
 import BottomSheet from "@gorhom/bottom-sheet";
 import { colors } from "../../constants/styling";
+import { maxContentWidth } from "../../constants/responsive";
 import { SafeAreaView } from "react-native-safe-area-context";
 import DismissKeyboardView from "../../components/DismissKeyboardView";
 import TextInput1 from "../../components/TextInput1";
@@ -186,6 +187,9 @@ const styles = StyleSheet.create({
 	},
 	sheetCont: {
 		flex: 1,
+		width: "100%",
+		maxWidth: maxContentWidth,
+		alignSelf: "center",
 		paddingHorizontal: 16,
 		paddingTop: 50,
 		alignItems: "center",

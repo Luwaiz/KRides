@@ -27,7 +27,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import Toast from "react-native-toast-message";
 import BackButton from "../../components/buttons/BackButton";
 import { colors } from "../../constants/styling";
-import { sp, fs, br } from "../../constants/responsive";
+import { sp, fs, br, maxContentWidth } from "../../constants/responsive";
 import { FIREBASE_AUTH, FIREBASE_DB } from "../../firebaseConfig";
 import { useUserDetails } from "../../constants/Store";
 import { createTopupAccount, verifyTopup } from "../../helpers/walletHelpers";
@@ -499,6 +499,9 @@ const styles = StyleSheet.create({
     fontFamily: "Albert-SemiBold",
   },
   scroll: {
+    width: "100%",
+    maxWidth: maxContentWidth,
+    alignSelf: "center",
     paddingBottom: sp(32),
   },
   balanceCard: {

@@ -2,6 +2,7 @@ import { StyleSheet, Text, View, Alert, KeyboardAvoidingView, Platform } from "r
 import React, { useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors } from "../../constants/styling";
+import { maxContentWidth } from "../../constants/responsive";
 import DismissKeyboardView from "../../components/DismissKeyboardView";
 import BackButton from "../../components/buttons/BackButton";
 import ActiveButton from "../../components/buttons/ActiveButton";
@@ -139,6 +140,9 @@ const styles = StyleSheet.create({
 		fontFamily: "Albert-SemiBold",
 	},
 	infoCont: {
+		width: "100%",
+		maxWidth: maxContentWidth,
+		alignSelf: "center",
 		marginVertical: 16,
 		paddingHorizontal: 16,
 		gap: 4,
@@ -159,6 +163,9 @@ const styles = StyleSheet.create({
 	},
 	bottomCont: {
 		flex: 1,
+		width: "100%",
+		maxWidth: maxContentWidth,
+		alignSelf: "center",
 		paddingHorizontal: 16,
 	},
 	inputCont: {
