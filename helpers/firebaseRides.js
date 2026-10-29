@@ -1,8 +1,5 @@
-import { FIREBASE_DB } from "../firebaseConfig";
-import { NOTIFICATION_API_KEY } from "@env";
-
-
-const VALID_STATUSES = new Set(['pending', 'accepted', 'in_progress', 'completed', 'cancelled']);
+import { FIREBASE_DB, FIREBASE_AUTH } from "../firebaseConfig";
+import { createCardRide, cancelRideOnServer, checkRefundStatus } from "./flutterwaveRefund";
 
 function isValidCoord(lat, lng) {
 	return (
@@ -73,7 +70,6 @@ function validateRideData(data) {
 import {
 	collection,
 	doc,
-	setDoc,
 	updateDoc,
 	onSnapshot,
 	query,
@@ -81,20 +77,13 @@ import {
 	orderBy,
 	limit,
 	startAfter,
-	serverTimestamp,
 	getDocs,
 	getDoc,
-	runTransaction,
 	arrayUnion,
 } from "firebase/firestore";
 
-const PAYMENTS_SERVER_URL = 'https://krides.onrender.com/api/payments';
-import {
-	notifyDriversAboutNewRide,
-	notifyCustomerRideCompleted,
-} from "./notificationHelpers";
-
-
+// Paid rides are created by the server: it verifies the Flutterwave charge, computes
+// the fare, and notifies drivers. The app can't write ride documents directly.
 export const createRide = async (rideData) => {
 	const validationErrors = validateRideData(rideData);
 	if (validationErrors.length > 0) {
@@ -103,226 +92,45 @@ export const createRide = async (rideData) => {
 		throw new Error(message);
 	}
 
-	try {
-		const { FIREBASE_AUTH } = require("../firebaseConfig");
-		const currentUser = FIREBASE_AUTH.currentUser;
-
-		console.log("🔐 createRide - Auth Check: UIDs match:", currentUser?.uid === rideData.customerId);
-
-		if (!currentUser) {
-			throw new Error("No authenticated user found. Please log in again.");
-		}
-
-		if (currentUser.uid !== rideData.customerId) {
-			throw new Error(
-				`Auth mismatch: Firebase UID (${currentUser.uid}) !== customerId (${rideData.customerId})`
-			);
-		}
-
-		const ridesRef = collection(FIREBASE_DB, "rides");
-		const rideDoc = doc(ridesRef);
-		const rideId = rideDoc.id;
-
-		const ride = {
-			id: rideId,
-			customerId: rideData.customerId,
-			customerName: (rideData.customerName || "").trim(),
-			customerPhone: (rideData.customerPhone || "").trim(),
-			customerPhotoURL: rideData.customerPhotoURL || null,
-			pickupLocation: (rideData.pickupLocation || "").trim(),
-			pickupCoords: rideData.pickupCoords || null,
-			destination: (rideData.destination || "").trim(),
-			destinationCoords: rideData.destinationCoords || null,
-			numberOfPassengers: rideData.numberOfPassengers || 1,
-			amount: rideData.amount || 0,
-			status: "pending",
-			driverId: null,
-			driverName: null,
-			driverPhone: null,
-			vehicleId: null,
-			paymentMethod: rideData.paymentMethod || "cash",
-			transactionId: rideData.transactionId || null,
-			createdAt: serverTimestamp(),
-			acceptedAt: null,
-			completedAt: null,
-			cancelledAt: null,
-		};
-
-		await setDoc(rideDoc, ride);
-		console.log("✅ Ride created:", rideId);
-
-		notifyDriversAboutNewRide(
-			rideId,
-			rideData.customerName,
-			rideData.pickupLocation,
-			rideData.destination
-		).catch(async (err) => {
-			console.warn("⚠️ Driver notification failed:", err.message);
-			updateDoc(rideDoc, { notificationFailed: true }).catch(() => {});
-		});
-
-		return rideId;
-	} catch (error) {
-		console.error("❌ Error creating ride:", error);
-		throw error;
+	const currentUser = FIREBASE_AUTH.currentUser;
+	if (!currentUser) {
+		throw new Error("No authenticated user found. Please log in again.");
 	}
-};
-
-export const updateRideStatus = async (rideId, status) => {
-	if (!VALID_STATUSES.has(status)) {
+	if (currentUser.uid !== rideData.customerId) {
 		throw new Error(
-			`Invalid ride status: "${status}". Must be one of: ${[...VALID_STATUSES].join(', ')}`
+			`Auth mismatch: Firebase UID (${currentUser.uid}) !== customerId (${rideData.customerId})`
 		);
 	}
-
-	try {
-		const rideRef = doc(FIREBASE_DB, "rides", rideId);
-		const updates = { status };
-
-		if (status === "completed") {
-			updates.completedAt = serverTimestamp();
-		}
-
-		await updateDoc(rideRef, updates);
-		console.log(`✅ Ride status updated to ${status}:`, rideId);
-		if (status === "completed") {
-			const rideDoc = await getDoc(rideRef);
-			if (rideDoc.exists()) {
-				const rideData = rideDoc.data();
-				if (rideData.customerId) {
-					await notifyCustomerRideCompleted(rideData.customerId, rideId);
-				}
-			}
-		}
-	} catch (error) {
-		console.error("❌ Error updating ride status:", error);
-		throw error;
+	if (!rideData.transactionId) {
+		throw new Error("A completed payment is required to book a ride.");
 	}
+
+	const { rideId } = await createCardRide(rideData.transactionId, {
+		customerName: rideData.customerName,
+		customerPhone: rideData.customerPhone,
+		customerPhotoURL: rideData.customerPhotoURL || null,
+		pickupLocation: rideData.pickupLocation,
+		pickupCoords: rideData.pickupCoords,
+		destination: rideData.destination,
+		destinationCoords: rideData.destinationCoords,
+		numberOfPassengers: Number(rideData.numberOfPassengers),
+	});
+	console.log("✅ Ride created:", rideId);
+	return rideId;
 };
 
+// The server decides who is cancelling (from the login token) and issues any refund,
+// so `cancelledBy` is no longer sent; it's kept in the signature for existing callers.
 export const cancelRideWithRefund = async (rideId, cancelledBy = 'customer', reason = '') => {
-	const { processRefund } = require('./flutterwaveRefund');
-	const rideRef = doc(FIREBASE_DB, "rides", rideId);
-
-	let rideData;
-	try {
-		await runTransaction(FIREBASE_DB, async (txn) => {
-			const snap = await txn.get(rideRef);
-			if (!snap.exists()) throw new Error("RIDE_NOT_FOUND");
-			const data = snap.data();
-			if (data.status === 'cancelled') throw new Error("ALREADY_CANCELLED");
-			if (data.refundProcessing === true) throw new Error("REFUND_IN_PROGRESS");
-			txn.update(rideRef, { refundProcessing: true });
-			rideData = data;
-		});
-	} catch (err) {
-		if (err.message === "ALREADY_CANCELLED") {
-			console.log("ℹ️ Ride already cancelled — no action taken");
-			return { status: "cancelled", alreadyCancelled: true };
-		}
-		if (err.message === "REFUND_IN_PROGRESS") {
-			console.log("ℹ️ Cancellation already in progress — no action taken");
-			return { status: "pending", refundProcessing: true };
-		}
-		if (err.message === "RIDE_NOT_FOUND") throw new Error("Ride not found");
-		throw err;
-	}
-
-	const updates = {
-		status: "cancelled",
-		cancelledAt: serverTimestamp(),
-		cancelledBy,
-		refundProcessing: false,
-	};
-
-	if (reason) updates.cancellationReason = reason;
-
-	if (rideData.transactionId && rideData.paymentMethod === 'flutterwave') {
-		try {
-			console.log("💰 Processing refund for cancelled ride, amount:", rideData.amount);
-
-			const refundResult = await processRefund(
-				rideData.transactionId,
-				null,
-				reason || `Ride cancelled by ${cancelledBy}`,
-				rideId
-			);
-
-			if (refundResult.success) {
-				updates.refundId = refundResult.refundId;
-				updates.refundAmount = rideData.amount;
-				if (refundResult.status === 'completed') {
-					updates.refundStatus = "completed";
-					updates.refundedAt = serverTimestamp();
-				} else {
-					updates.refundStatus = "pending";
-				}
-				console.log("✅ Refund initiated:", refundResult.refundId, "status:", refundResult.status);
-			}
-		} catch (refundError) {
-			console.error("❌ Refund failed:", refundError.message);
-			updates.refundStatus = "failed";
-			updates.refundError = refundError.message;
-		}
-	} else if (rideData.paymentMethod === 'wallet' && rideData.customerId) {
-		try {
-			console.log("💰 Processing wallet refund for cancelled ride...");
-			const { FIREBASE_AUTH } = require("../firebaseConfig");
-			const idToken = await FIREBASE_AUTH.currentUser?.getIdToken();
-			if (!idToken) throw new Error("No authenticated user for wallet refund");
-
-			const controller = new AbortController();
-			const timeoutId = setTimeout(() => controller.abort(), 10000);
-			let response;
-			try {
-				response = await fetch(`${PAYMENTS_SERVER_URL}/wallet-refund`, {
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json',
-						'x-api-key': NOTIFICATION_API_KEY || '',
-						'Authorization': `Bearer ${idToken}`,
-					},
-					body: JSON.stringify({ idToken, rideId }),
-					signal: controller.signal,
-				});
-			} finally {
-				clearTimeout(timeoutId);
-			}
-			const result = await response.json();
-
-			if (result.success) {
-				updates.walletRefundStatus = 'completed';
-				updates.walletRefunded = true;
-				updates.refundAmount = rideData.amount;
-				console.log(`✅ Wallet refund of ₦${rideData.amount} processed`);
-			} else {
-				updates.walletRefundStatus = 'failed';
-				updates.walletRefundError = result.error;
-				console.error("❌ Wallet refund failed:", result.error);
-			}
-		} catch (walletRefundErr) {
-			console.error("❌ Wallet refund error:", walletRefundErr.message);
-			updates.walletRefundStatus = 'failed';
-			updates.walletRefundError = walletRefundErr.message;
-		}
-	} else if (rideData.paymentMethod === 'flutterwave' && !rideData.transactionId) {
-		console.warn("⚠️ Flutterwave payment with no transactionId — flagging for manual review");
-		updates.refundStatus = 'needs_review';
-		updates.needsManualRefundReview = true;
-		updates.refundReviewReason = 'Flutterwave transactionId missing at cancellation time';
+	const result = await cancelRideOnServer(rideId, reason);
+	if (result.alreadyCancelled) {
+		console.log("ℹ️ Ride already cancelled — no action taken");
+	} else if (result.refundProcessing) {
+		console.log("ℹ️ Cancellation already in progress — no action taken");
 	} else {
-		console.log("ℹ️ Cash ride — no refund needed");
+		console.log(`✅ Ride cancelled by ${result.cancelledBy || cancelledBy}:`, rideId);
 	}
-
-	try {
-		await updateDoc(rideRef, updates);
-		console.log(`✅ Ride cancelled by ${cancelledBy}:`, rideId);
-	} catch (writeError) {
-		updateDoc(rideRef, { refundProcessing: false }).catch(() => {});
-		throw writeError;
-	}
-
-	return updates;
+	return result;
 };
 
 export const declineRide = async (rideId, driverId) => {
@@ -361,8 +169,6 @@ export const checkPendingRefunds = async (customerId) => {
 	if (!customerId) return [];
 
 	try {
-		const { checkRefundStatus } = require('./flutterwaveRefund');
-
 		const ridesRef = collection(FIREBASE_DB, "rides");
 		const q = query(
 			ridesRef,
@@ -380,7 +186,8 @@ export const checkPendingRefunds = async (customerId) => {
 					let status, lastErr;
 					for (let attempt = 0; attempt < 3; attempt++) {
 						try {
-							status = await checkRefundStatus(ride.refundId);
+							// Passing the rideId lets the server record a completed refund on the ride.
+							status = await checkRefundStatus(ride.refundId, docSnapshot.id);
 							break;
 						} catch (e) {
 							lastErr = e;
@@ -388,14 +195,6 @@ export const checkPendingRefunds = async (customerId) => {
 						}
 					}
 					if (!status) throw lastErr;
-
-					if (status.status === "completed") {
-						const rideRef = doc(FIREBASE_DB, "rides", docSnapshot.id);
-						await updateDoc(rideRef, {
-							refundStatus: "completed",
-							refundedAt: serverTimestamp(),
-						});
-					}
 
 					pendingRefunds.push({
 						rideId: docSnapshot.id,

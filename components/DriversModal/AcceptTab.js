@@ -6,12 +6,12 @@ import Phone from "../../assets/svg/Call.svg";
 import ActiveButton from "../buttons/ActiveButton";
 import DangerButton from "../buttons/DangerButton";
 import { colors } from "../../constants/styling";
-import { sp, fs, br } from "../../constants/responsive";
+import { sp, fs, br, maxContentWidth } from "../../constants/responsive";
 import { useAcceptedRideStore, useDriverDetails } from "../../constants/Store";
 import useAuthStore from "../../constants/Store";
 import Avatar from "../../assets/svg/Frame 77avatar.svg";
 import Arrival from "../modals/Arrival";
-import { updateRideStatus, listenToPendingRides, listenToRide, declineRide, getRide, cancelRideWithRefund } from "../../helpers/firebaseRides";
+import { listenToPendingRides, listenToRide, declineRide, getRide, cancelRideWithRefund } from "../../helpers/firebaseRides";
 import { getRideCoordinates } from "../../helpers/getLocationCoordinates";
 import { doc, runTransaction, serverTimestamp } from "firebase/firestore";
 import { FIREBASE_DB, FIREBASE_AUTH } from "../../firebaseConfig";
@@ -616,6 +616,9 @@ export default AcceptTab;
 const styles = StyleSheet.create({
 	sheetCont: {
 		flex: 1,
+		width: "100%",
+		maxWidth: maxContentWidth,
+		alignSelf: "center",
 		paddingBottom: sp(40),
 		paddingTop: sp(30),
 		paddingHorizontal: sp(16),

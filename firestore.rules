@@ -2,6 +2,10 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Money, payout, refund and verification fields are written only by the
+    // notification server (Admin SDK, which bypasses these rules). The server trusts
+    // them, so clients must never be able to change them.
+
     function isAuth() {
       return request.auth != null;
     }
@@ -10,12 +14,13 @@ service cloud.firestore {
       return isAuth() && request.auth.uid == uid;
     }
 
-    function rideFieldLengthsOk() {
-      let d = request.resource.data;
-      return (!('customerName'   in d) || (d.customerName   is string && d.customerName.size()   <= 100)) &&
-             (!('customerPhone'  in d) || (d.customerPhone  is string && d.customerPhone.size()  <=  20)) &&
-             (!('pickupLocation' in d) || (d.pickupLocation is string && d.pickupLocation.size() <= 200)) &&
-             (!('destination'    in d) || (d.destination    is string && d.destination.size()    <= 200));
+    function changedKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    function driverProtectedFields() {
+      return ['bankDetailsVerified', 'bankCode', 'accountNumber', 'accountName', 'bankName',
+              'subaccountId', 'subaccountCreatedAt', 'ratings', 'totalPaidOut', 'createdByAdmin'];
     }
 
     function hasVerifiedBankDetails() {
@@ -25,8 +30,8 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read:   if isOwner(userId);
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId);
+      allow create: if isOwner(userId) && !('walletBalance' in request.resource.data);
+      allow update: if isOwner(userId) && !changedKeys().hasAny(['walletBalance']);
       allow delete: if false;
     }
 
@@ -37,47 +42,42 @@ service cloud.firestore {
 
     match /drivers/{driverId} {
       allow read:   if isOwner(driverId);
-      allow create: if isOwner(driverId);
-      // Ratings are written server-side only (POST /api/rides/rate, Admin
-      // SDK — bypasses these rules entirely), after verifying the caller
-      // actually owns the ride being rated and hasn't rated it before.
-      // There used to be a client-side allowance here for exactly the
-      // 'ratings' field with no caller-identity or value check at all —
-      // any authenticated user (not just customers, not just ones who'd
-      // actually ridden with this driver) could overwrite any driver's
-      // entire rating history directly via the client SDK. Removed: the
-      // real flow never needed it, and it was pure unguarded attack surface.
-      allow update: if isOwner(driverId);
+      allow create: if isOwner(driverId) && !request.resource.data.keys().hasAny(driverProtectedFields());
+      allow update: if isOwner(driverId) && !changedKeys().hasAny(driverProtectedFields());
       allow delete: if false;
     }
 
     match /rides/{rideId} {
-      allow create: if isAuth()
-                    && request.resource.data.customerId == request.auth.uid
-                    && rideFieldLengthsOk();
+      // Rides are created by the server after payment is verified
+      // (POST /api/rides/create for card, /api/wallet/pay-ride for wallet).
+      allow create: if false;
 
       allow read: if isAuth() && (
         resource.data.customerId == request.auth.uid ||
         resource.data.driverId   == request.auth.uid ||
-        (
-          resource.data.status == 'pending' &&
-          exists(/databases/$(database)/documents/drivers/$(request.auth.uid))
-        )
+        (resource.data.status == 'pending' && hasVerifiedBankDetails())
       );
 
       allow update: if isAuth() && (
-        resource.data.customerId == request.auth.uid ||
-        resource.data.driverId   == request.auth.uid ||
+        // A verified driver accepts a pending ride.
         (
           resource.data.status == 'pending' &&
           (resource.data.driverId == null || resource.data.driverId == '') &&
           request.resource.data.driverId == request.auth.uid &&
           request.resource.data.status   == 'accepted' &&
+          changedKeys().hasOnly(['status', 'driverId', 'driverName', 'driverPhone', 'vehicleId', 'acceptedAt']) &&
           hasVerifiedBankDetails()
         ) ||
+        // The assigned driver marks arrival. Completion and cancellation go through the server.
         (
-          request.resource.data.diff(resource.data)
-            .affectedKeys().hasOnly(['declined_by']) &&
+          resource.data.driverId == request.auth.uid &&
+          resource.data.status in ['accepted', 'in_progress'] &&
+          request.resource.data.status == 'in_progress' &&
+          changedKeys().hasOnly(['status', 'hasArrived', 'arrivedAt'])
+        ) ||
+        // A driver declines a pending ride: only their own UID may be appended.
+        (
+          changedKeys().hasOnly(['declined_by']) &&
           request.resource.data.declined_by is list &&
           request.resource.data.declined_by.hasAll(resource.data.declined_by) &&
           request.resource.data.declined_by.size() == resource.data.declined_by.size() + 1 &&
@@ -86,8 +86,7 @@ service cloud.firestore {
         )
       );
 
-      allow delete: if isAuth()
-                    && resource.data.customerId == request.auth.uid;
+      allow delete: if false;
     }
 
     match /driver_locations/{driverId} {

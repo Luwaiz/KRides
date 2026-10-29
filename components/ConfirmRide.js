@@ -13,7 +13,7 @@ import Naira from "../assets/svg/Naira.svg";
 import RideConfirm from "./modals/RideConfirm";
 import RatingModal from "./modals/RatingModal";
 import ReportDriverModal from "./modals/ReportDriverModal";
-import { sp, fs, br, ms } from "../constants/responsive";
+import { sp, fs, br, ms, maxContentWidth } from "../constants/responsive";
 import Toast from "react-native-toast-message";
 import {
 	useRideStore,
@@ -33,7 +33,7 @@ import { signOut } from "firebase/auth";
 import useAuthStore from "../constants/Store";
 import { notifyDriversAboutNewRide, notifyDriverRideCancelled } from "../helpers/notificationHelpers";
 import { payWithWallet } from "../helpers/walletHelpers";
-import { processRefund, verifyRideCharge } from "../helpers/flutterwaveRefund";
+import { processRefund } from "../helpers/flutterwaveRefund";
 import notificationManager from "../helpers/notificationManager";
 
 const ConfirmRide = () => {
@@ -150,6 +150,8 @@ const ConfirmRide = () => {
 			const data = error.response?.data;
 			if (data?.error === 'insufficient_balance') {
 				Alert.alert('Insufficient Balance', `You need ₦${data.shortfall?.toLocaleString('en-NG') ?? ''} more. Top up your wallet and try again.`);
+			} else if (data?.error === 'price_changed') {
+				Alert.alert('Price Updated', `The fare for this ride is now ₦${data.fare?.toLocaleString('en-NG') ?? ''}. Please review and try again.`);
 			} else {
 				Alert.alert('Payment Failed', 'Could not process wallet payment. Please try again.');
 			}
@@ -161,7 +163,7 @@ const ConfirmRide = () => {
 
 	const refundOrRecordOrphanedCharge = async (transactionId, reasonForLog) => {
 		try {
-			await processRefund(transactionId, Price, reasonForLog);
+			await processRefund(transactionId, null, reasonForLog);
 			Toast.show({
 				type: 'tomatoToast',
 				text1: 'Payment Refunded',
@@ -171,6 +173,17 @@ const ConfirmRide = () => {
 			});
 		} catch (refundError) {
 			console.error("❌ Auto-refund failed for orphaned charge:", refundError);
+			if (refundError.status === 409) {
+				// The server refuses to refund a payment that already has a ride attached.
+				Toast.show({
+					type: 'tomatoToast',
+					text1: 'Booking May Have Gone Through',
+					text2: 'This payment is already attached to a ride. Check your active ride or contact support.',
+					position: 'top',
+					visibilityTime: 6000,
+				});
+				return;
+			}
 			try {
 				await addDoc(collection(FIREBASE_DB, "orphanedCharges"), {
 					customerId: UserId,
@@ -320,14 +333,6 @@ const ConfirmRide = () => {
 		bookingInFlight.current = true;
 		setLoading(true);
 		try {
-			if (transactionId) {
-				// Payment.js's checkout allows bank transfer/USSD alongside card, so the
-				// amount actually paid isn't guaranteed to match Price just because
-				// Flutterwave's redirect reported "completed" — re-verify the real
-				// charge server-side before trusting it as payment for this ride.
-				await verifyRideCharge(transactionId, Price);
-			}
-
 			const rideData = {
 				customerId: UserId,
 				customerName:
@@ -390,28 +395,8 @@ const ConfirmRide = () => {
 			}
 
 			if (transactionId) {
-				try {
-					await processRefund(transactionId, Price, 'Ride creation failed after payment');
-					messageTitle = 'Payment Refunded';
-					messageBody = "Your payment couldn't be turned into a booking, so we refunded it. Please try again.";
-				} catch (refundError) {
-					console.error("❌ Auto-refund failed for orphaned charge:", refundError);
-					try {
-						await addDoc(collection(FIREBASE_DB, "orphanedCharges"), {
-							customerId: UserId,
-							transactionId,
-							amount: Price,
-							rideCreationError: error.message || String(error),
-							refundError: refundError.message || String(refundError),
-							status: "unresolved",
-							createdAt: serverTimestamp(),
-						});
-					} catch (logError) {
-						console.error("❌ Failed to record orphaned charge for reconciliation:", logError);
-					}
-					messageTitle = 'Payment Received, Booking Failed';
-					messageBody = `You were charged but the ride wasn't created. Support has been notified — reference ${transactionId}.`;
-				}
+				await refundOrRecordOrphanedCharge(transactionId, `Ride creation failed after payment: ${error.message || error}`);
+				return;
 			}
 
 			Toast.show({
@@ -719,6 +704,9 @@ export default ConfirmRide;
 const styles = StyleSheet.create({
 	bottomCont: {
 		flex: 1,
+		width: "100%",
+		maxWidth: maxContentWidth,
+		alignSelf: "center",
 		paddingBottom: sp(16),
 	},
 	callDriver: {

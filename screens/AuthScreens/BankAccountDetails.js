@@ -12,13 +12,14 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors } from "../../constants/styling";
+import { maxContentWidth } from "../../constants/responsive";
 import DismissKeyboardView from "../../components/DismissKeyboardView";
 import TextInput1 from "../../components/TextInput1";
 import ActiveButton from "../../components/buttons/ActiveButton";
 import BackButton from "../../components/buttons/BackButton";
 import { Picker } from "@react-native-picker/picker";
 import { FIREBASE_DB, FIREBASE_AUTH } from "../../firebaseConfig";
-import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { doc, updateDoc } from "firebase/firestore";
 const PAYMENTS_SERVER_URL = 'https://krides.onrender.com/api/payments';
 import { NOTIFICATION_API_KEY } from "@env";
 import { useDriverDetails } from "../../constants/Store";
@@ -100,6 +101,7 @@ const BankAccountDetails = ({ navigation, route }) => {
                 },
                 body: JSON.stringify({
                     bankCode,
+                    bankName,
                     accountNumber,
                     accountName,
                     businessName: fullName || accountName,
@@ -110,21 +112,11 @@ const BankAccountDetails = ({ navigation, route }) => {
             const result = await response.json();
             console.log("Subaccount creation result:", result);
 
+            // The server saves the bank details and marks them verified once Flutterwave
+            // confirms the account; the app only mirrors them into local state.
             if (result.success) {
-                const subaccountId = result.data.subaccount_id;
                 const verifiedBankName = result.data.bank_name || bankName;
                 const verifiedAccountName = result.data.verified_account_name || accountName;
-
-                const driverRef = doc(FIREBASE_DB, "drivers", driverId);
-                await updateDoc(driverRef, {
-                    bankName: verifiedBankName,
-                    bankCode: bankCode,
-                    accountNumber: accountNumber,
-                    accountName: verifiedAccountName,
-                    subaccountId: subaccountId,
-                    subaccountCreatedAt: serverTimestamp(),
-                    bankDetailsVerified: true,
-                });
 
                 useDriverDetails.getState().setDriverProfile({
                     ...useDriverDetails.getState(),
@@ -313,6 +305,9 @@ const styles = StyleSheet.create({
     },
     sheetCont: {
         flex: 1,
+        width: "100%",
+        maxWidth: maxContentWidth,
+        alignSelf: "center",
         paddingHorizontal: 16,
         paddingTop: 30,
     },

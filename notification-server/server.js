@@ -33,8 +33,54 @@ if (FLUTTERWAVE_PROXY_URL) {
     console.log('🔒 Flutterwave outbound requests are routed through QuotaGuard');
 }
 
+// Render sits behind one proxy hop; without this every client shares the proxy's IP
+// and the per-IP rate limiters below would throttle all users together.
+app.set('trust proxy', 1);
+
 app.use('/api', cors({ origin: false }));
 app.use(express.json());
+
+function safeEqual(a, b) {
+    if (typeof a !== 'string' || typeof b !== 'string') return false;
+    const ha = crypto.createHash('sha256').update(a).digest();
+    const hb = crypto.createHash('sha256').update(b).digest();
+    return crypto.timingSafeEqual(ha, hb);
+}
+
+function createIpRateLimiter({ windowMs, max }) {
+    const hits = new Map();
+    setInterval(() => {
+        const now = Date.now();
+        for (const [key, entry] of hits) {
+            if (now >= entry.resetAt) hits.delete(key);
+        }
+    }, windowMs).unref();
+
+    const isBlocked = (ip) => {
+        const entry = hits.get(ip);
+        return !!entry && Date.now() < entry.resetAt && entry.count >= max;
+    };
+    const record = (ip) => {
+        const now = Date.now();
+        const entry = hits.get(ip);
+        if (!entry || now >= entry.resetAt) {
+            hits.set(ip, { count: 1, resetAt: now + windowMs });
+        } else {
+            entry.count++;
+        }
+    };
+    const middleware = (req, res, next) => {
+        if (isBlocked(req.ip)) {
+            return res.status(429).json({ error: 'Too many requests. Please wait and try again.' });
+        }
+        record(req.ip);
+        next();
+    };
+    return { isBlocked, record, middleware };
+}
+
+const lookupLimiter = createIpRateLimiter({ windowMs: 15 * 60 * 1000, max: 30 });
+const adminAuthFailures = createIpRateLimiter({ windowMs: 15 * 60 * 1000, max: 10 });
 
 const API_KEY = process.env.NOTIFICATION_API_KEY;
 
@@ -56,9 +102,12 @@ app.use('/admin-api', (req, res, next) => {
         console.error('❌ ADMIN_API_KEY is not set');
         return res.status(503).json({ error: 'Admin panel not configured' });
     }
+    if (adminAuthFailures.isBlocked(req.ip)) {
+        return res.status(429).json({ error: 'Too many failed attempts. Try again in 15 minutes.' });
+    }
     if (req.path === '/login') return next();
-    const provided = req.headers['x-admin-key'];
-    if (!provided || provided !== ADMIN_API_KEY) {
+    if (!safeEqual(req.headers['x-admin-key'], ADMIN_API_KEY)) {
+        adminAuthFailures.record(req.ip);
         return res.status(401).json({ error: 'Unauthorized' });
     }
     next();
@@ -74,8 +123,7 @@ app.use('/api', (req, res, next) => {
         console.error('❌ NOTIFICATION_API_KEY is not set');
         return res.status(503).json({ error: 'Server not configured' });
     }
-    const provided = req.headers['x-api-key'];
-    if (!provided || provided !== API_KEY) {
+    if (!safeEqual(req.headers['x-api-key'], API_KEY)) {
         console.warn('🚫 Rejected request with invalid API key from', req.ip);
         return res.status(401).json({ error: 'Unauthorized' });
     }
@@ -202,7 +250,18 @@ async function sendFCMNotification(pushToken, title, body, data = {}) {
     };
 }
 
+async function shareARide(uidA, uidB) {
+    const [aIsCustomer, aIsDriver] = await Promise.all([
+        db.collection('rides').where('customerId', '==', uidA).where('driverId', '==', uidB).limit(1).get(),
+        db.collection('rides').where('driverId', '==', uidA).where('customerId', '==', uidB).limit(1).get(),
+    ]);
+    return !aIsCustomer.empty || !aIsDriver.empty;
+}
+
 app.post('/api/notifications/send', async (req, res) => {
+    const decoded = await verifyFirebaseToken(req);
+    if (!decoded) return res.status(401).json({ success: false, error: 'Unauthorized' });
+
     try {
         const { userId, role, title, body, data } = req.body;
 
@@ -211,6 +270,13 @@ app.post('/api/notifications/send', async (req, res) => {
                 success: false,
                 error: 'Missing required fields: userId, role, title, body'
             });
+        }
+        if (typeof title !== 'string' || typeof body !== 'string' || title.length > 100 || body.length > 300) {
+            return res.status(400).json({ success: false, error: 'title/body too long' });
+        }
+
+        if (!(await shareARide(decoded.uid, String(userId)))) {
+            return res.status(403).json({ success: false, error: 'You can only notify people you share a ride with' });
         }
 
         const collectionName = role === 'driver' ? 'drivers' : 'users';
@@ -242,58 +308,44 @@ app.post('/api/notifications/send', async (req, res) => {
     }
 });
 
-app.post('/api/notifications/send-bulk', async (req, res) => {
-    try {
-        const { userIds, role, title, body, data } = req.body;
+async function notifyOnlineDrivers(rideId, ride) {
+    const driversSnapshot = await db.collection('drivers')
+        .where('isOnline', '==', true)
+        .limit(100)
+        .get();
+    const results = [];
 
-        if (!userIds || !Array.isArray(userIds) || !role || !title || !body) {
-            return res.status(400).json({
-                success: false,
-                error: 'Missing required fields: userIds (array), role, title, body'
-            });
-        }
+    for (const doc of driversSnapshot.docs) {
+        const pushToken = doc.data().fcmToken;
+        if (!pushToken) continue;
 
-        const collectionName = role === 'driver' ? 'drivers' : 'users';
-        const results = [];
-
-        for (const userId of userIds) {
-            const userDoc = await db.collection(collectionName).doc(userId).get();
-
-            if (userDoc.exists) {
-                const userData = userDoc.data();
-                const pushToken = userData.fcmToken;
-
-                if (pushToken) {
-                    const result = await sendFCMNotification(pushToken, title, body, data || {});
-                    results.push({ userId, ...result });
-                } else {
-                    results.push({ userId, success: false, error: 'No push token' });
-                }
-            } else {
-                results.push({ userId, success: false, error: 'User not found' });
+        const result = await sendFCMNotification(
+            pushToken,
+            'New Ride Request 🚗',
+            `${ride.customerName || 'A customer'} requested a ride from ${ride.pickupLocation || 'nearby'} to ${ride.destination || 'destination'}`,
+            {
+                type: 'ride_booked',
+                rideId: String(rideId),
             }
+        );
+        results.push({ driverId: doc.id, ...result });
+        if (result.permanent) {
+            await db.collection('drivers').doc(doc.id).update({ fcmToken: null });
+            console.log(`🧹 Cleared stale FCM token for driver ${doc.id}`);
         }
-
-        const successCount = results.filter(r => r.success).length;
-
-        res.json({
-            success: true,
-            totalSent: successCount,
-            totalFailed: results.length - successCount,
-            results
-        });
-    } catch (error) {
-        console.error('Error in /api/notifications/send-bulk:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
     }
-});
+
+    return { driversNotified: results.filter(r => r.success).length, totalDrivers: driversSnapshot.size };
+}
+
+const MAX_DRIVER_NOTIFY_CALLS_PER_RIDE = 3;
 
 app.post('/api/notifications/notify-drivers', async (req, res) => {
+    const decoded = await verifyFirebaseToken(req);
+    if (!decoded) return res.status(401).json({ success: false, error: 'Unauthorized' });
+
     try {
-        const { rideId, customerName, pickupLocation, destination } = req.body;
+        const { rideId } = req.body;
 
         if (!rideId) {
             return res.status(400).json({
@@ -302,44 +354,28 @@ app.post('/api/notifications/notify-drivers', async (req, res) => {
             });
         }
 
-        const driversSnapshot = await db.collection('drivers')
-            .where('isOnline', '==', true)
-            .limit(100)
-            .get();
-        const results = [];
-
-        for (const doc of driversSnapshot.docs) {
-            const driver = doc.data();
-            const pushToken = driver.fcmToken;
-
-            if (pushToken) {
-                const result = await sendFCMNotification(
-                    pushToken,
-                    'New Ride Request 🚗',
-                    `${customerName || 'A customer'} requested a ride from ${pickupLocation || 'nearby'} to ${destination || 'destination'}`,
-                    {
-                        type: 'ride_booked',
-                        rideId: String(rideId),
-                    }
-                );
-                results.push({ driverId: doc.id, ...result });
-                if (result.permanent) {
-                    await db.collection('drivers').doc(doc.id).update({ fcmToken: null });
-                    console.log(`🧹 Cleared stale FCM token for driver ${doc.id}`);
+        const rideRef = db.collection('rides').doc(String(rideId));
+        let ride;
+        try {
+            ride = await db.runTransaction(async (txn) => {
+                const snap = await txn.get(rideRef);
+                if (!snap.exists) throw Object.assign(new Error('Ride not found'), { httpStatus: 404 });
+                const data = snap.data();
+                if (data.customerId !== decoded.uid) throw Object.assign(new Error('Not your ride'), { httpStatus: 403 });
+                if (data.status !== 'pending') throw Object.assign(new Error('Ride is no longer pending'), { httpStatus: 409 });
+                if ((data.driverNotifyCount || 0) >= MAX_DRIVER_NOTIFY_CALLS_PER_RIDE) {
+                    throw Object.assign(new Error('Drivers were already notified about this ride'), { httpStatus: 429 });
                 }
-            } else {
-                console.log(`⚠️ Driver ${doc.id} has no push token`);
-            }
+                txn.update(rideRef, { driverNotifyCount: admin.firestore.FieldValue.increment(1) });
+                return data;
+            });
+        } catch (err) {
+            if (err.httpStatus) return res.status(err.httpStatus).json({ success: false, error: err.message });
+            throw err;
         }
 
-        const successCount = results.filter(r => r.success).length;
-
-        res.json({
-            success: true,
-            driversNotified: successCount,
-            totalDrivers: driversSnapshot.size,
-            results
-        });
+        const summary = await notifyOnlineDrivers(rideId, ride);
+        res.json({ success: true, ...summary });
     } catch (error) {
         console.error('Error in /api/notifications/notify-drivers:', error);
         res.status(500).json({
@@ -350,15 +386,27 @@ app.post('/api/notifications/notify-drivers', async (req, res) => {
 });
 
 app.post('/api/notifications/ride-accepted', async (req, res) => {
-    try {
-        const { customerId, rideId, driverName } = req.body;
+    const decoded = await verifyFirebaseToken(req);
+    if (!decoded) return res.status(401).json({ success: false, error: 'Unauthorized' });
 
-        if (!customerId || !rideId) {
+    try {
+        const { rideId } = req.body;
+
+        if (!rideId) {
             return res.status(400).json({
                 success: false,
-                error: 'Missing required fields: customerId, rideId'
+                error: 'Missing required field: rideId'
             });
         }
+
+        const rideSnap = await db.collection('rides').doc(String(rideId)).get();
+        if (!rideSnap.exists) return res.status(404).json({ success: false, error: 'Ride not found' });
+        const ride = rideSnap.data();
+        if (ride.driverId !== decoded.uid) {
+            return res.status(403).json({ success: false, error: 'You are not the driver for this ride' });
+        }
+        const customerId = ride.customerId;
+        const driverName = ride.driverName;
 
         const customerDoc = await db.collection('users').doc(customerId).get();
 
@@ -401,15 +449,29 @@ app.post('/api/notifications/ride-accepted', async (req, res) => {
 });
 
 app.post('/api/notifications/ride-completed', async (req, res) => {
-    try {
-        const { customerId, rideId } = req.body;
+    const decoded = await verifyFirebaseToken(req);
+    if (!decoded) return res.status(401).json({ success: false, error: 'Unauthorized' });
 
-        if (!customerId || !rideId) {
+    try {
+        const { rideId } = req.body;
+
+        if (!rideId) {
             return res.status(400).json({
                 success: false,
-                error: 'Missing required fields: customerId, rideId'
+                error: 'Missing required field: rideId'
             });
         }
+
+        const rideSnap = await db.collection('rides').doc(String(rideId)).get();
+        if (!rideSnap.exists) return res.status(404).json({ success: false, error: 'Ride not found' });
+        const ride = rideSnap.data();
+        if (ride.driverId !== decoded.uid && ride.customerId !== decoded.uid) {
+            return res.status(403).json({ success: false, error: 'This ride does not belong to you' });
+        }
+        if (ride.status !== 'completed') {
+            return res.status(409).json({ success: false, error: 'Ride is not completed' });
+        }
+        const customerId = ride.customerId;
 
         const customerDoc = await db.collection('users').doc(customerId).get();
 
@@ -452,16 +514,31 @@ app.post('/api/notifications/ride-completed', async (req, res) => {
 });
 
 app.post('/api/notifications/notify-driver-arrived', async (req, res) => {
-    try {
-        const { customerId, driverName } = req.body;
-        console.log('📍 Driver arrival notification request:', { customerId, driverName });
+    const decoded = await verifyFirebaseToken(req);
+    if (!decoded) return res.status(401).json({ success: false, error: 'Unauthorized' });
 
-        if (!customerId || !driverName) {
+    try {
+        const { customerId } = req.body;
+
+        if (!customerId) {
             return res.status(400).json({
                 success: false,
-                error: 'Missing required fields: customerId, driverName'
+                error: 'Missing required field: customerId'
             });
         }
+
+        const activeRides = await db.collection('rides')
+            .where('driverId', '==', decoded.uid)
+            .where('customerId', '==', String(customerId))
+            .limit(20)
+            .get();
+        const activeRide = activeRides.docs
+            .map((d) => d.data())
+            .find((r) => r.status === 'accepted' || r.status === 'in_progress');
+        if (!activeRide) {
+            return res.status(403).json({ success: false, error: 'No active ride with this customer' });
+        }
+        const driverName = activeRide.driverName || 'Your driver';
 
         const customerDoc = await db.collection('users').doc(customerId).get();
 
@@ -508,18 +585,17 @@ app.post('/api/rides/rate', async (req, res) => {
     const decoded = await verifyFirebaseToken(req);
     if (!decoded) return res.status(401).json({ error: 'Unauthorized' });
 
-    const { rideId, driverId, rating, feedback } = req.body;
+    const { rideId, rating, feedback } = req.body;
 
-    if (!rideId || !driverId) {
-        return res.status(400).json({ error: 'rideId and driverId are required' });
+    if (!rideId) {
+        return res.status(400).json({ error: 'rideId is required' });
     }
     if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
         return res.status(400).json({ error: 'rating must be an integer 1–5' });
     }
 
     try {
-        const rideRef = db.collection('rides').doc(rideId);
-        const driverRef = db.collection('drivers').doc(driverId);
+        const rideRef = db.collection('rides').doc(String(rideId));
         const now = new Date();
 
         await db.runTransaction(async (txn) => {
@@ -532,10 +608,14 @@ app.post('/api/rides/rate', async (req, res) => {
             if (ride.customerId !== decoded.uid) {
                 throw Object.assign(new Error('Forbidden — not your ride'), { httpStatus: 403 });
             }
+            if (ride.status !== 'completed' || !ride.driverId) {
+                throw Object.assign(new Error('Only completed rides can be rated'), { httpStatus: 409 });
+            }
             if (ride.customerRating) {
                 throw Object.assign(new Error('Already rated'), { httpStatus: 409 });
             }
 
+            const driverRef = db.collection('drivers').doc(ride.driverId);
             const driverSnap = await txn.get(driverRef);
             const existingRatings = driverSnap.exists ? (driverSnap.data().ratings || []) : [];
             const updatedRatings = [...existingRatings, {
@@ -588,47 +668,15 @@ app.post('/api/payments/verify-ride-charge', async (req, res) => {
         return res.status(400).json({ error: 'transactionId and expectedAmount are required' });
     }
 
-    const secretKey = process.env.FLUTTERWAVE_SECRET_KEY;
-    if (!secretKey) {
-        return res.status(500).json({ error: 'Payment service not configured' });
-    }
-
     try {
-        const existingRide = await db.collection('rides')
-            .where('transactionId', '==', String(transactionId))
-            .limit(1)
-            .get();
-
-        if (!existingRide.empty) {
+        if (await isRideTransactionUsed(transactionId)) {
             return res.status(409).json({ error: 'This payment has already been used for a ride' });
         }
 
-        const result = await flutterwaveRequest(
-            `https://api.flutterwave.com/v3/transactions/${transactionId}/verify`,
-            { headers: { Authorization: `Bearer ${secretKey}` } }
-        );
-
-        if (result.status !== 'success' || !result.data) {
-            return res.status(402).json({ error: 'Could not verify this payment with Flutterwave' });
-        }
-
-        const payment = result.data;
-
-        // tx_ref is generated client-side as krides_ride_{customerId}_... (Payment.js) —
-        // without this, any authenticated user could "pay" for their own ride with any
-        // other successful, sufficiently-funded transactionId they happened to learn of,
-        // since nothing else in this response ties a Flutterwave transaction to a
-        // Firebase UID.
-        if (!payment.tx_ref || !payment.tx_ref.startsWith(`krides_ride_${decoded.uid}_`)) {
-            return res.status(403).json({ error: 'This payment does not belong to you' });
-        }
+        const payment = await fetchOwnedRidePayment(transactionId, decoded.uid);
 
         if (payment.status !== 'successful') {
             return res.status(402).json({ error: `Payment is not successful (status: ${payment.status})` });
-        }
-
-        if (payment.currency !== 'NGN') {
-            return res.status(402).json({ error: `Unexpected currency: ${payment.currency}` });
         }
 
         const paidAmount = Number(payment.amount);
@@ -640,16 +688,284 @@ app.post('/api/payments/verify-ride-charge', async (req, res) => {
 
         return res.json({ success: true, verified: true, amount: paidAmount });
     } catch (error) {
+        if (error.httpStatus) return res.status(error.httpStatus).json({ error: error.message });
         console.error('❌ verify-ride-charge error:', error.message);
         return res.status(500).json({ error: 'Could not verify payment. Please try again.' });
     }
+});
+
+// Looks up a Flutterwave ride charge and confirms it belongs to `uid`. tx_ref is
+// generated client-side as krides_ride_{customerId}_... (Payment.js); nothing else in
+// Flutterwave's response ties a transaction to a Firebase UID.
+async function fetchOwnedRidePayment(transactionId, uid) {
+    const secretKey = process.env.FLUTTERWAVE_SECRET_KEY;
+    if (!secretKey) throw Object.assign(new Error('Payment service not configured'), { httpStatus: 500 });
+
+    const result = await flutterwaveRequest(
+        `https://api.flutterwave.com/v3/transactions/${encodeURIComponent(String(transactionId))}/verify`,
+        { headers: { Authorization: `Bearer ${secretKey}` } }
+    );
+    if (result.status !== 'success' || !result.data) {
+        throw Object.assign(new Error('Could not verify this payment with Flutterwave'), { httpStatus: 402 });
+    }
+
+    const payment = result.data;
+    if (!payment.tx_ref || !payment.tx_ref.startsWith(`krides_ride_${uid}_`)) {
+        throw Object.assign(new Error('This payment does not belong to you'), { httpStatus: 403 });
+    }
+    if (payment.currency !== 'NGN') {
+        throw Object.assign(new Error(`Unexpected currency: ${payment.currency}`), { httpStatus: 402 });
+    }
+    return payment;
+}
+
+async function isRideTransactionUsed(transactionId) {
+    const id = String(transactionId);
+    const [usedSnap, legacyRide] = await Promise.all([
+        db.collection('usedRideTransactions').doc(id).get(),
+        db.collection('rides').where('transactionId', '==', id).limit(1).get(),
+    ]);
+    return usedSnap.exists || !legacyRide.empty;
+}
+
+const MAX_PASSENGERS = 4;
+
+function computeFare(pricing, passengers) {
+    const fee = passengers >= pricing.groupThreshold ? pricing.platformFeeGroup : pricing.platformFeeStandard;
+    return pricing.baseFarePerPassenger * passengers + fee;
+}
+
+function isValidCoords(c) {
+    return !!c &&
+        typeof c.latitude === 'number' && isFinite(c.latitude) && Math.abs(c.latitude) <= 90 &&
+        typeof c.longitude === 'number' && isFinite(c.longitude) && Math.abs(c.longitude) <= 180;
+}
+
+function cleanString(value, maxLength) {
+    return typeof value === 'string' ? value.trim().slice(0, maxLength) : '';
+}
+
+// Whitelists and validates client-supplied ride details. Money fields (amount,
+// paymentMethod, transactionId) are never taken from here.
+function sanitizeRideInput(input) {
+    if (!input || typeof input !== 'object') return { error: 'Ride details are required' };
+
+    const passengers = Number(input.numberOfPassengers);
+    if (!Number.isInteger(passengers) || passengers < 1 || passengers > MAX_PASSENGERS) {
+        return { error: `numberOfPassengers must be 1–${MAX_PASSENGERS}` };
+    }
+
+    const pickupLocation = cleanString(input.pickupLocation, 200);
+    const destination = cleanString(input.destination, 200);
+    if (!pickupLocation || !destination) return { error: 'Pickup and destination are required' };
+    if (!isValidCoords(input.pickupCoords) || !isValidCoords(input.destinationCoords)) {
+        return { error: 'Pickup and destination coordinates are invalid' };
+    }
+
+    const photo = typeof input.customerPhotoURL === 'string' && /^https:\/\//.test(input.customerPhotoURL)
+        ? input.customerPhotoURL.slice(0, 500)
+        : null;
+
+    return {
+        fields: {
+            customerName: cleanString(input.customerName, 100) || 'Customer',
+            customerPhone: cleanString(input.customerPhone, 20),
+            customerPhotoURL: photo,
+            pickupLocation,
+            pickupCoords: { latitude: input.pickupCoords.latitude, longitude: input.pickupCoords.longitude },
+            destination,
+            destinationCoords: { latitude: input.destinationCoords.latitude, longitude: input.destinationCoords.longitude },
+            numberOfPassengers: passengers,
+        },
+    };
+}
+
+function newRideDoc(rideId, customerId, fields, money) {
+    return {
+        id: rideId,
+        customerId,
+        ...fields,
+        ...money,
+        status: 'pending',
+        driverId: null,
+        driverName: null,
+        driverPhone: null,
+        vehicleId: null,
+        declined_by: [],
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        acceptedAt: null,
+        completedAt: null,
+        cancelledAt: null,
+    };
+}
+
+app.post('/api/rides/create', async (req, res) => {
+    const decoded = await verifyFirebaseToken(req);
+    if (!decoded) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { transactionId, ride: input } = req.body || {};
+    if (!transactionId) return res.status(400).json({ error: 'transactionId is required' });
+
+    const { fields, error: inputError } = sanitizeRideInput(input);
+    if (inputError) return res.status(400).json({ error: inputError });
+
+    try {
+        const pricing = await getPricingConfig();
+        const fare = computeFare(pricing, fields.numberOfPassengers);
+
+        if (await isRideTransactionUsed(transactionId)) {
+            return res.status(409).json({ error: 'This payment has already been used for a ride' });
+        }
+
+        const payment = await fetchOwnedRidePayment(transactionId, decoded.uid);
+        if (payment.status !== 'successful') {
+            return res.status(402).json({ error: `Payment is not successful (status: ${payment.status})` });
+        }
+        const paidAmount = Number(payment.amount);
+        if (!paidAmount || paidAmount < fare) {
+            return res.status(402).json({
+                error: `Amount paid (₦${paidAmount}) is less than the fare (₦${fare})`,
+                fare,
+            });
+        }
+
+        const txId = String(payment.id || transactionId);
+        const usedRef = db.collection('usedRideTransactions').doc(txId);
+        const rideRef = db.collection('rides').doc();
+        const rideDoc = newRideDoc(rideRef.id, decoded.uid, fields, {
+            amount: fare,
+            amountPaid: paidAmount,
+            paymentMethod: 'flutterwave',
+            transactionId: txId,
+        });
+
+        await db.runTransaction(async (txn) => {
+            const usedSnap = await txn.get(usedRef);
+            if (usedSnap.exists) {
+                throw Object.assign(new Error('This payment has already been used for a ride'), { httpStatus: 409 });
+            }
+            txn.create(usedRef, {
+                customerId: decoded.uid,
+                rideId: rideRef.id,
+                amountPaid: paidAmount,
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+            txn.set(rideRef, rideDoc);
+        });
+
+        console.log(`✅ Card ride created: rideId=${rideRef.id} customer=${decoded.uid} fare=₦${fare} paid=₦${paidAmount}`);
+        res.json({ success: true, rideId: rideRef.id, amount: fare });
+
+        notifyOnlineDrivers(rideRef.id, rideDoc).catch((err) => {
+            console.warn(`⚠️ Driver notification failed for ride ${rideRef.id}:`, err.message);
+            rideRef.update({ notificationFailed: true }).catch(() => {});
+        });
+    } catch (error) {
+        if (error.httpStatus) return res.status(error.httpStatus).json({ error: error.message });
+        console.error('❌ rides/create error:', error);
+        return res.status(500).json({ error: 'Could not create ride. Please try again.' });
+    }
+});
+
+const CANCELLABLE_STATUSES = new Set(['pending', 'accepted', 'in_progress']);
+
+app.post('/api/rides/cancel', async (req, res) => {
+    const decoded = await verifyFirebaseToken(req);
+    if (!decoded) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { rideId, reason } = req.body || {};
+    if (!rideId) return res.status(400).json({ error: 'rideId is required' });
+
+    const rideRef = db.collection('rides').doc(String(rideId));
+    let ride;
+    let cancelledBy;
+
+    try {
+        ride = await db.runTransaction(async (txn) => {
+            const snap = await txn.get(rideRef);
+            if (!snap.exists) throw Object.assign(new Error('Ride not found'), { httpStatus: 404 });
+            const data = snap.data();
+
+            if (data.customerId === decoded.uid) cancelledBy = 'customer';
+            else if (data.driverId && data.driverId === decoded.uid) cancelledBy = 'driver';
+            else throw Object.assign(new Error('This ride does not belong to you'), { httpStatus: 403 });
+
+            if (data.status === 'cancelled') throw Object.assign(new Error('ALREADY_CANCELLED'), { code: 'ALREADY_CANCELLED' });
+            if (data.refundProcessing === true) throw Object.assign(new Error('REFUND_IN_PROGRESS'), { code: 'REFUND_IN_PROGRESS' });
+            if (!CANCELLABLE_STATUSES.has(data.status)) {
+                throw Object.assign(new Error(`Cannot cancel a ride with status: ${data.status}`), { httpStatus: 409 });
+            }
+
+            const update = {
+                status: 'cancelled',
+                cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
+                cancelledBy,
+                refundProcessing: true,
+            };
+            const cleanReason = cleanString(reason, 200);
+            if (cleanReason) update.cancellationReason = cleanReason;
+            txn.update(rideRef, update);
+            return data;
+        });
+    } catch (error) {
+        if (error.code === 'ALREADY_CANCELLED') return res.json({ success: true, status: 'cancelled', alreadyCancelled: true });
+        if (error.code === 'REFUND_IN_PROGRESS') return res.json({ success: true, status: 'pending', refundProcessing: true });
+        if (error.httpStatus) return res.status(error.httpStatus).json({ error: error.message });
+        console.error('❌ rides/cancel transaction error:', error);
+        return res.status(500).json({ error: 'Could not cancel ride. Please try again.' });
+    }
+
+    const updates = {};
+    const amount = Number(ride.amount) || 0;
+
+    if (ride.paymentMethod === 'flutterwave' && ride.transactionId) {
+        try {
+            const refund = await refundFlutterwaveTransaction(ride.transactionId, null, `Ride cancelled by ${cancelledBy}`);
+            updates.refundId = refund?.id ?? null;
+            updates.refundAmount = Number(ride.amountPaid) || amount;
+            if (refund?.status === 'completed') {
+                updates.refundStatus = 'completed';
+                updates.refundedAt = admin.firestore.FieldValue.serverTimestamp();
+            } else {
+                updates.refundStatus = 'pending';
+            }
+        } catch (err) {
+            console.error(`❌ Refund failed for cancelled ride ${rideId}:`, err.message);
+            updates.refundStatus = 'failed';
+            updates.refundError = err.message;
+        }
+    } else if (ride.paymentMethod === 'flutterwave') {
+        updates.refundStatus = 'needs_review';
+        updates.needsManualRefundReview = true;
+        updates.refundReviewReason = 'Flutterwave transactionId missing at cancellation time';
+    } else if (ride.paymentMethod === 'wallet' && ride.customerId && amount > 0) {
+        try {
+            await refundWalletForRide(rideRef, ride.customerId, amount, `Ride cancelled by ${cancelledBy}`);
+            updates.walletRefundStatus = 'completed';
+            updates.refundAmount = amount;
+        } catch (err) {
+            console.error(`❌ Wallet refund failed for cancelled ride ${rideId}:`, err.message);
+            updates.walletRefundStatus = 'failed';
+            updates.walletRefundError = err.message;
+        }
+    }
+
+    try {
+        await rideRef.update({ ...updates, refundProcessing: false });
+    } catch (err) {
+        console.error(`❌ Could not record refund outcome for ride ${rideId}:`, err.message);
+    }
+
+    const { refundedAt, ...responseUpdates } = updates;
+    console.log(`✅ Ride ${rideId} cancelled by ${cancelledBy}`, responseUpdates);
+    return res.json({ success: true, status: 'cancelled', cancelledBy, ...responseUpdates });
 });
 
 app.post('/api/payments/refund', async (req, res) => {
     const decoded = await verifyFirebaseToken(req);
     if (!decoded) return res.status(401).json({ error: 'Unauthorized' });
 
-    const { transactionId, rideId, amount, comments } = req.body;
+    const { transactionId, rideId, comments } = req.body;
 
     if (!transactionId && !rideId) {
         return res.status(400).json({ error: 'transactionId or rideId is required' });
@@ -660,23 +976,45 @@ app.post('/api/payments/refund', async (req, res) => {
         return res.status(500).json({ error: 'Payment service not configured' });
     }
 
-    let refundTransactionId = transactionId;
-    if (rideId) {
-        const rideSnap = await db.collection('rides').doc(rideId).get();
-        if (!rideSnap.exists) return res.status(404).json({ error: 'Ride not found' });
-        const ride = rideSnap.data();
-        if (ride.customerId !== decoded.uid && ride.driverId !== decoded.uid) {
-            return res.status(403).json({ error: 'This ride does not belong to you' });
+    let refundTransactionId;
+    try {
+        if (rideId) {
+            const rideSnap = await db.collection('rides').doc(String(rideId)).get();
+            if (!rideSnap.exists) return res.status(404).json({ error: 'Ride not found' });
+            const ride = rideSnap.data();
+            if (ride.customerId !== decoded.uid && ride.driverId !== decoded.uid) {
+                return res.status(403).json({ error: 'This ride does not belong to you' });
+            }
+            if (!ride.transactionId || ride.paymentMethod !== 'flutterwave') {
+                return res.status(400).json({ error: 'This ride has no card payment to refund' });
+            }
+            // Only cancelled rides are refundable. refundProcessing marks a cancellation the
+            // previous app version had started but not yet written as 'cancelled'.
+            const cancelling = ride.status === 'cancelled' ||
+                (ride.refundProcessing === true && (ride.status === 'pending' || ride.status === 'accepted'));
+            if (!cancelling) {
+                return res.status(409).json({ error: `Cannot refund a ride with status: ${ride.status}` });
+            }
+            if (ride.refundStatus === 'completed' || (ride.refundStatus === 'pending' && ride.refundId)) {
+                return res.status(409).json({ error: 'This ride has already been refunded' });
+            }
+            refundTransactionId = ride.transactionId;
+        } else {
+            // A charge with no ride behind it (booking failed after payment).
+            await fetchOwnedRidePayment(transactionId, decoded.uid);
+            if (await isRideTransactionUsed(transactionId)) {
+                return res.status(409).json({ error: 'This payment is attached to a ride — cancel the ride instead' });
+            }
+            refundTransactionId = String(transactionId);
         }
-        if (!ride.transactionId) {
-            return res.status(400).json({ error: 'This ride has no transaction to refund' });
-        }
-        refundTransactionId = ride.transactionId;
+    } catch (error) {
+        if (error.httpStatus) return res.status(error.httpStatus).json({ error: error.message });
+        console.error('❌ refund pre-check error:', error);
+        return res.status(500).json({ success: false, error: 'Payment service unavailable. Please try again.' });
     }
 
     try {
-        const payload = { comments: comments || 'Ride cancelled' };
-        if (amount) payload.amount = amount;
+        const payload = { comments: cleanString(comments, 200) || 'Ride cancelled' };
 
         const result = await flutterwaveRequest(`https://api.flutterwave.com/v3/transactions/${refundTransactionId}/refund`, {
             method: 'POST',
@@ -716,7 +1054,18 @@ app.get('/api/payments/refund/:refundId', async (req, res) => {
     }
 
     try {
-        const result = await flutterwaveRequest(`https://api.flutterwave.com/v3/refunds/${refundId}`, {
+        const rideId = typeof req.query.rideId === 'string' ? req.query.rideId : null;
+        let rideRef = null;
+        if (rideId) {
+            rideRef = db.collection('rides').doc(rideId);
+            const rideSnap = await rideRef.get();
+            const ride = rideSnap.exists ? rideSnap.data() : null;
+            if (!ride || (ride.customerId !== decoded.uid && ride.driverId !== decoded.uid) || String(ride.refundId) !== String(refundId)) {
+                return res.status(403).json({ success: false, error: 'This refund does not belong to you' });
+            }
+        }
+
+        const result = await flutterwaveRequest(`https://api.flutterwave.com/v3/refunds/${encodeURIComponent(refundId)}`, {
             headers: {
                 Authorization: `Bearer ${secretKey}`,
                 'Content-Type': 'application/json',
@@ -724,7 +1073,14 @@ app.get('/api/payments/refund/:refundId', async (req, res) => {
         });
 
         if (result.status === 'success') {
-            res.json({ success: true, status: result.data.status, data: result.data });
+            const status = result.data?.status;
+            if (rideRef && status === 'completed') {
+                await rideRef.update({
+                    refundStatus: 'completed',
+                    refundedAt: admin.firestore.FieldValue.serverTimestamp(),
+                }).catch((err) => console.warn(`⚠️ Could not record completed refund on ride ${rideId}:`, err.message));
+            }
+            res.json({ success: true, status, data: { status } });
         } else {
             res.status(400).json({ success: false, error: result.message });
         }
@@ -769,9 +1125,13 @@ app.post('/api/payments/create-subaccount', async (req, res) => {
         }
 
         const verifiedAccountName = resolveResult.data.account_name;
+        const verifiedBankName = cleanString(req.body.bankName, 100) || null;
 
         const driverSnap = await db.collection('drivers').doc(decoded.uid).get();
-        const existing = driverSnap.exists ? driverSnap.data() : null;
+        if (!driverSnap.exists) {
+            return res.status(403).json({ error: 'Only driver accounts can add payout bank details' });
+        }
+        const existing = driverSnap.data();
         let isUpdate = !!(existing?.subaccountId && existing?.bankCode === bankCode);
 
         const createPayload = {
@@ -823,7 +1183,21 @@ app.post('/api/payments/create-subaccount', async (req, res) => {
 
         if (result.status === 'success') {
             const subaccountId = result.data?.subaccount_id || (isUpdate ? existing.subaccountId : undefined);
-            res.json({ success: true, data: { ...result.data, subaccount_id: subaccountId, verified_account_name: verifiedAccountName } });
+            const bankName = result.data?.bank_name || verifiedBankName || existing?.bankName || null;
+
+            // Bank details are written here, after Flutterwave confirmed the account, rather
+            // than by the app — so bankDetailsVerified actually means verified.
+            await db.collection('drivers').doc(decoded.uid).set({
+                bankName,
+                bankCode,
+                accountNumber,
+                accountName: verifiedAccountName,
+                subaccountId: subaccountId || null,
+                subaccountCreatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                bankDetailsVerified: true,
+            }, { merge: true });
+
+            res.json({ success: true, data: { ...result.data, bank_name: bankName, subaccount_id: subaccountId, verified_account_name: verifiedAccountName } });
         } else {
             res.status(400).json({ error: result.message || (isUpdate ? 'Subaccount update failed' : 'Subaccount creation failed') });
         }
@@ -939,7 +1313,7 @@ setInterval(() => {
     }
 }, 30 * 60 * 1000);
 
-app.post('/api/auth/driver-email', async (req, res) => {
+app.post('/api/auth/driver-email', lookupLimiter.middleware, async (req, res) => {
     const { phone } = req.body;
     if (!phone || typeof phone !== 'string' || !phone.trim()) {
         return res.status(400).json({ error: 'phone is required' });
@@ -983,7 +1357,7 @@ app.post('/api/auth/driver-email', async (req, res) => {
     }
 });
 
-app.post('/api/auth/check-phone', async (req, res) => {
+app.post('/api/auth/check-phone', lookupLimiter.middleware, async (req, res) => {
     const { phone } = req.body;
     if (!phone || typeof phone !== 'string' || !phone.trim()) {
         return res.status(400).json({ error: 'phone is required' });
@@ -1019,10 +1393,14 @@ app.post('/api/auth/check-phone', async (req, res) => {
 
 
 app.post('/api/wallet/create-topup-account', async (req, res) => {
-    const { userId, email, name, amount } = req.body;
+    const decoded = await verifyFirebaseToken(req);
+    if (!decoded) return res.status(401).json({ error: 'Unauthorized' });
 
-    if (!userId || !email || !amount) {
-        return res.status(400).json({ error: 'userId, email, and amount are required' });
+    const { email, name, amount } = req.body;
+    const userId = decoded.uid;
+
+    if (!email || !amount) {
+        return res.status(400).json({ error: 'email and amount are required' });
     }
 
     const parsedAmount = Number(amount);
@@ -1170,8 +1548,7 @@ app.post('/api/wallet/webhook', async (req, res) => {
         return res.sendStatus(500);
     }
 
-    const signature = req.headers['verif-hash'];
-    if (!signature || signature !== webhookSecret) {
+    if (!safeEqual(req.headers['verif-hash'], webhookSecret)) {
         console.warn('🚫 Webhook rejected: invalid verif-hash');
         return res.sendStatus(401);
     }
@@ -1400,9 +1777,22 @@ app.post('/api/wallet/pay-ride', async (req, res) => {
         return res.status(401).json({ error: 'Invalid or expired session. Please log in again.' });
     }
 
-    const amount = Number(rideData.amount);
-    if (!amount || amount <= 0) {
-        return res.status(400).json({ error: 'Invalid fare amount' });
+    const { fields, error: inputError } = sanitizeRideInput(rideData);
+    if (inputError) {
+        return res.status(400).json({ error: inputError });
+    }
+
+    let amount;
+    try {
+        amount = computeFare(await getPricingConfig(), fields.numberOfPassengers);
+    } catch (err) {
+        console.error('❌ pay-ride pricing error:', err);
+        return res.status(500).json({ error: 'Could not process payment. Please try again.' });
+    }
+
+    // The app shows the customer a price before they confirm; never charge a different one.
+    if (rideData.amount !== undefined && Number(rideData.amount) !== amount) {
+        return res.status(409).json({ error: 'price_changed', fare: amount });
     }
 
     try {
@@ -1416,26 +1806,11 @@ app.post('/api/wallet/pay-ride', async (req, res) => {
             const balance = userSnap.data().walletBalance || 0;
             if (balance < amount) throw new Error(`INSUFFICIENT_BALANCE:${balance}`);
 
-            txn.set(rideRef, {
-                customerId: userId,
-                customerName: (rideData.customerName || 'Customer').trim(),
-                customerPhone: (rideData.customerPhone || '').trim(),
-                pickupLocation: (rideData.pickupLocation || '').trim(),
-                pickupCoords: rideData.pickupCoords || null,
-                destination: (rideData.destination || '').trim(),
-                destinationCoords: rideData.destinationCoords || null,
-                numberOfPassengers: rideData.numberOfPassengers || 1,
+            txn.set(rideRef, newRideDoc(rideRef.id, userId, fields, {
                 amount,
                 paymentMethod: 'wallet',
                 transactionId: null,
-                status: 'pending',
-                driverId: null,
-                driverName: null,
-                driverPhone: null,
-                vehicleId: null,
-                declined_by: [],
-                createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            });
+            }));
 
             txn.update(userRef, {
                 walletBalance: admin.firestore.FieldValue.increment(-amount),
@@ -1672,7 +2047,11 @@ app.post('/api/payments/wallet-refund', async (req, res) => {
             return res.status(400).json({ error: 'This ride was not paid via wallet' });
         }
 
-        if (ride.refundProcessing !== true && ride.status !== 'cancelled') {
+        // refundProcessing marks a cancellation the previous app version had started but
+        // not yet written as 'cancelled'; it never applies once a driver has started the ride.
+        const cancelling = ride.status === 'cancelled' ||
+            (ride.refundProcessing === true && (ride.status === 'pending' || ride.status === 'accepted'));
+        if (!cancelling) {
             return res.status(400).json({ error: `Cannot refund ride with status: ${ride.status}` });
         }
 
@@ -1706,7 +2085,7 @@ app.post('/api/payments/wallet-refund', async (req, res) => {
             const currentBalance = Number(userSnap.data().walletBalance) || 0;
             txn.update(userRef, { walletBalance: currentBalance + refundedAmount });
 
-            const txRef = db.collection('walletTransactions').doc();
+            const txRef = userRef.collection('walletTransactions').doc();
             txn.set(txRef, {
                 userId: ride.customerId,
                 type: 'refund',
@@ -1870,7 +2249,7 @@ async function refundWalletForRide(rideRef, customerId, amount, description) {
         const currentBalance = Number(userSnap.data().walletBalance) || 0;
         txn.update(userRef, { walletBalance: currentBalance + amount });
 
-        const txRef = db.collection('walletTransactions').doc();
+        const txRef = userRef.collection('walletTransactions').doc();
         txn.set(txRef, {
             userId: customerId,
             type: 'refund',
@@ -1934,7 +2313,7 @@ async function sweepStalePendingRides() {
                     refunded = true;
                 } else if (amount > 0 && ride.paymentMethod === 'flutterwave' && ride.transactionId) {
                     refundAttempted = true;
-                    await refundFlutterwaveTransaction(ride.transactionId, amount, 'No driver accepted the ride in time');
+                    await refundFlutterwaveTransaction(ride.transactionId, null, 'No driver accepted the ride in time');
                     await rideRef.update({ refundStatus: 'completed', refundedAt: admin.firestore.FieldValue.serverTimestamp() });
                     refunded = true;
                 } else if (amount > 0 && ride.paymentMethod === 'flutterwave' && !ride.transactionId) {
@@ -2021,7 +2400,7 @@ async function retryFlutterwaveRefund(rideDoc) {
 
     try {
         console.log(`🔁 Retrying refund for ride ${rideDoc.id} (attempt ${attempts + 1}/${REFUND_RETRY_MAX_ATTEMPTS})`);
-        await refundFlutterwaveTransaction(ride.transactionId, ride.refundAmount || ride.amount, 'Retry of previously failed refund');
+        await refundFlutterwaveTransaction(ride.transactionId, null, 'Retry of previously failed refund');
         await rideRef.update({
             refundStatus: 'completed',
             refundedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -2184,7 +2563,8 @@ setInterval(retryFailedPayouts, PAYOUT_RETRY_SWEEP_INTERVAL_MS);
 
 app.post('/admin-api/login', (req, res) => {
     const { password } = req.body || {};
-    if (password !== ADMIN_API_KEY) {
+    if (!safeEqual(password, ADMIN_API_KEY)) {
+        adminAuthFailures.record(req.ip);
         return res.status(401).json({ error: 'Incorrect password' });
     }
     res.json({ success: true });
