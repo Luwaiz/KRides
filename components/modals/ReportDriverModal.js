@@ -18,6 +18,7 @@ import { colors } from "../../constants/styling";
 import { sp, fs, br, wp } from "../../constants/responsive";
 import { FIREBASE_AUTH } from "../../firebaseConfig";
 import { NOTIFICATION_API_KEY } from "@env";
+import { API_BASE_URL } from "../../constants/server";
 
 const { width } = Dimensions.get("screen");
 
@@ -30,7 +31,7 @@ const REPORT_REASONS = [
 	"Other",
 ];
 
-const SERVER_URL = "https://krides.onrender.com/api/reports";
+const SERVER_URL = `${API_BASE_URL}/reports`;
 
 const ReportDriverModal = ({ visible, onClose, history }) => {
 	const [selectedReason, setSelectedReason] = useState(null);

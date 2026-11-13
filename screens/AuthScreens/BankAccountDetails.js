@@ -20,9 +20,11 @@ import BackButton from "../../components/buttons/BackButton";
 import { Picker } from "@react-native-picker/picker";
 import { FIREBASE_DB, FIREBASE_AUTH } from "../../firebaseConfig";
 import { doc, updateDoc } from "firebase/firestore";
-const PAYMENTS_SERVER_URL = 'https://krides.onrender.com/api/payments';
 import { NOTIFICATION_API_KEY } from "@env";
 import { useDriverDetails } from "../../constants/Store";
+import { API_BASE_URL } from "../../constants/server";
+
+const PAYMENTS_SERVER_URL = `${API_BASE_URL}/payments`;
 const NIGERIAN_BANKS = [
     { label: "Access Bank", value: "044" },
     { label: "Guaranty Trust Bank", value: "058" },

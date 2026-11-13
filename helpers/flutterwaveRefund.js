@@ -1,7 +1,8 @@
 import { NOTIFICATION_API_KEY } from "@env";
 import { FIREBASE_AUTH } from "../firebaseConfig";
+import { API_BASE_URL } from "../constants/server";
 
-const SERVER_URL = 'https://krides.onrender.com/api';
+const SERVER_URL = API_BASE_URL;
 const PAYMENTS_SERVER_URL = `${SERVER_URL}/payments`;
 const FETCH_TIMEOUT_MS = 10000;
 const BOOKING_TIMEOUT_MS = 30000;

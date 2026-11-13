@@ -19,6 +19,7 @@ import { NOTIFICATION_API_KEY } from "@env";
 import { DrawerActions, useNavigation } from "@react-navigation/native";
 import { calculateDriverEarnings } from "../../constants/commission";
 import { notifyCustomerDriverArrived, notifyCustomerRideCancelled } from "../../helpers/notificationHelpers";
+import { API_BASE_URL } from "../../constants/server";
 
 const AcceptTab = () => {
 	const [endRide, setEndRide] = useState(false);
@@ -148,7 +149,7 @@ const AcceptTab = () => {
 		const timeoutId = setTimeout(() => controller.abort(), 20000);
 		try {
 			const idToken = await FIREBASE_AUTH.currentUser.getIdToken();
-			const response = await fetch('https://krides.onrender.com/api/payments/complete-ride', {
+			const response = await fetch(`${API_BASE_URL}/payments/complete-ride`, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',

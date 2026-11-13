@@ -23,8 +23,9 @@ import {
 } from "firebase/firestore";
 import { FIREBASE_APP, FIREBASE_DB, FIREBASE_AUTH } from "../firebaseConfig";
 import { NOTIFICATION_API_KEY } from "@env";
+import { SERVER_URL } from "../constants/server";
 
-const NOTIFICATION_SERVER = 'https://krides.onrender.com';
+const NOTIFICATION_SERVER = SERVER_URL;
 
 
 export async function signInWithEmail(email, password) {

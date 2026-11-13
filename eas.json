@@ -9,7 +9,7 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "NOTIFICATION_SERVER_URL": "https://krides.onrender.com/api/notifications",
+        "NOTIFICATION_SERVER_URL": "https://krides-scc5.onrender.com/api/notifications",
         "FIREBASE_AUTH_DOMAIN": "kampusride.firebaseapp.com",
         "FIREBASE_PROJECT_ID": "kampusride",
         "FIREBASE_STORAGE_BUCKET": "kampusride.firebasestorage.app",
@@ -32,7 +32,7 @@
         "buildType": "apk"
       },
       "env": {
-        "NOTIFICATION_SERVER_URL": "https://krides.onrender.com/api/notifications",
+        "NOTIFICATION_SERVER_URL": "https://krides-scc5.onrender.com/api/notifications",
         "FIREBASE_AUTH_DOMAIN": "kampusride.firebaseapp.com",
         "FIREBASE_PROJECT_ID": "kampusride",
         "FIREBASE_STORAGE_BUCKET": "kampusride.firebasestorage.app",
@@ -60,7 +60,7 @@
         "image": "latest"
       },
       "env": {
-        "NOTIFICATION_SERVER_URL": "https://krides.onrender.com/api/notifications",
+        "NOTIFICATION_SERVER_URL": "https://krides-scc5.onrender.com/api/notifications",
         "FIREBASE_AUTH_DOMAIN": "kampusride.firebaseapp.com",
         "FIREBASE_PROJECT_ID": "kampusride",
         "FIREBASE_STORAGE_BUCKET": "kampusride.firebasestorage.app",

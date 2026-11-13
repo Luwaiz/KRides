@@ -61,8 +61,9 @@ import { sp, fs, br, wp, ms } from "../../constants/responsive";
 import { FIREBASE_AUTH } from "../../firebaseConfig";
 import { NOTIFICATION_API_KEY } from "@env";
 import ReportDriverModal from "./ReportDriverModal";
+import { API_BASE_URL } from "../../constants/server";
 
-const RATINGS_URL = 'https://krides.onrender.com/api/rides/rate';
+const RATINGS_URL = `${API_BASE_URL}/rides/rate`;
 
 const { width } = Dimensions.get("screen");
 

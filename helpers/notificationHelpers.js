@@ -1,8 +1,9 @@
 import axios from 'axios';
 import { NOTIFICATION_API_KEY } from '@env';
 import { FIREBASE_AUTH } from '../firebaseConfig';
+import { API_BASE_URL } from '../constants/server';
 
-const NOTIFICATION_SERVER_URL = 'https://krides.onrender.com/api/notifications';
+const NOTIFICATION_SERVER_URL = `${API_BASE_URL}/notifications`;
 
 const api = axios.create({
     headers: { 'x-api-key': NOTIFICATION_API_KEY || '' },

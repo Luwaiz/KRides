@@ -21,8 +21,9 @@ import { colors } from "../../constants/styling";
 import notificationManager from "../../helpers/notificationManager";
 import { NOTIFICATION_API_KEY } from "@env";
 import { wp } from "../../constants/responsive";
+import { API_BASE_URL } from "../../constants/server";
 
-const SERVER_URL = 'https://krides.onrender.com/api';
+const SERVER_URL = API_BASE_URL;
 
 const Confirmation1 = ({ modal, setModal, title }) => {
 	const navigation = useNavigation();
