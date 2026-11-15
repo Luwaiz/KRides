@@ -11,7 +11,7 @@ import {
 	Alert
 } from "react-native";
 import { AntDesign, Ionicons } from "@expo/vector-icons";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import DismissKeyboardView from "./DismissKeyboardView";
 import { colors } from "../constants/styling";
 import { maxContentWidth } from "../constants/responsive";
@@ -191,6 +191,9 @@ const LocationPicker = ({
 			transparent={false}
 			onRequestClose={onClose}
 		>
+			{/* A Modal is a separate native window on iOS, outside the app's provider, so
+			    it needs its own for SafeAreaView to see the status-bar inset. */}
+			<SafeAreaProvider>
 			<DismissKeyboardView>
 			<SafeAreaView style={styles.container}>
 				{}
@@ -256,6 +259,7 @@ const LocationPicker = ({
 				)}
 			</SafeAreaView>
 			</DismissKeyboardView>
+			</SafeAreaProvider>
 		</Modal>
 	);
 };
