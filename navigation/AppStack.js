@@ -19,26 +19,31 @@ const Stack = createNativeStackNavigator();
 const AppStack = () => {
 	const hasPhone = useAuthStore((state) => !!state.profile?.phone);
 
+	// Screens are defined conditionally rather than picked with initialRouteName: this stack
+	// mounts before the profile has loaded, and initialRouteName is only read once, so it
+	// would stay on the phone screen. This way it swaps to Home once the profile has a phone.
 	return (
-		<Stack.Navigator
-			screenOptions={{ headerShown: false }}
-			initialRouteName={hasPhone ? "Home" : "CompletePhoneNumber"}
-		>
-			<Stack.Screen name="Home" component={MainPage} />
-			<Stack.Screen name="CompletePhoneNumber" component={CompletePhoneNumber} />
-			<Stack.Screen name="Wallet" component={Wallet} />
-			<Stack.Screen
-				name="Settings"
-				component={Settings}
-				options={{ animation: "slide_from_left" }}
-			/>
-			<Stack.Screen name="Support" component={Support} />
-			<Stack.Screen name="About" component={About} />
-			<Stack.Screen name="History" component={History} />
-			<Stack.Screen name="Profile" component={ProfilePage} />
-			<Stack.Screen name="Destinations" component={PickDestination} />
-			<Stack.Screen name="Passenger" component={Passenger} />
-			<Stack.Screen name="Promo" component={Promo} />
+		<Stack.Navigator screenOptions={{ headerShown: false }}>
+			{hasPhone ? (
+				<>
+					<Stack.Screen name="Home" component={MainPage} />
+					<Stack.Screen name="Wallet" component={Wallet} />
+					<Stack.Screen
+						name="Settings"
+						component={Settings}
+						options={{ animation: "slide_from_left" }}
+					/>
+					<Stack.Screen name="Support" component={Support} />
+					<Stack.Screen name="About" component={About} />
+					<Stack.Screen name="History" component={History} />
+					<Stack.Screen name="Profile" component={ProfilePage} />
+					<Stack.Screen name="Destinations" component={PickDestination} />
+					<Stack.Screen name="Passenger" component={Passenger} />
+					<Stack.Screen name="Promo" component={Promo} />
+				</>
+			) : (
+				<Stack.Screen name="CompletePhoneNumber" component={CompletePhoneNumber} />
+			)}
 		</Stack.Navigator>
 	);
 };

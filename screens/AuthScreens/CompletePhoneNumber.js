@@ -11,7 +11,7 @@ import useAuthStore, { useUserDetails } from "../../constants/Store";
 import { FIREBASE_DB } from "../../firebaseConfig";
 import { doc, updateDoc } from "firebase/firestore";
 
-const CompletePhoneNumber = ({ navigation }) => {
+const CompletePhoneNumber = () => {
 	const [phone, setPhone] = useState("");
 	const [loading, setLoading] = useState(false);
 
@@ -41,10 +41,9 @@ const CompletePhoneNumber = ({ navigation }) => {
 				phone: normalizedPhone,
 			});
 
-			setAuthData(user, { ...profile, phone: normalizedPhone }, "customer");
 			setUserPhone(normalizedPhone);
-
-			navigation.replace("Home");
+			// AppStack switches to Home on its own once the profile has a phone.
+			setAuthData(user, { ...profile, phone: normalizedPhone }, "customer");
 		} catch (error) {
 			console.error("❌ Error saving phone number:", error);
 			Alert.alert("Error", "Could not save your phone number. Please try again.");
