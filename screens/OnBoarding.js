@@ -43,7 +43,7 @@ const OnBoarding = ({ navigation, onFinish }) => {
 	const navigateToHome = () => markSeenAndNavigate();
 
 	return (
-		<SafeAreaView style={styles.container}>
+		<SafeAreaView style={styles.container} edges={["bottom"]}>
 			<FlatList
 				ref={slideRef}
 				data={OnBoard}
@@ -93,6 +93,7 @@ export default OnBoarding;
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
+		backgroundColor: "#fff",
 	},
 	indicator: {
 		width,
