@@ -56,6 +56,14 @@ const Navigation = () => {
 
 				setUser(currentUser);
 
+				// Anyone who has signed in is past onboarding. The flag is otherwise only saved
+				// from the onboarding screen itself, so users who never went through it (signed
+				// in on an older build, or restored a session) would see it after logging out.
+				if (currentUser) {
+					setHasSeenOnboarding(true);
+					AsyncStorage.setItem('has_seen_onboarding', 'true').catch(() => {});
+				}
+
 				const currentRole = useAuthStore.getState().role;
 				if (currentUser && !currentRole) {
 					try {
