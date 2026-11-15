@@ -5,7 +5,7 @@ import { API_BASE_URL } from "../constants/server";
 const SERVER_URL = API_BASE_URL;
 const PAYMENTS_SERVER_URL = `${SERVER_URL}/payments`;
 const FETCH_TIMEOUT_MS = 10000;
-const BOOKING_TIMEOUT_MS = 30000;
+const BOOKING_TIMEOUT_MS = 60000; // allows for an idle server waking up
 
 function fetchWithTimeout(url, options = {}, timeoutMs = FETCH_TIMEOUT_MS) {
     const controller = new AbortController();

@@ -83,7 +83,13 @@ const Login = ({ navigation }) => {
 				});
 			}
 		} catch (error) {
+			if (error.cancelled) return;
 			console.error('❌ Google Sign-In Error:', error);
+			// Firebase sign-in already succeeded by the time the role check fails, so sign
+			// back out; otherwise the account would be let in despite the message.
+			if (error.code === 'auth/wrong-role-account') {
+				await Firebase.signOut();
+			}
 			Alert.alert("Sign-In Failed", error.message || 'Google Sign-In failed. Please try again.');
 		}
 	};

@@ -8,7 +8,7 @@ import TextInput1 from "../../components/TextInput1";
 import ActiveButton from "../../components/buttons/ActiveButton";
 import Terms from "../../components/Terms";
 import BackButton from "../../components/buttons/BackButton";
-import { useDriverDetails } from "../../constants/Store";
+import useAuthStore, { useDriverDetails } from "../../constants/Store";
 import Firebase from "../../hooks/Firebase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -20,12 +20,6 @@ const DriverSignup = ({ navigation }) => {
 	const [fullName, setFull] = useState("");
 	const [confirmPassword, setConfirmPassword] = useState("");
 	const [loading, setLoading] = useState(false);
-
-	const { setVehicleId, setPhone, setFullName } = useDriverDetails((state) => ({
-		setVehicleId: state.setVehicleId,
-		setPhone: state.setPhone,
-		setFullName: state.setFullName,
-	}));
 
 	const isPhoneValid = (phone) => {
 		const phoneRegex = /^\+?\d{7,15}$/;
@@ -142,9 +136,20 @@ const DriverSignup = ({ navigation }) => {
 
 			console.log("✅ Driver account created:", user.uid);
 
-			setFullName(fullName);
-			setVehicleId(vehicle_id);
-			setPhone(normalizedPhone);
+			// The auth listener can run before the driver profile has been saved, and then it
+			// leaves the role unset (the loading screen would never go away). Set it here now
+			// that the profile exists. The driver screens open on bank details from there.
+			const profile = {
+				uid: user.uid,
+				fullname: fullName,
+				email,
+				phone: normalizedPhone,
+				vehicle_id,
+				role: "driver",
+			};
+			useDriverDetails.getState().setDriverProfile(profile);
+			useAuthStore.getState().setAuthData(user, profile, "driver");
+			AsyncStorage.removeItem('pending_role').catch(() => {});
 
 			try {
 				await Firebase.registerFcmToken(user.uid);
@@ -153,7 +158,6 @@ const DriverSignup = ({ navigation }) => {
 			}
 
 			setLoading(false);
-			navigation.replace("BankAccountDetails");
 		} catch (error) {
 			console.error("❌ Driver signup error:", error.code, error.message);
 			setLoading(false);

@@ -14,7 +14,8 @@ import useAuthStore, {
 	useDriverDetails,
 	useUserDetails,
 } from "../../constants/Store";
-import { FIREBASE_AUTH } from "../../firebaseConfig";
+import { FIREBASE_AUTH, FIREBASE_DB } from "../../firebaseConfig";
+import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import Toast from "react-native-toast-message";
 import { colors } from "../../constants/styling";
@@ -96,7 +97,22 @@ const Confirmation1 = ({ modal, setModal, title }) => {
 			const currentUser = FIREBASE_AUTH.currentUser;
 			if (currentUser) {
 				const { role } = useAuthStore.getState();
-				await notificationManager.cleanup(currentUser.uid, role);
+				const tasks = [notificationManager.cleanup(currentUser.uid, role)];
+				// Take the driver offline, or the server keeps sending them ride requests.
+				if (role === "driver") {
+					tasks.push(
+						updateDoc(doc(FIREBASE_DB, "drivers", currentUser.uid), {
+							isOnline: false,
+							lastStatusChange: serverTimestamp(),
+						}).catch(() => {})
+					);
+				}
+				// Firestore saves wait for the server, so offline they'd never finish. Give them
+				// a few seconds, then sign out regardless.
+				await Promise.race([
+					Promise.allSettled(tasks),
+					new Promise((resolve) => setTimeout(resolve, 4000)),
+				]);
 			}
 
 			await signOut(FIREBASE_AUTH);

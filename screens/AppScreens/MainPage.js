@@ -20,7 +20,8 @@ import Toast from "react-native-toast-message";
 import { getNextPendingRating } from "../../components/modals/RatingModal";
 import notificationManager from "../../helpers/notificationManager";
 import { doc, onSnapshot } from "firebase/firestore";
-import { FIREBASE_DB } from "../../firebaseConfig";
+import { FIREBASE_DB, FIREBASE_AUTH } from "../../firebaseConfig";
+import { restoreCustomerRide } from "../../helpers/restoreRide";
 
 const MainPage = () => {
 	const [location, setLocation] = useState(false);
@@ -194,6 +195,15 @@ const MainPage = () => {
 		if (!UserId) return;
 		checkPendingRefunds(UserId).catch(() => {});
 	}, [UserId]);
+
+	// Pick up a ride that was still under way when the app was last closed.
+	const authUid = UserId || FIREBASE_AUTH.currentUser?.uid;
+	useEffect(() => {
+		if (!authUid) return;
+		restoreCustomerRide(authUid).catch((err) =>
+			console.warn("⚠️ Could not restore active ride:", err.message)
+		);
+	}, [authUid]);
 
 	useEffect(() => {
 		notificationWarningShown.current = false;
@@ -375,15 +385,19 @@ const MainPage = () => {
 								'Customer cancelled the ride'
 							);
 
+							// Don't hold up the customer while the driver is notified.
 							if (rideSnapshot?.driverId) {
-								await notifyDriverRideCancelled(
+								notifyDriverRideCancelled(
 									rideSnapshot.driverId,
 									activeRide.rideId,
 									`${firstName} ${lastName}`
-								);
+								).catch(() => {});
 							}
 
+							setHomePage();
 							clearActiveRide();
+							useRideStore.getState().clearRide();
+							useRideDetailsStore.getState().resetRideDetails();
 
 							if (result.refundStatus === "completed") {
 								Toast.show({

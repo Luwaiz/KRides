@@ -78,7 +78,11 @@ export function useGoogleAuth() {
                 errorMessage = err.message;
             }
 
-            throw new Error(errorMessage);
+            const wrapped = new Error(errorMessage);
+            // Lets screens skip the error alert when the user simply closed the Google sheet.
+            wrapped.cancelled = err.code === statusCodes.SIGN_IN_CANCELLED;
+            wrapped.code = err.code;
+            throw wrapped;
         } finally {
             setLoading(false);
         }

@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View, TouchableOpacity, Image, Linking, Alert, ActivityIndicator } from "react-native";
 import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import { MaterialIcons, Octicons } from "@expo/vector-icons";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Phone from "../../assets/svg/Call.svg";
 import ActiveButton from "../buttons/ActiveButton";
 import DangerButton from "../buttons/DangerButton";
@@ -11,7 +11,7 @@ import { useAcceptedRideStore, useDriverDetails } from "../../constants/Store";
 import useAuthStore from "../../constants/Store";
 import Avatar from "../../assets/svg/Frame 77avatar.svg";
 import Arrival from "../modals/Arrival";
-import { listenToPendingRides, listenToRide, declineRide, getRide, cancelRideWithRefund } from "../../helpers/firebaseRides";
+import { listenToPendingRides, listenToRide, getRide, cancelRideWithRefund } from "../../helpers/firebaseRides";
 import { getRideCoordinates } from "../../helpers/getLocationCoordinates";
 import { doc, runTransaction, serverTimestamp } from "firebase/firestore";
 import { FIREBASE_DB, FIREBASE_AUTH } from "../../firebaseConfig";
@@ -64,16 +64,37 @@ const AcceptTab = () => {
 		return unsubscribe;
 	}, [uid, acceptedRide]);
 
-	useEffect(() => {
-		if (!acceptedRide?.rideId) return;
+	// Set while this driver is cancelling, so the listener below doesn't report it as the
+	// customer's cancellation.
+	const selfCancellingRef = useRef(false);
+	// The ride whose cancellation has already been shown, so later snapshots don't repeat it.
+	const cancelShownForRef = useRef(null);
 
-		const unsubscribe = listenToRide(acceptedRide.rideId, (rideData) => {
-			if (rideData && rideData.status === 'cancelled') {
-				Alert.alert("Ride Cancelled", "The customer cancelled this ride.");
-				clearAcceptedRide();
-				setHasArrived(false);
-				setEndRide(false);
-			}
+	// A restored or queued ride may already be under way.
+	useEffect(() => {
+		setHasArrived(!!acceptedRide?.hasArrived || acceptedRide?.status === 'in_progress');
+	}, [acceptedRide?.rideId]);
+
+	useEffect(() => {
+		const rideId = acceptedRide?.rideId;
+		if (!rideId) return;
+
+		const unsubscribe = listenToRide(rideId, (rideData) => {
+			if (!rideData || rideData.status !== 'cancelled') return;
+			if (selfCancellingRef.current || cancelShownForRef.current === rideId) return;
+			cancelShownForRef.current = rideId;
+
+			setHasArrived(false);
+			setEndRide(false);
+			Alert.alert(
+				"Ride Cancelled",
+				rideData.cancelledBy === 'customer'
+					? "The customer cancelled this ride."
+					: "This ride has been cancelled.",
+				// Moves on to a queued ride if there is one, otherwise back to requests.
+				[{ text: "OK", onPress: handleRideCompleteDismiss }],
+				{ cancelable: false }
+			);
 		});
 
 		return unsubscribe;
@@ -91,8 +112,10 @@ const AcceptTab = () => {
 		);
 	};
 
+	// Called once the current ride is over (completed or cancelled). Read from the store
+	// rather than the render, since this also runs from listener callbacks.
 	const handleRideCompleteDismiss = () => {
-		const queued = nextRide;
+		const queued = useAcceptedRideStore.getState().nextRide;
 		if (queued) {
 			Alert.alert(
 				"Next Ride Ready",
@@ -103,11 +126,25 @@ const AcceptTab = () => {
 						style: "destructive",
 						onPress: async () => {
 							setHasArrived(false);
+							setNextRide(null);
 							clearAcceptedRide();
+							// The queued ride is already assigned to this driver, so declining it
+							// has to cancel it (refunding the customer) or they'd wait forever.
 							try {
-								await declineRide(queued.rideId, uid);
+								await cancelRideWithRefund(queued.rideId, 'driver', 'Driver declined queued ride');
+								if (queued.customerId) {
+									notifyCustomerRideCancelled(
+										queued.customerId,
+										queued.rideId,
+										fullName || 'Your driver'
+									).catch(() => {});
+								}
 							} catch (e) {
-								console.warn("⚠️ Could not decline queued ride:", e.message);
+								console.warn("⚠️ Could not cancel queued ride:", e.message);
+								Alert.alert(
+									"Couldn't Decline Ride",
+									"We couldn't release the queued ride. It will reappear when you reopen the app — please decline it again then."
+								);
 							}
 						},
 					},
@@ -205,8 +242,10 @@ const AcceptTab = () => {
 					style: "destructive",
 					onPress: async () => {
 						setCancelling(true);
+						selfCancellingRef.current = true;
 						try {
 							const result = await cancelRideWithRefund(acceptedRide.rideId, 'driver', 'Driver cancelled ride');
+							cancelShownForRef.current = acceptedRide.rideId;
 
 							if (acceptedRide.customerId) {
 								notifyCustomerRideCancelled(
@@ -216,27 +255,34 @@ const AcceptTab = () => {
 								).catch(() => {});
 							}
 
-							clearAcceptedRide();
 							setHasArrived(false);
 							setEndRide(false);
 
+							let message = "The ride has been cancelled.";
 							if (result.refundStatus === "completed") {
-								Alert.alert("Ride Cancelled", `Ride cancelled — the customer's ₦${result.refundAmount} refund has been initiated.`);
+								message = `Ride cancelled — the customer's ₦${result.refundAmount} refund has been initiated.`;
 							} else if (result.walletRefundStatus === "completed") {
-								Alert.alert("Ride Cancelled", `Ride cancelled — ₦${result.refundAmount} has been returned to the customer's wallet.`);
+								message = `Ride cancelled — ₦${result.refundAmount} has been returned to the customer's wallet.`;
 							} else if (
 								result.refundStatus === "failed" ||
 								result.refundStatus === "needs_review" ||
 								result.walletRefundStatus === "failed"
 							) {
-								Alert.alert("Ride Cancelled", "Ride cancelled, but the customer's refund could not be processed automatically. Support has been notified.");
+								message = "Ride cancelled, but the customer's refund could not be processed automatically. Support has been notified.";
+							}
+
+							// With a queued ride, OK offers it next; otherwise back to requests.
+							if (useAcceptedRideStore.getState().nextRide) {
+								Alert.alert("Ride Cancelled", message, [{ text: "OK", onPress: handleRideCompleteDismiss }], { cancelable: false });
 							} else {
-								Alert.alert("Ride Cancelled", "The ride has been cancelled.");
+								clearAcceptedRide();
+								Alert.alert("Ride Cancelled", message);
 							}
 						} catch (error) {
 							console.error("❌ Error cancelling ride:", error);
 							Alert.alert("Error", "Unable to cancel ride. Please check your connection and try again.");
 						} finally {
+							selfCancellingRef.current = false;
 							setCancelling(false);
 						}
 					},
@@ -313,9 +359,16 @@ const AcceptTab = () => {
 		} catch (error) {
 			if (error.message === 'RIDE_CANCELLED' || error.message === 'RIDE_NOT_FOUND') {
 				console.warn('⚠️ Cannot mark arrival — ride was cancelled');
-				Alert.alert('Ride Cancelled', 'This ride was cancelled by the customer.');
-				clearAcceptedRide();
 				setHasArrived(false);
+				if (cancelShownForRef.current !== acceptedRide.rideId) {
+					cancelShownForRef.current = acceptedRide.rideId;
+					Alert.alert(
+						'Ride Cancelled',
+						'This ride was cancelled by the customer.',
+						[{ text: 'OK', onPress: handleRideCompleteDismiss }],
+						{ cancelable: false }
+					);
+				}
 			} else {
 				console.error('Error notifying arrival:', error);
 				Alert.alert('Error', 'Could not update arrival status. Please try again.');

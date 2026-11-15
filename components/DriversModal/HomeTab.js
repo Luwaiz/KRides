@@ -309,7 +309,17 @@ const HomeTab = () => {
 						</View>
 						{rides?.length === 0 ? (
 							<View style={styles.noRidesContainer}>
-								{isOnline ? (
+								{!bankDetailsVerified ? (
+									// Ride requests are only loaded once bank details are verified, so
+									// don't tell the driver we're listening when we aren't.
+									<>
+										<View style={styles.offlineDot} />
+										<Text style={styles.listeningText}>Add your bank details to get rides</Text>
+										<Text style={styles.listeningSubtext}>
+											Ride requests show up here once your payout bank account is verified, so you can be paid for every trip.
+										</Text>
+									</>
+								) : isOnline ? (
 									<>
 										<Animated.View style={[styles.listeningDot, { opacity: pulseAnim }]} />
 										<Text style={styles.listeningText}>Listening for ride requests...</Text>
@@ -326,12 +336,21 @@ const HomeTab = () => {
 										</Text>
 									</>
 								)}
-								<TouchableOpacity
-									onPress={onRefresh}
-									style={styles.refreshButton}
-								>
-									<Text style={styles.refreshButtonText}>Refresh</Text>
-								</TouchableOpacity>
+								{!bankDetailsVerified ? (
+									<TouchableOpacity
+										onPress={() => navigation.navigate("BankAccountDetails")}
+										style={styles.refreshButton}
+									>
+										<Text style={styles.refreshButtonText}>Add Bank Details</Text>
+									</TouchableOpacity>
+								) : (
+									<TouchableOpacity
+										onPress={onRefresh}
+										style={styles.refreshButton}
+									>
+										<Text style={styles.refreshButtonText}>Refresh</Text>
+									</TouchableOpacity>
+								)}
 							</View>
 						) : (
 							<BottomSheetFlatList

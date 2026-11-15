@@ -10,7 +10,26 @@ import Toast from "react-native-toast-message";
 import useAuthStore, {
 	useUserDetails,
 	useDriverDetails,
+	useActiveRideStore,
+	useAcceptedRideStore,
+	useRideStore,
+	useRideDetailsStore,
+	useBottomTabStore,
+	useDriverAvailability,
 } from "../constants/Store";
+
+// Ride and screen state isn't tied to an account, so wipe it on sign-out; otherwise the
+// next person to sign in on this phone would inherit the previous one's ride.
+function clearSessionState() {
+	useActiveRideStore.getState().clearActiveRide();
+	useAcceptedRideStore.getState().clearAcceptedRide();
+	useAcceptedRideStore.getState().clearNextRide();
+	useRideStore.getState().clearRide();
+	useRideDetailsStore.getState().resetRideDetails();
+	useBottomTabStore.getState().setHomePage();
+	useBottomTabStore.getState().setDriverHome();
+	useDriverAvailability.getState().setOffline();
+}
 
 import OnBoarding from "../screens/OnBoarding";
 import AuthStack from "./AuthStack";
@@ -115,10 +134,9 @@ const Navigation = () => {
 								if (!mounted) return;
 
 								if (driverSnap.exists()) {
-									const profile = driverSnap.data();
-									setDriverProfile({ ...profile, uid: currentUser.uid });
-									setAuthData(currentUser, profile, "driver");
-									AsyncStorage.setItem(`role_${currentUser.uid}`, "driver").catch(() => {});
+									// A driver account used customer Google sign-in. The sign-in screen
+									// shows "use driver login" and signs out, so don't let it in here.
+									console.log("ℹ️ Driver account used customer Google sign-in; waiting for sign-out");
 								} else {
 									setAuthData(currentUser, {
 										email: currentUser.email,
@@ -142,7 +160,10 @@ const Navigation = () => {
 									setDriverProfile({ ...profile, uid: currentUser.uid });
 									setAuthData(currentUser, profile, role);
 									AsyncStorage.setItem(`role_${currentUser.uid}`, role).catch(() => {});
-								} else if (pendingRole !== 'driver') {
+								} else if (pendingRole !== 'driver' && pendingRole !== 'signup' && !useAuthStore.getState().role) {
+									// No profile yet usually means sign-up is still saving it, and the
+									// sign-up screen sets the full profile itself once it has. Only
+									// fall back to a bare customer if nothing else has set a role.
 									setAuthData(currentUser, {
 										email: currentUser.email,
 										name: currentUser.displayName || "User"
@@ -189,6 +210,7 @@ const Navigation = () => {
 					if (mounted) {
 						setAuthData(null, null, null);
 					}
+					clearSessionState();
 					AsyncStorage.getAllKeys()
 						.then(keys => {
 							const roleKeys = keys.filter(k => k.startsWith('role_'));

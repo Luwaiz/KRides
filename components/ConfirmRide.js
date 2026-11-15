@@ -34,6 +34,7 @@ import useAuthStore from "../constants/Store";
 import { notifyDriversAboutNewRide, notifyDriverRideCancelled } from "../helpers/notificationHelpers";
 import { payWithWallet } from "../helpers/walletHelpers";
 import { processRefund } from "../helpers/flutterwaveRefund";
+import { restoreCustomerRide } from "../helpers/restoreRide";
 import notificationManager from "../helpers/notificationManager";
 
 const ConfirmRide = () => {
@@ -152,6 +153,30 @@ const ConfirmRide = () => {
 				Alert.alert('Insufficient Balance', `You need ₦${data.shortfall?.toLocaleString('en-NG') ?? ''} more. Top up your wallet and try again.`);
 			} else if (data?.error === 'price_changed') {
 				Alert.alert('Price Updated', `The fare for this ride is now ₦${data.fare?.toLocaleString('en-NG') ?? ''}. Please review and try again.`);
+			} else if (!error.response) {
+				// No answer from the server (timeout or dropped connection): the payment may
+				// still have gone through, so check for the ride before suggesting a retry.
+				let restored = await restoreCustomerRide(UserId).catch(() => null);
+				if (!restored) {
+					await new Promise((resolve) => setTimeout(resolve, 4000));
+					restored = await restoreCustomerRide(UserId).catch(() => null);
+				}
+				if (restored) {
+					setRideId(restored.rideId);
+					Toast.show({ type: 'tomatoToast', text1: 'Ride Booked!', text2: 'Searching for a driver near you...', position: 'top', visibilityTime: 3000 });
+					setHomePage();
+					notifyDriversAboutNewRide(
+						restored.rideId,
+						`${firstName || ''} ${lastName || ''}`.trim() || 'Customer',
+						location,
+						destination
+					).catch(() => {});
+				} else {
+					Alert.alert(
+						'Could Not Confirm Payment',
+						"We didn't hear back from the server, so we can't tell whether your wallet was charged. Check your wallet balance before trying again."
+					);
+				}
 			} else {
 				Alert.alert('Payment Failed', 'Could not process wallet payment. Please try again.');
 			}
@@ -174,7 +199,21 @@ const ConfirmRide = () => {
 		} catch (refundError) {
 			console.error("❌ Auto-refund failed for orphaned charge:", refundError);
 			if (refundError.status === 409) {
-				// The server refuses to refund a payment that already has a ride attached.
+				// The server refuses to refund a payment that already has a ride attached, so the
+				// booking did go through. Show that ride rather than leaving the customer guessing.
+				const restored = await restoreCustomerRide(UserId).catch(() => null);
+				if (restored) {
+					setRideId(restored.rideId);
+					setHomePage();
+					Toast.show({
+						type: 'tomatoToast',
+						text1: 'Ride Booked!',
+						text2: 'Searching for a driver near you...',
+						position: 'top',
+						visibilityTime: 3000,
+					});
+					return;
+				}
 				Toast.show({
 					type: 'tomatoToast',
 					text1: 'Booking May Have Gone Through',

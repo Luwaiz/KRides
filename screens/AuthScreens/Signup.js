@@ -12,7 +12,8 @@ import BackButton from "../../components/buttons/BackButton";
 import Firebase from "../../hooks/Firebase";
 import Toast from "react-native-toast-message";
 import { useGoogleAuth } from "../../hooks/useGoogleAuth";
-import useAuthStore from "../../constants/Store";
+import useAuthStore, { useUserDetails } from "../../constants/Store";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { checkRateLimit, recordAttempt, clearAttempts } from "../../helpers/authRateLimiter";
 
 const Signup = ({ navigation }) => {
@@ -59,6 +60,12 @@ const Signup = ({ navigation }) => {
 				});
 			}
 		} catch (error) {
+			if (error.cancelled) return;
+			// Firebase sign-in already succeeded by the time the role check fails, so sign
+			// back out; otherwise the account would be let in despite the message.
+			if (error.code === 'auth/wrong-role-account') {
+				await Firebase.signOut();
+			}
 			Alert.alert("Google Sign-Up Failed", error.message || "Please try again.");
 		}
 	};
@@ -113,16 +120,29 @@ const Signup = ({ navigation }) => {
 		try {
 			console.log("🚀 Starting customer signup process...");
 
+			// Tells the auth listener this screen will set the profile, so it doesn't fill in a
+			// bare one (without the phone number) while the profile is still being saved.
+			await AsyncStorage.setItem('pending_role', JSON.stringify({ role: 'signup', expiresAt: Date.now() + 5 * 60 * 1000 }));
+
+			const name = `${firstName} ${lastName}`.trim();
 			const user = await Firebase.signUpWithEmail({
 				email,
 				password,
-				name: `${firstName} ${lastName}`.trim(),
+				name,
 				phone,
 				role: "customer",
 			});
 
 			console.log("✅ Customer signup success:", user.uid);
 			clearAttempts(identifier);
+
+			const details = useUserDetails.getState();
+			details.setUserId(user.uid);
+			details.setEmail(email);
+			details.setPhone(phone);
+			details.setFirstName(firstName);
+			details.setLastName(lastName);
+			setAuthData(user, { uid: user.uid, name, email, phone, role: "customer" }, "customer");
 
 			try {
 				await Firebase.registerFcmToken(user.uid);
@@ -142,6 +162,7 @@ const Signup = ({ navigation }) => {
 		} catch (error) {
 			setLoading(false);
 			recordAttempt(identifier);
+			await AsyncStorage.removeItem('pending_role').catch(() => {});
 			console.error("❌ Customer signup error:", error);
 
 			let errorMessage = "Sign up failed. Please try again.";

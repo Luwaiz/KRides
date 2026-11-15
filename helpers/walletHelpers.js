@@ -48,9 +48,11 @@ export const payWithWallet = async (rideData) => {
 
     const idToken = await user.getIdToken();
 
+    // Longer than the default: a server that has been idle can take a while to wake, and
+    // giving up early would tell the customer the payment failed when it may not have.
     const response = await api.post(`${SERVER_URL}/wallet/pay-ride`, {
         idToken,
         rideData,
-    });
+    }, { timeout: 60000 });
     return response.data;
 };

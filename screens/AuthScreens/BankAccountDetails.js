@@ -135,13 +135,7 @@ const BankAccountDetails = ({ navigation, route }) => {
                     [
                         {
                             text: "Continue",
-                            onPress: () => {
-                                if (isEditing) {
-                                    navigation.goBack();
-                                } else {
-                                    navigation.replace("DriverHome");
-                                }
-                            },
+                            onPress: leaveScreen,
                         },
                     ]
                 );
@@ -153,6 +147,17 @@ const BankAccountDetails = ({ navigation, route }) => {
             Alert.alert("Error", error.message || "Could not save bank details.");
         } finally {
             setLoading(false);
+        }
+    };
+
+    // Opened from inside the app (profile, "Set up now"), go back to where the driver came
+    // from; replacing would stack a second home screen with its own listeners and popups.
+    // Only right after sign-up, when this is the first screen, open home in its place.
+    const leaveScreen = () => {
+        if (navigation.canGoBack()) {
+            navigation.goBack();
+        } else {
+            navigation.replace("DriverHome");
         }
     };
 
@@ -178,7 +183,7 @@ const BankAccountDetails = ({ navigation, route }) => {
                                 bankDetailsSkipped: true,
                             });
 
-                            navigation.replace("DriverHome");
+                            leaveScreen();
                         } catch (error) {
                             console.error("Error skipping:", error);
                             Alert.alert("Error", "Could not skip. Please try again.");

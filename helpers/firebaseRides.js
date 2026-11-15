@@ -321,6 +321,29 @@ export const getRide = async (rideId) => {
 	}
 };
 
+// Rides that are still under way for this user, oldest first. The app keeps the current
+// ride only in memory, so this is how it picks the ride back up after a restart.
+// role: 'customer' matches customerId, 'driver' matches driverId.
+export const getUnfinishedRides = async (uid, role) => {
+	if (!uid) return [];
+	const field = role === "driver" ? "driverId" : "customerId";
+	const statuses = role === "driver"
+		? ["accepted", "in_progress"]
+		: ["pending", "accepted", "in_progress"];
+
+	const q = query(
+		collection(FIREBASE_DB, "rides"),
+		where(field, "==", uid),
+		where("status", "in", statuses),
+		limit(5)
+	);
+	const snapshot = await getDocs(q);
+	const toMillis = (t) => (t?.toMillis ? t.toMillis() : 0);
+	return snapshot.docs
+		.map((d) => ({ ...d.data(), rideId: d.id }))
+		.sort((a, b) => toMillis(a.acceptedAt || a.createdAt) - toMillis(b.acceptedAt || b.createdAt));
+};
+
 export const getCustomerHistory = async (customerId) => {
 	try {
 		const ridesRef = collection(FIREBASE_DB, "rides");

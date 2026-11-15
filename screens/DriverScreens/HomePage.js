@@ -19,7 +19,8 @@ import { GOOGLE_MAPS_API_KEY } from "@env";
 import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import MapViewDirections from "react-native-maps-directions";
 import Geolocation from "@react-native-community/geolocation";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { restoreDriverRide } from "../../helpers/restoreRide";
 import { FIREBASE_DB } from "../../firebaseConfig";
 import notificationManager from "../../helpers/notificationManager";
 import { useDriverDetails } from "../../constants/Store";
@@ -78,6 +79,25 @@ const HomePage = () => {
 		notificationManager.initialize(uid, 'driver').catch((error) => {
 			console.error("❌ Error setting up notifications:", error);
 		});
+	}, [uid]);
+
+	useEffect(() => {
+		if (!uid) return;
+
+		// Pick up a ride that was still under way when the app was last closed.
+		restoreDriverRide(uid).catch((err) =>
+			console.warn("⚠️ Could not restore accepted ride:", err.message)
+		);
+
+		// The toggle starts as "offline", but the server goes by the driver document. If the
+		// driver left the app while online, show them as online so the two agree.
+		getDoc(doc(FIREBASE_DB, "drivers", uid))
+			.then((snap) => {
+				if (snap.exists() && snap.data().isOnline === true) {
+					useDriverAvailability.getState().setOnline();
+				}
+			})
+			.catch(() => {});
 	}, [uid]);
 
 	const isOnline = useDriverAvailability((state) => state.isOnline);
