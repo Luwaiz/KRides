@@ -19,10 +19,10 @@ import TextInput1 from "../../components/TextInput1";
 import ActiveButton from "../../components/buttons/ActiveButton";
 import BackButton from "../../components/buttons/BackButton";
 import BankPicker from "../../components/BankPicker";
-import { FIREBASE_DB, FIREBASE_AUTH } from "../../firebaseConfig";
-import { doc, updateDoc } from "firebase/firestore";
+import { FIREBASE_AUTH } from "../../firebaseConfig";
 import { NOTIFICATION_API_KEY } from "@env";
-import { useDriverDetails } from "../../constants/Store";
+import useAuthStore, { useDriverDetails, useUserDetails } from "../../constants/Store";
+import { signOut } from "firebase/auth";
 import { API_BASE_URL } from "../../constants/server";
 
 const PAYMENTS_SERVER_URL = `${API_BASE_URL}/payments`;
@@ -54,6 +54,9 @@ const NIGERIAN_BANKS = [
 
 const BankAccountDetails = ({ navigation, route }) => {
     const isEditing = !!route?.params?.isEditing;
+    // Set when a driver hasn't saved verified bank details yet; the app shows only this
+    // screen (no back button, no dashboard) until they have.
+    const isRequired = !!route?.params?.required;
 
     const { fullName, phone, uid, existingBankCode, existingAccountNumber, existingAccountName } = useDriverDetails((state) => ({
         fullName: state.fullName,
@@ -282,6 +285,9 @@ const BankAccountDetails = ({ navigation, route }) => {
     // from; replacing would stack a second home screen with its own listeners and popups.
     // Only right after sign-up, when this is the first screen, open home in its place.
     const leaveScreen = () => {
+        // Required setup: the app swaps to the dashboard on its own the moment the bank
+        // details are marked verified, so there is nowhere to navigate to from here.
+        if (isRequired) return;
         if (navigation.canGoBack()) {
             navigation.goBack();
         } else {
@@ -289,39 +295,22 @@ const BankAccountDetails = ({ navigation, route }) => {
         }
     };
 
-    const handleSkip = async () => {
-        Alert.alert(
-            "Skip Bank Details",
-            "Are you sure you want to skip? You won't be able to receive payments until you add your bank details.",
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Skip",
-                    onPress: async () => {
-                        setLoading(true);
-                        try {
-                            const driverId = uid || FIREBASE_AUTH.currentUser?.uid;
-                            if (!driverId) return;
-
-                            const driverRef = doc(FIREBASE_DB, "drivers", driverId);
-                            await updateDoc(driverRef, { bankDetailsSkipped: true });
-
-                            useDriverDetails.getState().setDriverProfile({
-                                ...useDriverDetails.getState(),
-                                bankDetailsSkipped: true,
-                            });
-
-                            leaveScreen();
-                        } catch (error) {
-                            console.error("Error skipping:", error);
-                            Alert.alert("Error", "Could not skip. Please try again.");
-                        } finally {
-                            setLoading(false);
-                        }
-                    },
+    // Bank details are compulsory for drivers. This is the only way out of the required
+    // screen besides saving them, so a driver on the wrong account isn't trapped here.
+    const handleLogOut = () => {
+        Alert.alert("Log out?", "You'll need to add your bank details before you can drive.", [
+            { text: "Cancel", style: "cancel" },
+            {
+                text: "Log out",
+                style: "destructive",
+                onPress: async () => {
+                    await signOut(FIREBASE_AUTH).catch(() => {});
+                    useUserDetails.getState().clearUser();
+                    useDriverDetails.getState().clearDriver();
+                    useAuthStore.getState().clearAuth();
                 },
-            ]
-        );
+            },
+        ]);
     };
 
     return (
@@ -337,12 +326,18 @@ const BankAccountDetails = ({ navigation, route }) => {
                         keyboardShouldPersistTaps="handled"
                     >
                         <View style={styles.topCont}>
-                            <View style={styles.headerRow}>
-                                <BackButton text={<Text style={styles.headText}>{isEditing ? "Edit Bank Details" : "Bank Details"}</Text>} />
-                                {!isEditing && (
-                                    <TouchableOpacity onPress={handleSkip} disabled={loading}>
-                                        <Text style={styles.skipText}>{loading ? "..." : "Skip"}</Text>
-                                    </TouchableOpacity>
+                            <View style={[styles.headerRow, isRequired && { paddingRight: 16 }]}>
+                                {isRequired ? (
+                                    <>
+                                        <View style={styles.requiredTitle}>
+                                            <Text style={styles.headText}>Bank Details</Text>
+                                        </View>
+                                        <TouchableOpacity onPress={handleLogOut} disabled={loading}>
+                                            <Text style={styles.skipText}>Log out</Text>
+                                        </TouchableOpacity>
+                                    </>
+                                ) : (
+                                    <BackButton text={<Text style={styles.headText}>{isEditing ? "Edit Bank Details" : "Bank Details"}</Text>} />
                                 )}
                             </View>
                         </View>
@@ -351,7 +346,7 @@ const BankAccountDetails = ({ navigation, route }) => {
                                 <Text style={styles.subText}>
                                     {isEditing
                                         ? "Update your bank account details below."
-                                        : "Please provide your bank account details to receive payments."}
+                                        : "Add your bank account to start driving. This is where your earnings are paid."}
                                 </Text>
 
                                 <BankPicker
@@ -450,6 +445,11 @@ const styles = StyleSheet.create({
         justifyContent: "space-between",
         alignItems: "center",
         paddingRight: 50,
+    },
+    requiredTitle: {
+        flex: 1,
+        paddingHorizontal: 16,
+        marginTop: 10,
     },
     skipText: {
         color: colors.secondary,

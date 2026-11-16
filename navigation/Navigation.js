@@ -26,6 +26,8 @@ function clearSessionState() {
 	useAcceptedRideStore.getState().clearNextRide();
 	useRideStore.getState().clearRide();
 	useRideDetailsStore.getState().resetRideDetails();
+	// A signed-out session must not leave a driver's verified status behind.
+	useDriverDetails.getState().clearDriver();
 	useBottomTabStore.getState().setHomePage();
 	useBottomTabStore.getState().setDriverHome();
 	useDriverAvailability.getState().setOffline();
@@ -35,6 +37,9 @@ import OnBoarding from "../screens/OnBoarding";
 import AuthStack from "./AuthStack";
 import AppStackNavigator from "./AppStack";
 import DriverDrawer from "./DriverDrawer";
+import BankAccountDetails from "../screens/AuthScreens/BankAccountDetails";
+import DriverProfileGate from "../components/DriverProfileGate";
+import { getDriverScreen } from "./driverGate";
 
 const Stack = createNativeStackNavigator();
 
@@ -50,6 +55,12 @@ const Navigation = () => {
 	}, []);
 
 	const storeRole = useAuthStore((state) => state.role);
+
+	// What a driver sees depends on their saved profile, so both of these come from the driver
+	// store. getDriverScreen compares the uid so a previous account's data can never count.
+	const driverUid = useDriverDetails((state) => state.uid);
+	const bankDetailsVerified = useDriverDetails((state) => state.bankDetailsVerified);
+	const driverScreen = getDriverScreen(user, driverUid, bankDetailsVerified);
 	const setAuthData = useAuthStore((state) => state.setAuthData);
 
 	const { setFirstName, setLastName, setEmail, setPhone, setUserId } =
@@ -250,11 +261,29 @@ const Navigation = () => {
 							<Stack.Screen name="AuthStack" component={AuthStack} />
 						</>
 					) : storeRole === "driver" ? (
-						<Stack.Screen
-							key="driver-drawer"
-							name="DriverDrawer"
-							component={DriverDrawer}
-						/>
+						// Drivers only reach the dashboard with verified bank details. Until the
+						// profile has loaded we don't know, so nothing is shown but a loader.
+						driverScreen === "loading" ? (
+							<Stack.Screen
+								key="driver-profile-gate"
+								name="DriverProfileGate"
+								component={DriverProfileGate}
+							/>
+						) : driverScreen === "bank" ? (
+							<Stack.Screen
+								key="driver-bank-setup"
+								name="DriverBankSetup"
+								component={BankAccountDetails}
+								initialParams={{ required: true }}
+								options={{ gestureEnabled: false }}
+							/>
+						) : (
+							<Stack.Screen
+								key="driver-drawer"
+								name="DriverDrawer"
+								component={DriverDrawer}
+							/>
+						)
 					) : (
 						<Stack.Screen
 							key="customer-stack"
