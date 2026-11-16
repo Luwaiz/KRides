@@ -59,7 +59,7 @@ export const useDriverDetails = create((set) => ({
 	bankDetailsVerified: false,
 	bankDetailsSkipped: false,
 	setDriverProfile: (profile) =>
-		set({
+		set((state) => ({
 			fullName: profile.name || profile.fullName || profile.fullname || "",
 			phone: profile.phone,
 			email: profile.email,
@@ -74,9 +74,14 @@ export const useDriverDetails = create((set) => ({
 			bankCode: profile.bankCode || "",
 			accountNumber: profile.accountNumber || "",
 			accountName: profile.accountName || "",
-			bankDetailsVerified: profile.bankDetailsVerified || false,
+			// A verified account stays verified for the session. Profile updates can arrive from
+			// the phone's cache before a just-saved bank verification has synced, and must not undo it
+			// (that sent drivers straight back to the bank screen). Sign-out clears it.
+			bankDetailsVerified:
+				profile.bankDetailsVerified === true ||
+				(state.bankDetailsVerified === true && !!profile.uid && state.uid === profile.uid),
 			bankDetailsSkipped: profile.bankDetailsSkipped || false,
-		}),
+		})),
 	setFullName: (fullName) => set({ fullName }),
 	setPhone: (phone) => set({ phone }),
 	setEmail: (email) => set({ email }),

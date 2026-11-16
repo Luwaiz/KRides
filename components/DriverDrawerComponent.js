@@ -112,7 +112,9 @@ const DriverDrawerComponent = (props) => {
 				if (!snap.exists()) return;
 				const data = snap.data();
 				const setDriverProfile = useDriverDetails.getState().setDriverProfile;
-				if (setDriverProfile) setDriverProfile(data);
+				// The uid is always set from the signed-in account: the navigator matches the
+				// profile to the account by it, and a driver document may not carry the field.
+				if (setDriverProfile) setDriverProfile({ ...data, uid });
 			},
 			(error) => {
 				if (error.code === "permission-denied") {

@@ -166,7 +166,7 @@ const DriverProfilePage = () => {
 			const driverSnap = await getDoc(driverRef);
 			if (driverSnap.exists()) {
 				const updatedProfile = driverSnap.data();
-				setDriverProfile(updatedProfile);
+				setDriverProfile({ ...updatedProfile, uid: driverRef.id });
 				const { setAuthData, user, role } = useAuthStore.getState();
 				setAuthData(user, updatedProfile, role);
 			}
@@ -261,7 +261,7 @@ const DriverProfilePage = () => {
 			const driverSnap = await getDoc(driverRef);
 			if (driverSnap.exists()) {
 				const updatedProfile = driverSnap.data();
-				setDriverProfile(updatedProfile);
+				setDriverProfile({ ...updatedProfile, uid: driverRef.id });
 
 				const { setAuthData, user, role } = useAuthStore.getState();
 				setAuthData(user, updatedProfile, role);
