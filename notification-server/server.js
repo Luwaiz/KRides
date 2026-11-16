@@ -1090,6 +1090,47 @@ app.get('/api/payments/refund/:refundId', async (req, res) => {
     }
 });
 
+// Flutterwave's own list of Nigerian banks, so the codes the app sends are ones its account
+// lookup and transfers accept (fintechs like OPay and PalmPay have codes of their own).
+// Cached because the list rarely changes.
+let bankListCache = { banks: null, fetchedAt: 0 };
+const BANK_LIST_TTL_MS = 24 * 60 * 60 * 1000;
+
+app.get('/api/payments/banks', async (req, res) => {
+    const decoded = await verifyFirebaseToken(req);
+    if (!decoded) return res.status(401).json({ error: 'Unauthorized' });
+
+    if (bankListCache.banks && Date.now() - bankListCache.fetchedAt < BANK_LIST_TTL_MS) {
+        return res.json({ success: true, banks: bankListCache.banks });
+    }
+
+    const secretKey = process.env.FLUTTERWAVE_SECRET_KEY;
+    if (!secretKey) return res.status(500).json({ error: 'Payment service not configured' });
+
+    try {
+        const result = await flutterwaveRequest('https://api.flutterwave.com/v3/banks/NG', {
+            method: 'GET',
+            headers: { Authorization: `Bearer ${secretKey}` },
+        });
+        if (result.status !== 'success' || !Array.isArray(result.data) || !result.data.length) {
+            throw new Error(result.message || 'Empty bank list');
+        }
+
+        const seen = new Set();
+        const banks = result.data
+            .filter((b) => b && b.code && b.name && !seen.has(b.code) && seen.add(b.code))
+            .map((b) => ({ label: String(b.name).trim(), value: String(b.code) }))
+            .sort((a, b) => a.label.localeCompare(b.label));
+
+        bankListCache = { banks, fetchedAt: Date.now() };
+        res.json({ success: true, banks });
+    } catch (error) {
+        console.error('❌ bank list error:', error.message);
+        if (bankListCache.banks) return res.json({ success: true, banks: bankListCache.banks });
+        res.status(502).json({ error: 'Could not load banks right now.' });
+    }
+});
+
 // Looks up the name on a bank account so the driver sees it as soon as they've entered the
 // number. Limited per driver (and by the IP limiter) so it can't be used to look up
 // strangers' accounts in bulk. create-subaccount still resolves the account itself.

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
     StyleSheet,
     Text,
@@ -18,7 +18,7 @@ import DismissKeyboardView from "../../components/DismissKeyboardView";
 import TextInput1 from "../../components/TextInput1";
 import ActiveButton from "../../components/buttons/ActiveButton";
 import BackButton from "../../components/buttons/BackButton";
-import { Picker } from "@react-native-picker/picker";
+import BankPicker from "../../components/BankPicker";
 import { FIREBASE_DB, FIREBASE_AUTH } from "../../firebaseConfig";
 import { doc, updateDoc } from "firebase/firestore";
 import { NOTIFICATION_API_KEY } from "@env";
@@ -64,9 +64,41 @@ const BankAccountDetails = ({ navigation, route }) => {
         existingAccountName: state.accountName,
     }));
 
-    const [bankCode, setBankCode] = useState(
-        (isEditing && existingBankCode) || NIGERIAN_BANKS[0].value
-    );
+    // No bank is preselected, so nobody saves the first bank in the list by mistake.
+    const [bankCode, setBankCode] = useState((isEditing && existingBankCode) || "");
+    const [banks, setBanks] = useState(NIGERIAN_BANKS);
+
+    // Load the full bank list from the server (Flutterwave's own codes). The built-in list
+    // stays as the fallback if that fails.
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const currentUser = FIREBASE_AUTH.currentUser;
+                if (!currentUser) return;
+                const idToken = await currentUser.getIdToken();
+                const response = await fetch(`${PAYMENTS_SERVER_URL}/banks`, {
+                    headers: {
+                        "x-api-key": NOTIFICATION_API_KEY || "",
+                        "Authorization": `Bearer ${idToken}`,
+                    },
+                });
+                const result = await response.json().catch(() => null);
+                if (cancelled || !response.ok || !Array.isArray(result?.banks) || !result.banks.length) return;
+                setBanks(result.banks);
+            } catch (error) {
+                console.warn("⚠️ Could not load bank list, using built-in list:", error.message);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, []);
+
+    // Keep a saved bank selectable even if it's missing from the loaded list.
+    const bankOptions = useMemo(() => {
+        if (!bankCode || banks.some((b) => b.value === bankCode)) return banks;
+        const known = NIGERIAN_BANKS.find((b) => b.value === bankCode);
+        return known ? [known, ...banks] : banks;
+    }, [banks, bankCode]);
     const [accountNumber, setAccountNumber] = useState(isEditing ? existingAccountNumber || "" : "");
     const [accountName, setAccountName] = useState(isEditing ? existingAccountName || "" : "");
     const [loading, setLoading] = useState(false);
@@ -92,7 +124,7 @@ const BankAccountDetails = ({ navigation, route }) => {
         if (key === resolvedFor) return;
 
         setAccountName("");
-        if (!/^\d{10}$/.test(accountNumber)) {
+        if (!bankCode || !/^\d{10}$/.test(accountNumber)) {
             setResolving(false);
             return;
         }
@@ -154,6 +186,10 @@ const BankAccountDetails = ({ navigation, route }) => {
     }, [bankCode, accountNumber, manualName, retryCount]);
 
     const handleSubmit = async () => {
+        if (!bankCode) {
+            Alert.alert("Choose Your Bank", "Select the bank your account is with.");
+            return;
+        }
         if (!accountNumber || !/^\d{10}$/.test(accountNumber)) {
             Alert.alert("Invalid Account Number", "Nigerian bank account numbers must be exactly 10 digits.");
             return;
@@ -175,7 +211,7 @@ const BankAccountDetails = ({ navigation, route }) => {
         setLoading(true);
 
         try {
-            const selectedBank = NIGERIAN_BANKS.find((b) => b.value === bankCode);
+            const selectedBank = bankOptions.find((b) => b.value === bankCode);
             const bankName = selectedBank ? selectedBank.label : "Unknown Bank";
             const currentUser = FIREBASE_AUTH.currentUser;
             const driverId = uid || currentUser?.uid;
@@ -295,7 +331,11 @@ const BankAccountDetails = ({ navigation, route }) => {
                 behavior={Platform.OS === "ios" ? "padding" : "height"}
             >
                 <DismissKeyboardView>
-                    <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
+                    <ScrollView
+                        style={{ flex: 1 }}
+                        contentContainerStyle={{ flexGrow: 1 }}
+                        keyboardShouldPersistTaps="handled"
+                    >
                         <View style={styles.topCont}>
                             <View style={styles.headerRow}>
                                 <BackButton text={<Text style={styles.headText}>{isEditing ? "Edit Bank Details" : "Bank Details"}</Text>} />
@@ -314,24 +354,12 @@ const BankAccountDetails = ({ navigation, route }) => {
                                         : "Please provide your bank account details to receive payments."}
                                 </Text>
 
-                                <View style={styles.inputContainer}>
-                                    <Text style={styles.label}>Select Bank</Text>
-                                    <View style={styles.pickerContainer}>
-                                        <Picker
-                                            selectedValue={bankCode}
-                                            onValueChange={(itemValue) => setBankCode(itemValue)}
-                                            style={styles.picker}
-                                        >
-                                            {NIGERIAN_BANKS.map((bank) => (
-                                                <Picker.Item
-                                                    key={bank.value}
-                                                    label={bank.label}
-                                                    value={bank.value}
-                                                />
-                                            ))}
-                                        </Picker>
-                                    </View>
-                                </View>
+                                <BankPicker
+                                    banks={bankOptions}
+                                    value={bankCode}
+                                    onChange={setBankCode}
+                                    disabled={loading}
+                                />
 
                                 <TextInput1
                                     text={"Account Number"}
@@ -365,7 +393,11 @@ const BankAccountDetails = ({ navigation, route }) => {
                                                 </>
                                             ) : (
                                                 <Text style={styles.nameHint}>
-                                                    {resolveError ? "Not verified" : "Shows up once you enter your account number"}
+                                                    {resolveError
+                                                        ? "Not verified"
+                                                        : !bankCode
+                                                            ? "Choose your bank first"
+                                                            : "Shows up once you enter your account number"}
                                                 </Text>
                                             )}
                                         </View>
@@ -447,27 +479,6 @@ const styles = StyleSheet.create({
         color: "#666",
         marginBottom: 20,
         textAlign: "center",
-    },
-    inputContainer: {
-        marginBottom: 15,
-        width: "100%",
-    },
-    label: {
-        fontFamily: "Albert-Medium",
-        fontSize: 14,
-        marginBottom: 8,
-        color: "#333",
-    },
-    pickerContainer: {
-        borderWidth: 1,
-        borderColor: "#E0E0E0",
-        borderRadius: 12,
-        backgroundColor: "#F9F9F9",
-        overflow: "hidden",
-    },
-    picker: {
-        height: 50,
-        width: "100%",
     },
     nameCont: {
         marginBottom: 16,
