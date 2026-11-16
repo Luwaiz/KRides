@@ -337,7 +337,7 @@ const BankAccountDetails = ({ navigation, route }) => {
         <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
             <KeyboardAvoidingView
                 style={{ flex: 1 }}
-                behavior={Platform.OS === "ios" ? "padding" : "height"}
+                behavior={Platform.OS === "ios" ? "padding" : undefined}
             >
                 <DismissKeyboardView>
                     <ScrollView

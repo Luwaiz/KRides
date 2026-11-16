@@ -54,9 +54,10 @@ const CompletePhoneNumber = () => {
 
 	return (
 		<SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
+			{/* Android resizes the window for the keyboard itself; adding behavior="height" on top of that left the screen at a stale height with the background showing below it. */}
 			<KeyboardAvoidingView
 				style={{ flex: 1 }}
-				behavior={Platform.OS === "ios" ? "padding" : "height"}
+				behavior={Platform.OS === "ios" ? "padding" : undefined}
 			>
 				<DismissKeyboardView>
 					<View style={{ flex: 1 }}>
