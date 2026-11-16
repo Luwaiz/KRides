@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
     StyleSheet,
     Text,
@@ -11,6 +11,7 @@ import {
     Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import { colors } from "../../constants/styling";
 import { maxContentWidth } from "../../constants/responsive";
 import DismissKeyboardView from "../../components/DismissKeyboardView";
@@ -70,9 +71,100 @@ const BankAccountDetails = ({ navigation, route }) => {
     const [accountName, setAccountName] = useState(isEditing ? existingAccountName || "" : "");
     const [loading, setLoading] = useState(false);
 
+    // The account name is looked up from the bank as soon as a full number is entered.
+    // resolvedFor is the bank + number the shown name belongs to.
+    const [resolvedFor, setResolvedFor] = useState(
+        isEditing && existingBankCode && existingAccountNumber && existingAccountName
+            ? `${existingBankCode}:${existingAccountNumber}`
+            : null
+    );
+    const [resolving, setResolving] = useState(false);
+    const [resolveError, setResolveError] = useState(null);
+    const [retryCount, setRetryCount] = useState(0);
+    // Falls back to typing the name if the server doesn't offer the lookup yet.
+    const [manualName, setManualName] = useState(false);
+
+    useEffect(() => {
+        if (manualName) return;
+        setResolveError(null);
+
+        const key = `${bankCode}:${accountNumber}`;
+        if (key === resolvedFor) return;
+
+        setAccountName("");
+        if (!/^\d{10}$/.test(accountNumber)) {
+            setResolving(false);
+            return;
+        }
+
+        let cancelled = false;
+        let timedOut = false;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+            timedOut = true;
+            controller.abort();
+        }, 30000);
+        setResolving(true);
+
+        (async () => {
+            try {
+                const currentUser = FIREBASE_AUTH.currentUser;
+                if (!currentUser) throw new Error("Not signed in");
+                const idToken = await currentUser.getIdToken();
+                const response = await fetch(`${PAYMENTS_SERVER_URL}/resolve-account`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "x-api-key": NOTIFICATION_API_KEY || "",
+                        "Authorization": `Bearer ${idToken}`,
+                    },
+                    body: JSON.stringify({ bankCode, accountNumber }),
+                    signal: controller.signal,
+                });
+                const result = await response.json().catch(() => null);
+                if (cancelled) return;
+
+                if (response.ok && result?.accountName) {
+                    setAccountName(result.accountName);
+                    setResolvedFor(key);
+                } else if (response.status === 404 && result?.code !== "not_found") {
+                    // A server without the lookup yet: let the driver type the name instead.
+                    setManualName(true);
+                } else {
+                    setResolveError(result?.error || "Couldn't check this account. Please try again.");
+                }
+            } catch (error) {
+                if (cancelled) return;
+                setResolveError(
+                    timedOut
+                        ? "The bank is taking too long to respond. Please try again."
+                        : "Couldn't check this account. Check your connection and try again."
+                );
+            } finally {
+                clearTimeout(timeoutId);
+                if (!cancelled) setResolving(false);
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+            clearTimeout(timeoutId);
+            controller.abort();
+        };
+    }, [bankCode, accountNumber, manualName, retryCount]);
+
     const handleSubmit = async () => {
         if (!accountNumber || !/^\d{10}$/.test(accountNumber)) {
             Alert.alert("Invalid Account Number", "Nigerian bank account numbers must be exactly 10 digits.");
+            return;
+        }
+        if (!manualName && (resolvedFor !== `${bankCode}:${accountNumber}` || !accountName)) {
+            Alert.alert(
+                "Account Not Verified",
+                resolving
+                    ? "Still checking your account with the bank — give it a moment."
+                    : "We need to confirm the account name with your bank first. Check the number and bank, then try again."
+            );
             return;
         }
         if (!accountName || accountName.trim().length < 2) {
@@ -250,18 +342,49 @@ const BankAccountDetails = ({ navigation, route }) => {
                                     value={accountNumber}
                                 />
 
-                                <TextInput1
-                                    text={"Account Name"}
-                                    placeholder={"John Doe"}
-                                    onChangeText={setAccountName}
-                                    value={accountName}
-                                />
+                                {manualName ? (
+                                    <TextInput1
+                                        text={"Account Name"}
+                                        placeholder={"John Doe"}
+                                        onChangeText={setAccountName}
+                                        value={accountName}
+                                    />
+                                ) : (
+                                    <View style={styles.nameCont}>
+                                        <Text style={styles.nameLabel}>Account Name</Text>
+                                        <View style={[styles.nameBox, resolveError && styles.nameBoxError]}>
+                                            {resolving ? (
+                                                <>
+                                                    <ActivityIndicator size="small" color={colors.primaryBlue} />
+                                                    <Text style={styles.nameHint}>Checking with your bank…</Text>
+                                                </>
+                                            ) : accountName ? (
+                                                <>
+                                                    <Ionicons name="checkmark-circle" size={20} color="#2e7d32" />
+                                                    <Text style={styles.nameValue} numberOfLines={1}>{accountName}</Text>
+                                                </>
+                                            ) : (
+                                                <Text style={styles.nameHint}>
+                                                    {resolveError ? "Not verified" : "Shows up once you enter your account number"}
+                                                </Text>
+                                            )}
+                                        </View>
+                                        {resolveError ? (
+                                            <Text style={styles.nameError}>
+                                                {resolveError}{" "}
+                                                <Text style={styles.retryText} onPress={() => setRetryCount((n) => n + 1)}>
+                                                    Try again
+                                                </Text>
+                                            </Text>
+                                        ) : null}
+                                    </View>
+                                )}
 
                                 <View style={{ marginTop: 30 }}>
                                     <ActiveButton
                                         title={loading ? "Processing..." : (isEditing ? "Save Changes" : "Save & Continue")}
                                         onPress={handleSubmit}
-                                        disabled={loading}
+                                        disabled={loading || resolving}
                                         loading={loading}
                                     />
                                 </View>
@@ -345,5 +468,46 @@ const styles = StyleSheet.create({
     picker: {
         height: 50,
         width: "100%",
+    },
+    nameCont: {
+        marginBottom: 16,
+    },
+    nameLabel: {
+        fontSize: 16,
+    },
+    nameBox: {
+        width: "100%",
+        height: 48,
+        backgroundColor: colors.lightGrey2,
+        borderRadius: 8,
+        marginTop: 8,
+        paddingHorizontal: 16,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        borderWidth: 1,
+        borderColor: "transparent",
+    },
+    nameBoxError: {
+        borderColor: "#d32f2f",
+    },
+    nameValue: {
+        flex: 1,
+        fontSize: 16,
+        fontFamily: "Albert-SemiBold",
+        color: "#222",
+    },
+    nameHint: {
+        fontSize: 14,
+        color: colors.lightGrey3,
+    },
+    nameError: {
+        marginTop: 6,
+        fontSize: 13,
+        color: "#d32f2f",
+    },
+    retryText: {
+        color: colors.primaryBlue,
+        fontFamily: "Albert-SemiBold",
     },
 });

@@ -1090,6 +1090,58 @@ app.get('/api/payments/refund/:refundId', async (req, res) => {
     }
 });
 
+// Looks up the name on a bank account so the driver sees it as soon as they've entered the
+// number. Limited per driver (and by the IP limiter) so it can't be used to look up
+// strangers' accounts in bulk. create-subaccount still resolves the account itself.
+const accountResolveLimiter = createIpRateLimiter({ windowMs: 15 * 60 * 1000, max: 15 });
+
+app.post('/api/payments/resolve-account', lookupLimiter.middleware, async (req, res) => {
+    const decoded = await verifyFirebaseToken(req);
+    if (!decoded) return res.status(401).json({ error: 'Unauthorized' });
+
+    const accountNumber = String(req.body?.accountNumber || '');
+    const bankCode = String(req.body?.bankCode || '');
+    if (!/^\d{10}$/.test(accountNumber) || !/^\d{3,6}$/.test(bankCode)) {
+        return res.status(400).json({ error: 'Enter a 10-digit account number and pick a bank.' });
+    }
+
+    if (accountResolveLimiter.isBlocked(decoded.uid)) {
+        return res.status(429).json({ error: 'Too many lookups. Please wait a few minutes and try again.' });
+    }
+    accountResolveLimiter.record(decoded.uid);
+
+    const secretKey = process.env.FLUTTERWAVE_SECRET_KEY;
+    if (!secretKey) return res.status(500).json({ error: 'Payment service not configured' });
+
+    try {
+        const driverSnap = await db.collection('drivers').doc(decoded.uid).get();
+        if (!driverSnap.exists) {
+            return res.status(403).json({ error: 'Only driver accounts can add payout bank details' });
+        }
+
+        const result = await flutterwaveRequest('https://api.flutterwave.com/v3/accounts/resolve', {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${secretKey}`,
+                'Content-Type': 'application/json',
+            },
+            data: { account_number: accountNumber, account_bank: bankCode },
+        });
+
+        if (result.status !== 'success' || !result.data?.account_name) {
+            return res.status(404).json({
+                error: "We couldn't find this account at the selected bank. Check the number and bank.",
+                code: 'not_found',
+            });
+        }
+
+        res.json({ success: true, accountName: result.data.account_name });
+    } catch (error) {
+        console.error('❌ resolve-account error:', error.message);
+        res.status(502).json({ error: 'Could not reach the bank right now. Please try again.' });
+    }
+});
+
 app.post('/api/payments/create-subaccount', async (req, res) => {
     const decoded = await verifyFirebaseToken(req);
     if (!decoded) return res.status(401).json({ error: 'Unauthorized' });
