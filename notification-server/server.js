@@ -2062,6 +2062,10 @@ app.post('/api/payments/complete-ride', async (req, res) => {
     const rideRef = db.collection('rides').doc(rideId);
     let ride;
 
+    // Read once, before the transaction, so the fee recorded on the ride and the amount paid
+    // out are worked out from the same prices.
+    const pricing = await getPricingConfig();
+
     try {
         ride = await db.runTransaction(async (txn) => {
             const rideSnap = await txn.get(rideRef);
@@ -2084,9 +2088,18 @@ app.post('/api/payments/complete-ride', async (req, res) => {
                 throw new Error(`INVALID_STATUS:${data.status}`);
             }
 
+            // Record what the driver earns on the ride itself, as it is at completion. The app
+            // shows this figure, so a later change to the fee settings can't alter what past
+            // rides appear to have earned.
+            const rideAmount = Number(data.amount) || 0;
+            const ridePassengers = Number(data.numberOfPassengers) || 1;
+            const rideFee = ridePassengers >= pricing.groupThreshold ? pricing.platformFeeGroup : pricing.platformFeeStandard;
+
             txn.update(rideRef, {
                 status: 'completed',
                 completedAt: admin.firestore.FieldValue.serverTimestamp(),
+                platformFee: rideAmount > 0 ? rideFee : 0,
+                driverEarnings: Math.max(rideAmount - rideFee, 0),
             });
 
             return data;
@@ -2113,7 +2126,6 @@ app.post('/api/payments/complete-ride', async (req, res) => {
     try {
         const totalAmount = Number(ride.amount) || 0;
         const passengers = Number(ride.numberOfPassengers) || 1;
-        const pricing = await getPricingConfig();
         const platformFee = passengers >= pricing.groupThreshold ? pricing.platformFeeGroup : pricing.platformFeeStandard;
         const driverEarnings = Math.max(totalAmount - platformFee, 0);
 

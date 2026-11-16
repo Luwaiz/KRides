@@ -12,6 +12,7 @@ import { getDriverTodayStats } from "../../helpers/driverStats";
 import { useDriverDetails, useDriverAvailability } from "../../constants/Store";
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { FIREBASE_DB } from "../../firebaseConfig";
+import { formatNaira } from "../../constants/commission";
 
 const HomeHeader = () => {
 	const navigation = useNavigation();
@@ -117,7 +118,7 @@ const HomeHeader = () => {
 					<Cash height={24} width={24} />
 					<View style={styles.texts}>
 						<Text style={styles.text}>Earned</Text>
-						<Text style={styles.text2}>₦{earnedToday}</Text>
+						<Text style={styles.text2}>{formatNaira(earnedToday)}</Text>
 					</View>
 				</View>
 			</View>

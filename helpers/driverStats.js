@@ -1,6 +1,6 @@
 import { FIREBASE_DB } from "../firebaseConfig";
 import { collection, query, where, getDocs } from "firebase/firestore";
-import { calculateDriverEarnings } from "../constants/commission";
+import { getRideDriverEarnings } from "../constants/commission";
 
 export const getDriverTodayStats = async (driverId) => {
     try {
@@ -9,10 +9,12 @@ export const getDriverTodayStats = async (driverId) => {
 
         const ridesRef = collection(FIREBASE_DB, "rides");
 
+        // Only today's rides, not every ride the driver has ever completed.
         const completedQuery = query(
             ridesRef,
             where("driverId", "==", driverId),
-            where("status", "==", "completed")
+            where("status", "==", "completed"),
+            where("completedAt", ">=", startOfToday)
         );
 
         const snapshot = await getDocs(completedQuery);
@@ -26,7 +28,7 @@ export const getDriverTodayStats = async (driverId) => {
             const completedAt = ride.completedAt?.toDate();
             if (completedAt && completedAt >= startOfToday) {
                 completedTrips++;
-                earnedToday += calculateDriverEarnings(ride.amount || 0, ride.numberOfPassengers || 1);
+                earnedToday += getRideDriverEarnings(ride);
             }
         });
 
@@ -65,7 +67,7 @@ export const getDriverAllTimeStats = async (driverId) => {
         snapshot.forEach((doc) => {
             const ride = doc.data();
             totalTrips++;
-            totalEarnings += calculateDriverEarnings(ride.amount || 0, ride.numberOfPassengers || 1);
+            totalEarnings += getRideDriverEarnings(ride);
 
             if (ride.driverRating) {
                 totalRating += ride.driverRating;

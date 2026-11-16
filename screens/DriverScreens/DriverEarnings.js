@@ -14,7 +14,7 @@ import BackButton from "../../components/buttons/BackButton";
 import { colors } from "../../constants/styling";
 import { sp, fs, br, ms, maxContentWidth } from "../../constants/responsive";
 import { getDriverEarnings, formatCurrency } from "../../helpers/driverEarnings";
-import { calculateDriverEarnings } from "../../constants/commission";
+import { getRideDriverEarnings } from "../../constants/commission";
 import { useDriverDetails } from "../../constants/Store";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -60,7 +60,7 @@ const DriverEarnings = () => {
             return d.getDate() === selectedDay;
         });
         const netEarnings = dayRides.reduce(
-            (s, r) => s + calculateDriverEarnings(r.amount || 0, r.numberOfPassengers || 1), 0
+            (s, r) => s + getRideDriverEarnings(r), 0
         );
         return {
             rides: dayRides,
@@ -288,7 +288,7 @@ const DriverEarnings = () => {
                                         </Text>
                                     </View>
                                     <Text style={styles.transactionAmount}>
-                                        {formatCurrency(calculateDriverEarnings(ride.amount || 0, ride.numberOfPassengers || 1))}
+                                        {formatCurrency(getRideDriverEarnings(ride))}
                                     </Text>
                                 </View>
                                 {ride.pickupAddress && ride.destinationAddress && (

@@ -40,6 +40,7 @@ import DriverDrawer from "./DriverDrawer";
 import BankAccountDetails from "../screens/AuthScreens/BankAccountDetails";
 import DriverProfileGate from "../components/DriverProfileGate";
 import { getDriverScreen } from "./driverGate";
+import { startPricingConfigListener } from "../constants/pricingConfig";
 
 const Stack = createNativeStackNavigator();
 
@@ -75,6 +76,15 @@ const Navigation = () => {
 	const { setDriverProfile } = useDriverDetails((state) => ({
 		setDriverProfile: state.setDriverProfile,
 	}));
+
+	// Prices are read from Firestore, which only signed-in users can do. Starting this when the
+	// app launches (signed out) was refused and never retried, so the app kept the built-in
+	// prices for the whole session. Start it once there is a user, stop it on sign-out.
+	const signedInUid = user?.uid || null;
+	useEffect(() => {
+		if (!signedInUid) return;
+		return startPricingConfigListener();
+	}, [signedInUid]);
 
 	useEffect(() => {
 		let mounted = true;

@@ -17,7 +17,7 @@ import { doc, runTransaction, serverTimestamp } from "firebase/firestore";
 import { FIREBASE_DB, FIREBASE_AUTH } from "../../firebaseConfig";
 import { NOTIFICATION_API_KEY } from "@env";
 import { DrawerActions, useNavigation } from "@react-navigation/native";
-import { calculateDriverEarnings } from "../../constants/commission";
+import { getRideDriverEarnings, formatNaira } from "../../constants/commission";
 import { notifyCustomerDriverArrived, notifyCustomerRideCancelled } from "../../helpers/notificationHelpers";
 import { API_BASE_URL } from "../../constants/server";
 
@@ -119,7 +119,7 @@ const AcceptTab = () => {
 		if (queued) {
 			Alert.alert(
 				"Next Ride Ready",
-				`You have a queued ride from ${queued.customerName || "a customer"}.\n\n${queued.pickupLocation || "Pickup"} → ${queued.destination || "Destination"}\n₦${calculateDriverEarnings(queued.amount || 0, queued.numberOfPassengers || 1)}\n\nStart this ride now?`,
+				`You have a queued ride from ${queued.customerName || "a customer"}.\n\n${queued.pickupLocation || "Pickup"} → ${queued.destination || "Destination"}\n${formatNaira(getRideDriverEarnings(queued))}\n\nStart this ride now?`,
 				[
 					{
 						text: "Decline",
@@ -496,7 +496,7 @@ const AcceptTab = () => {
 									<Text style={styles.time}>
 							{acceptedRide?.paymentMethod === 'wallet' ? 'Wallet' : acceptedRide?.paymentMethod === 'flutterwave' ? 'Card' : 'Cash'}
 						</Text>
-									<Text style={styles.time}>₦{calculateDriverEarnings(acceptedRide?.amount, acceptedRide?.numberOfPassengers) || "0"}</Text>
+									<Text style={styles.time}>{formatNaira(getRideDriverEarnings(acceptedRide))}</Text>
 								</View>
 							</View>
 							<TouchableOpacity
@@ -547,7 +547,7 @@ const AcceptTab = () => {
 							<View style={styles.nextRideInfo}>
 								<Text style={styles.nextRideLabel}>Next Ride Queued</Text>
 								<Text style={styles.nextRideText}>
-									{nextRide.customerName} • ₦{calculateDriverEarnings(nextRide.amount, nextRide.numberOfPassengers)}
+									{nextRide.customerName} • {formatNaira(getRideDriverEarnings(nextRide))}
 								</Text>
 								{(nextRide.pickupLocation || nextRide.location) ? (
 									<Text style={styles.nextRidePickup} numberOfLines={1}>
@@ -602,7 +602,7 @@ const AcceptTab = () => {
 														? ride.destination?.name || "Destination"
 														: ride.destination || "Destination"}
 												</Text>
-												<Text style={styles.pendingRidePrice}>₦{calculateDriverEarnings(ride.amount, ride.numberOfPassengers) || 0}</Text>
+												<Text style={styles.pendingRidePrice}>{formatNaira(getRideDriverEarnings(ride))}</Text>
 											</View>
 											<TouchableOpacity
 												style={[

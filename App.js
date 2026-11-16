@@ -13,10 +13,8 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import NetworkBanner from "./components/NetworkBanner";
 import UpdateBanner from "./components/UpdateBanner";
 import { installGlobalErrorHandlers } from "./helpers/globalErrorHandler";
-import { startPricingConfigListener } from "./constants/pricingConfig";
 
 installGlobalErrorHandlers();
-startPricingConfigListener();
 
 import {
 	configureReanimatedLogger,

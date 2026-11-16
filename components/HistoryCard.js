@@ -12,7 +12,7 @@ import AntDesign from "@expo/vector-icons/AntDesign";
 import { Ionicons } from "@expo/vector-icons";
 import { format } from "date-fns";
 import { useUserDetails, useDriverDetails } from "../constants/Store";
-import { calculateDriverEarnings } from "../constants/commission";
+import { getRideDriverEarnings, formatNaira } from "../constants/commission";
 import ReportDriverModal from "./modals/ReportDriverModal";
 
 const HistoryCard = ({ history }) => {
@@ -123,9 +123,9 @@ const HistoryCard = ({ history }) => {
 
 					<View style={styles.status}>
 						<Text style={styles.statusText}>
-							₦ {isDriver
-								? calculateDriverEarnings(history?.amount || 0, history?.numberOfPassengers || 1)
-								: history?.amount || 0}
+							{isDriver
+								? formatNaira(isCompleted ? getRideDriverEarnings(history) : 0)
+								: `₦ ${history?.amount || 0}`}
 						</Text>
 						<View style={styles.statusRight}>
 							{isCompleted ? (

@@ -1,6 +1,6 @@
 import { FIREBASE_DB } from "../firebaseConfig";
 import { collection, query, where, getDocs } from "firebase/firestore";
-import { calculateDriverEarnings, calculatePlatformFee } from "../constants/commission";
+import { getRideDriverEarnings } from "../constants/commission";
 
 export const getDriverEarnings = async (driverId, period = 'month', year = null, month = null) => {
     try {
@@ -39,7 +39,7 @@ export const getDriverEarnings = async (driverId, period = 'month', year = null,
         let netEarnings = 0;
 
         rides.forEach(ride => {
-            netEarnings += calculateDriverEarnings(ride.amount || 0, ride.numberOfPassengers || 1);
+            netEarnings += getRideDriverEarnings(ride);
         });
 
         const averagePerRide = totalRides > 0 ? netEarnings / totalRides : 0;

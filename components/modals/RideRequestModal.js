@@ -7,7 +7,7 @@ import { sp, fs, br, screen, maxContentWidth } from '../../constants/responsive'
 
 const CARD_WIDTH = Math.min(screen.width - sp(24), maxContentWidth);
 import { Ionicons } from '@expo/vector-icons';
-import { calculateDriverEarnings } from '../../constants/commission';
+import { getRideDriverEarnings, formatNaira } from '../../constants/commission';
 
 const TIMEOUT_SECONDS = 20;
 
@@ -108,7 +108,7 @@ const RideRequestModal = ({ visible, ride, onAccept, onDecline, onTimeout }) => 
         ? ride.destination
         : (ride.destination?.name || ride.destination?.address || ride.destinationAddress || 'Destination');
 
-    const earnings = calculateDriverEarnings(ride.amount || 0, ride.numberOfPassengers || 1);
+    const earnings = getRideDriverEarnings(ride);
 
     return (
         <Animated.View
@@ -150,7 +150,7 @@ const RideRequestModal = ({ visible, ride, onAccept, onDecline, onTimeout }) => 
             <View style={styles.bottomRow}>
                 <View style={styles.earningsBlock}>
                     <Text style={styles.earningsLabel}>Your earnings</Text>
-                    <Text style={styles.earningsValue}>₦{earnings}</Text>
+                    <Text style={styles.earningsValue}>{formatNaira(earnings)}</Text>
                     <Text style={styles.passengersText}>
                         {ride.numberOfPassengers || 1} pax
                     </Text>
