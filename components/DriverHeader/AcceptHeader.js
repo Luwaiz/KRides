@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import React from "react";
 import { Octicons } from "@expo/vector-icons";
 import { DrawerActions, useNavigation } from "@react-navigation/native";
@@ -12,22 +12,31 @@ const AcceptHeader = () => {
 	const OpenDrawer = () => {
 		navigation.dispatch(DrawerActions.openDrawer());
 	};
+	// The button sits in the normal layout flow, inside a container that has height. It used to
+	// be absolutely positioned inside a zero-height container, and iOS doesn't deliver touches
+	// to a view that lies outside its parent's frame, so the button showed but couldn't be tapped.
 	return (
-		<TouchableOpacity
-			style={[styles.drawerNav, { top: insets.top + 8 }]}
-			activeOpacity={0.7}
-			onPress={OpenDrawer}
-		>
-			<View>
-				<Octicons name="three-bars" size={24} color="black" />
-			</View>
-		</TouchableOpacity>
+		<View style={[styles.container, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
+			<TouchableOpacity
+				style={styles.drawerNav}
+				activeOpacity={0.7}
+				onPress={OpenDrawer}
+			>
+				<View>
+					<Octicons name="three-bars" size={24} color="black" />
+				</View>
+			</TouchableOpacity>
+		</View>
 	);
 };
 
 export default AcceptHeader;
 
 const styles = StyleSheet.create({
+	container: {
+		paddingLeft: 16,
+		alignItems: "flex-start",
+	},
 	drawerNav: {
 		width: 48,
 		height: 48,
@@ -35,9 +44,6 @@ const styles = StyleSheet.create({
 		justifyContent: "center",
 		alignItems: "center",
 		borderRadius: 24,
-		position: "absolute",
-		left: 16,
-		zIndex: 1000,
 		elevation: 5,
 	},
 });
