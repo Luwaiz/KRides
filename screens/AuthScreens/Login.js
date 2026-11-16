@@ -1,4 +1,4 @@
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import React, { useState } from "react";
 import BottomSheet from "@gorhom/bottom-sheet";
 import { colors } from "../../constants/styling";
@@ -96,15 +96,13 @@ const Login = ({ navigation }) => {
 
 	return (
 		<SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
-			<KeyboardAvoidingView
-				style={{ flex: 1 }}
-				behavior={Platform.OS === "ios" ? "padding" : undefined}
-			>
+			<View style={{ flex: 1 }}>
 				<DismissKeyboardView>
 					<ScrollView
 						style={{ flex: 1 }}
 						contentContainerStyle={{ flexGrow: 1 }}
 						keyboardShouldPersistTaps="handled"
+						automaticallyAdjustKeyboardInsets
 					>
 						<View style={styles.topCont}>
 							<BackButton text={<Text style={styles.headText}>Login</Text>} />
@@ -115,10 +113,13 @@ const Login = ({ navigation }) => {
 									<TextInput1
 										text={"Email Address"}
 										placeholder={"johndoe22@gmail.com"}
-										onChangeText={(text) => setEmail(text)}
+										onChangeText={(text) => setEmail(text.trim())}
 										value={email}
 										keyboardType="email-address"
 										autoCapitalize="none"
+										autoCorrect={false}
+										textContentType="username"
+										autoComplete="email"
 									/>
 									<TextInput1
 										text={"Password"}
@@ -126,6 +127,8 @@ const Login = ({ navigation }) => {
 										password
 										onChangeText={(text) => setPassword(text)}
 										value={password}
+										textContentType="password"
+										autoComplete="current-password"
 									/>
 									<Text
 										style={styles.forgot}
@@ -159,7 +162,7 @@ const Login = ({ navigation }) => {
 						</View>
 					</ScrollView>
 				</DismissKeyboardView>
-			</KeyboardAvoidingView>
+			</View>
 		</SafeAreaView>
 	);
 };

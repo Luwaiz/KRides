@@ -44,6 +44,8 @@ import { startPricingConfigListener } from "../constants/pricingConfig";
 
 const Stack = createNativeStackNavigator();
 
+const BlankScreen = () => <View style={{ flex: 1, backgroundColor: "white" }} />;
+
 const Navigation = () => {
 	const [initializing, setInitializing] = useState(true);
 	const [user, setUser] = useState(null);
@@ -270,6 +272,10 @@ const Navigation = () => {
 							)}
 							<Stack.Screen name="AuthStack" component={AuthStack} />
 						</>
+					) : !storeRole ? (
+						// Signed in but the account type isn't known yet (profile still loading or being created).
+						// Show nothing rather than guessing, so no customer screen mounts for a driver.
+						<Stack.Screen key="auth-pending" name="AuthPending" component={BlankScreen} />
 					) : storeRole === "driver" ? (
 						// Drivers only reach the dashboard with verified bank details. Until the
 						// profile has loaded we don't know, so nothing is shown but a loader.

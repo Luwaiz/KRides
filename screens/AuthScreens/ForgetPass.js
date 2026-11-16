@@ -1,5 +1,5 @@
-import { StyleSheet, Text, View, Alert, KeyboardAvoidingView, Platform } from "react-native";
-import React, { useState } from "react";
+import { StyleSheet, Text, View, Alert, ScrollView } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors } from "../../constants/styling";
 import { maxContentWidth } from "../../constants/responsive";
@@ -17,6 +17,8 @@ const ForgetPass = ({ navigation }) => {
 	const [modal, setModal] = useState(false);
 	const [email, setEmail] = useState("");
 	const [loading, setLoading] = useState(false);
+	const goBackTimer = useRef(null);
+	useEffect(() => () => clearTimeout(goBackTimer.current), []);
 	const ModalVisible = () => {
 		setModal(true);
 	};
@@ -58,7 +60,7 @@ const ForgetPass = ({ navigation }) => {
 				visibilityTime: 5000,
 			});
 
-			setTimeout(() => {
+			goBackTimer.current = setTimeout(() => {
 				navigation.goBack();
 			}, 2000);
 
@@ -82,12 +84,14 @@ const ForgetPass = ({ navigation }) => {
 	};
 	return (
 		<SafeAreaView style={styles.container}>
-			<KeyboardAvoidingView
-				style={{ flex: 1 }}
-				behavior={Platform.OS === "ios" ? "padding" : undefined}
-			>
+			<View style={{ flex: 1 }}>
 				<DismissKeyboardView>
-					<View style={{ flex: 1 }}>
+					<ScrollView
+						style={{ flex: 1 }}
+						contentContainerStyle={{ flexGrow: 1 }}
+						keyboardShouldPersistTaps="handled"
+						automaticallyAdjustKeyboardInsets
+					>
 						<View style={styles.topCont}>
 							<BackButton
 								text={<Text style={styles.headText}>Reset Password</Text>}
@@ -103,7 +107,9 @@ const ForgetPass = ({ navigation }) => {
 						</View>
 						<View style={styles.bottomCont}>
 							<TextInput1
-								onChangeText={(text) => setEmail(text)}
+								onChangeText={(text) => setEmail(text.trim())}
+								autoCorrect={false}
+								textContentType="emailAddress"
 								value={email}
 								placeholder="johndoe22@gmail.com"
 								keyboardType="email-address"
@@ -118,9 +124,9 @@ const ForgetPass = ({ navigation }) => {
 								/>
 							</View>
 						</View>
-					</View>
+					</ScrollView>
 				</DismissKeyboardView>
-			</KeyboardAvoidingView>
+			</View>
 		</SafeAreaView>
 	);
 };

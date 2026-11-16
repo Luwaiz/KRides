@@ -1,4 +1,4 @@
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import React, { useState } from "react";
 import { colors } from "../../constants/styling";
 import { maxContentWidth } from "../../constants/responsive";
@@ -69,15 +69,13 @@ const DriverLogin = ({ navigation }) => {
 
 	return (
 		<SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
-			<KeyboardAvoidingView
-				style={{ flex: 1 }}
-				behavior={Platform.OS === "ios" ? "padding" : undefined}
-			>
+			<View style={{ flex: 1 }}>
 				<DismissKeyboardView>
 					<ScrollView
 						style={{ flex: 1 }}
 						contentContainerStyle={{ flexGrow: 1 }}
 						keyboardShouldPersistTaps="handled"
+						automaticallyAdjustKeyboardInsets
 					>
 						<View style={styles.topCont}>
 							<BackButton text={<Text style={styles.headText}>Login</Text>} />
@@ -89,12 +87,16 @@ const DriverLogin = ({ navigation }) => {
 										text={"Phone number"}
 										placeholder={"08123456789 or +2348123456789"}
 										onChangeText={(text) => set_phone(text)}
+										keyboardType="phone-pad"
+										textContentType="telephoneNumber"
 									/>
 									<TextInput1
 										text={"Password"}
 										placeholder={"*************"}
 										password
 										onChangeText={(text) => set_password(text)}
+										textContentType="password"
+										autoComplete="current-password"
 									/>
 									<Text
 										style={styles.forgot}
@@ -119,7 +121,7 @@ const DriverLogin = ({ navigation }) => {
 						</View>
 					</ScrollView>
 				</DismissKeyboardView>
-			</KeyboardAvoidingView>
+			</View>
 		</SafeAreaView>
 	);
 };

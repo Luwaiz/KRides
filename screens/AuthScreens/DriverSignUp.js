@@ -1,4 +1,4 @@
-import { ScrollView, StyleSheet, Text, View, Alert, KeyboardAvoidingView, Platform } from "react-native";
+import { ScrollView, StyleSheet, Text, View, Alert } from "react-native";
 import React, { useState } from "react";
 import { colors } from "../../constants/styling";
 import { maxContentWidth } from "../../constants/responsive";
@@ -174,15 +174,13 @@ const DriverSignup = ({ navigation }) => {
 
 	return (
 		<SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
-			<KeyboardAvoidingView
-				style={{ flex: 1 }}
-				behavior={Platform.OS === "ios" ? "padding" : undefined}
-			>
+			<View style={{ flex: 1 }}>
 				<DismissKeyboardView>
 					<ScrollView
 						style={{ flex: 1 }}
 						contentContainerStyle={{ flexGrow: 1 }}
 						keyboardShouldPersistTaps="handled"
+						automaticallyAdjustKeyboardInsets
 					>
 						<View style={styles.topCont}>
 							<BackButton text={<Text style={styles.headText}>Sign Up</Text>} />
@@ -195,26 +193,33 @@ const DriverSignup = ({ navigation }) => {
 										placeholder={"John Doe"}
 										onChangeText={(text) => setFull(text)}
 										value={fullName}
+										autoCapitalize="words"
+										textContentType="name"
 									/>
 									<TextInput1
 										text={"Vehicle Id"}
 										placeholder={"e.g Z9"}
 										onChangeText={(text) => setVehicle_id(text)}
 										value={vehicle_id}
+										autoCorrect={false}
 									/>
 									<TextInput1
 										text={"Phone Number"}
 										placeholder={"08123456789"}
 										onChangeText={(text) => setPhoneNumber(text)}
 										value={phone}
+										keyboardType="phone-pad"
+										textContentType="telephoneNumber"
 									/>
 									<TextInput1
 										text={"Email Address"}
 										placeholder={"johndoe@gmail.com"}
-										onChangeText={(text) => setEmail(text)}
+										onChangeText={(text) => setEmail(text.trim())}
 										value={email}
 										keyboardType="email-address"
 										autoCapitalize="none"
+										autoCorrect={false}
+										textContentType="emailAddress"
 									/>
 									<TextInput1
 										text={"Password"}
@@ -222,6 +227,7 @@ const DriverSignup = ({ navigation }) => {
 										password
 										onChangeText={(text) => setPass(text)}
 										value={password}
+										textContentType="oneTimeCode"
 									/>
 									<TextInput1
 										text={"Confirm Password"}
@@ -229,6 +235,7 @@ const DriverSignup = ({ navigation }) => {
 										password
 										onChangeText={(text) => setConfirmPassword(text)}
 										value={confirmPassword}
+										textContentType="oneTimeCode"
 									/>
 									<ActiveButton
 										title={"Sign up"}
@@ -244,7 +251,7 @@ const DriverSignup = ({ navigation }) => {
 						</View>
 					</ScrollView>
 				</DismissKeyboardView>
-			</KeyboardAvoidingView>
+			</View>
 		</SafeAreaView>
 	);
 };

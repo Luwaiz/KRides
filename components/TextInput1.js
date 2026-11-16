@@ -1,10 +1,14 @@
-import { Keyboard, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
-import React, { useEffect, useState } from "react";
+import { StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import React, { useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 
 import { colors } from "../constants/styling";
 
-const TextInput1 = ({ text, placeholder, password,onChangeText,value, editable}) => {
+// Any other TextInput prop (keyboardType, autoCapitalize, maxLength, textContentType,
+// autoComplete...) is passed straight through. The screens have always supplied these, but
+// they used to be dropped here, so email fields capitalised and autocorrected, phone and
+// account-number fields showed the full keyboard, and maxLength was never applied.
+const TextInput1 = ({ text, placeholder, password, onChangeText, value, editable, ...inputProps }) => {
 	const [passwordVisible, setPasswordVisible] = useState(false);
 	const [focus, setFocus] = useState(false);
 	const toggleFocus = () => {
@@ -17,12 +21,19 @@ const TextInput1 = ({ text, placeholder, password,onChangeText,value, editable})
         setPasswordVisible(!passwordVisible);
     };
 
+	// Passwords are never capitalised or autocorrected.
+	const passwordProps = password
+		? { autoCapitalize: "none", autoCorrect: false, spellCheck: false }
+		: null;
+
 	return (
 		<View style={styles.container}>
 			<Text style={styles.text}>{text}</Text>
 			<View style={[styles.inputCont,focus && styles.focus]} focusable>
 				<TextInput
-                    secureTextEntry={password && !passwordVisible}
+					{...passwordProps}
+					{...inputProps}
+                    secureTextEntry={!!password && !passwordVisible}
 					placeholder={placeholder}
 					placeholderTextColor={colors.lightGrey}
 					onFocus={()=>toggleFocus()}
@@ -32,7 +43,6 @@ const TextInput1 = ({ text, placeholder, password,onChangeText,value, editable})
 					style={styles.input}
 					value={value}
 					editable={editable}
-					
 				/>
 				{password &&
 					(passwordVisible ? (

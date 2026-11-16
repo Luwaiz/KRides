@@ -1,4 +1,4 @@
-import { Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import React, { useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors } from "../../constants/styling";
@@ -54,13 +54,14 @@ const CompletePhoneNumber = () => {
 
 	return (
 		<SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
-			{/* Android resizes the window for the keyboard itself; adding behavior="height" on top of that left the screen at a stale height with the background showing below it. */}
-			<KeyboardAvoidingView
-				style={{ flex: 1 }}
-				behavior={Platform.OS === "ios" ? "padding" : undefined}
-			>
+			<View style={{ flex: 1 }}>
 				<DismissKeyboardView>
-					<View style={{ flex: 1 }}>
+					<ScrollView
+						style={{ flex: 1 }}
+						contentContainerStyle={{ flexGrow: 1 }}
+						keyboardShouldPersistTaps="handled"
+						automaticallyAdjustKeyboardInsets
+					>
 						<View style={styles.topCont}>
 							<Text style={styles.headText}>One last thing</Text>
 						</View>
@@ -85,9 +86,9 @@ const CompletePhoneNumber = () => {
 								</View>
 							</View>
 						</View>
-					</View>
+					</ScrollView>
 				</DismissKeyboardView>
-			</KeyboardAvoidingView>
+			</View>
 		</SafeAreaView>
 	);
 };

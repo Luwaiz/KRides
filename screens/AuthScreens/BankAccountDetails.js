@@ -7,8 +7,6 @@ import {
     Alert,
     ActivityIndicator,
     TouchableOpacity,
-    KeyboardAvoidingView,
-    Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -335,15 +333,13 @@ const BankAccountDetails = ({ navigation, route }) => {
 
     return (
         <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
-            <KeyboardAvoidingView
-                style={{ flex: 1 }}
-                behavior={Platform.OS === "ios" ? "padding" : undefined}
-            >
+            <View style={{ flex: 1 }}>
                 <DismissKeyboardView>
                     <ScrollView
                         style={{ flex: 1 }}
                         contentContainerStyle={{ flexGrow: 1 }}
                         keyboardShouldPersistTaps="handled"
+                        automaticallyAdjustKeyboardInsets
                     >
                         <View style={styles.topCont}>
                             <View style={[styles.headerRow, isRequired && { paddingRight: 16 }]}>
@@ -439,7 +435,7 @@ const BankAccountDetails = ({ navigation, route }) => {
                         </View>
                     </ScrollView>
                 </DismissKeyboardView>
-            </KeyboardAvoidingView>
+            </View>
         </SafeAreaView>
     );
 };

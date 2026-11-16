@@ -1,4 +1,4 @@
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import React, { useState } from "react";
 import { colors } from "../../constants/styling";
 import { maxContentWidth } from "../../constants/responsive";
@@ -183,12 +183,14 @@ const Signup = ({ navigation }) => {
 
 	return (
 		<SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
-			<KeyboardAvoidingView
-				style={{ flex: 1 }}
-				behavior={Platform.OS === "ios" ? "padding" : undefined}
-			>
+			<View style={{ flex: 1 }}>
 				<DismissKeyboardView>
-					<ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
+					<ScrollView
+						style={{ flex: 1 }}
+						contentContainerStyle={{ flexGrow: 1 }}
+						keyboardShouldPersistTaps="handled"
+						automaticallyAdjustKeyboardInsets
+					>
 						<View style={styles.topCont}>
 							<BackButton text={<Text style={styles.headText}>Sign Up</Text>} />
 						</View>
@@ -200,20 +202,26 @@ const Signup = ({ navigation }) => {
 										placeholder={"John"}
 										onChangeText={(text) => setFirstName(text)}
 										value={firstName}
+										autoCapitalize="words"
+										textContentType="givenName"
 									/>
 									<TextInput1
 										text={"Last Name"}
 										placeholder={"Doe"}
 										onChangeText={(text) => setLastName(text)}
 										value={lastName}
+										autoCapitalize="words"
+										textContentType="familyName"
 									/>
 									<TextInput1
 										text={"Email Address"}
 										placeholder={"johndoe22@gmail.com"}
-										onChangeText={(text) => setEmail(text)}
+										onChangeText={(text) => setEmail(text.trim())}
 										value={email}
 										keyboardType="email-address"
 										autoCapitalize="none"
+										autoCorrect={false}
+										textContentType="emailAddress"
 									/>
 									<TextInput1
 										text={"Phone Number"}
@@ -228,6 +236,7 @@ const Signup = ({ navigation }) => {
 										password
 										onChangeText={(text) => setPassword(text)}
 										value={password}
+										textContentType="oneTimeCode"
 									/>
 									<TextInput1
 										text={"Confirm Password"}
@@ -235,6 +244,7 @@ const Signup = ({ navigation }) => {
 										password
 										onChangeText={(text) => setConfirmPassword(text)}
 										value={confirmPassword}
+										textContentType="oneTimeCode"
 									/>
 									<ActiveButton
 										title={"Sign up"}
@@ -267,7 +277,7 @@ const Signup = ({ navigation }) => {
 						</View>
 					</ScrollView>
 				</DismissKeyboardView>
-			</KeyboardAvoidingView>
+			</View>
 		</SafeAreaView>
 	);
 };
