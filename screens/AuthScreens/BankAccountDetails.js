@@ -107,10 +107,10 @@ const BankAccountDetails = ({ navigation, route }) => {
     const [loading, setLoading] = useState(false);
 
     // The account name is looked up from the bank as soon as a full number is entered.
-    // resolvedFor is the bank + number the shown name belongs to.
-    const [resolvedFor, setResolvedFor] = useState(
+    // resolved is the bank + number a confirmed name belongs to, and that name.
+    const [resolved, setResolved] = useState(
         isEditing && existingBankCode && existingAccountNumber && existingAccountName
-            ? `${existingBankCode}:${existingAccountNumber}`
+            ? { key: `${existingBankCode}:${existingAccountNumber}`, name: existingAccountName }
             : null
     );
     const [resolving, setResolving] = useState(false);
@@ -124,7 +124,12 @@ const BankAccountDetails = ({ navigation, route }) => {
         setResolveError(null);
 
         const key = `${bankCode}:${accountNumber}`;
-        if (key === resolvedFor) return;
+        // Back to a bank and number that already have a confirmed name: show it again
+        // instead of leaving the name blank with nothing left to trigger a lookup.
+        if (resolved && key === resolved.key) {
+            setAccountName(resolved.name);
+            return;
+        }
 
         setAccountName("");
         if (!bankCode || !/^\d{10}$/.test(accountNumber)) {
@@ -161,7 +166,7 @@ const BankAccountDetails = ({ navigation, route }) => {
 
                 if (response.ok && result?.accountName) {
                     setAccountName(result.accountName);
-                    setResolvedFor(key);
+                    setResolved({ key, name: result.accountName });
                 } else if (response.status === 404 && result?.code !== "not_found") {
                     // A server without the lookup yet: let the driver type the name instead.
                     setManualName(true);
@@ -197,7 +202,7 @@ const BankAccountDetails = ({ navigation, route }) => {
             Alert.alert("Invalid Account Number", "Nigerian bank account numbers must be exactly 10 digits.");
             return;
         }
-        if (!manualName && (resolvedFor !== `${bankCode}:${accountNumber}` || !accountName)) {
+        if (!manualName && (resolved?.key !== `${bankCode}:${accountNumber}` || !accountName)) {
             Alert.alert(
                 "Account Not Verified",
                 resolving
@@ -212,6 +217,11 @@ const BankAccountDetails = ({ navigation, route }) => {
         }
 
         setLoading(true);
+
+        // Saving can involve several calls to the payment provider, and a sleeping server
+        // takes a while to wake, so allow a minute but never spin forever.
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000);
 
         try {
             const selectedBank = bankOptions.find((b) => b.value === bankCode);
@@ -240,16 +250,17 @@ const BankAccountDetails = ({ navigation, route }) => {
                     businessName: fullName || accountName,
                     phone,
                 }),
+                signal: controller.signal,
             });
 
-            const result = await response.json();
-            console.log("Subaccount creation result:", result);
+            // An error page from a proxy or a waking server isn't JSON.
+            const result = await response.json().catch(() => null);
 
             // The server saves the bank details and marks them verified once Flutterwave
             // confirms the account; the app only mirrors them into local state.
-            if (result.success) {
-                const verifiedBankName = result.data.bank_name || bankName;
-                const verifiedAccountName = result.data.verified_account_name || accountName;
+            if (response.ok && result?.success) {
+                const verifiedBankName = result.data?.bank_name || bankName;
+                const verifiedAccountName = result.data?.verified_account_name || accountName;
 
                 useDriverDetails.getState().setDriverProfile({
                     ...useDriverDetails.getState(),
@@ -271,12 +282,21 @@ const BankAccountDetails = ({ navigation, route }) => {
                     ]
                 );
             } else {
-                Alert.alert("Error", result.error || "Could not save bank details. Please check your account details and try again.");
+                Alert.alert(
+                    "Could Not Save",
+                    result?.error || "Something went wrong on our side. Please try again in a moment."
+                );
             }
         } catch (error) {
             console.error("Error saving bank details:", error);
-            Alert.alert("Error", error.message || "Could not save bank details.");
+            Alert.alert(
+                "Could Not Save",
+                error.name === "AbortError"
+                    ? "This is taking too long. Check your connection and try again."
+                    : "Couldn't reach the server. Check your connection and try again."
+            );
         } finally {
+            clearTimeout(timeoutId);
             setLoading(false);
         }
     };

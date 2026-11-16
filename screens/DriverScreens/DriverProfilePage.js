@@ -358,7 +358,7 @@ const DriverProfilePage = () => {
 						editable={false}
 					/>
 					{}
-					{!(profile?.bankName || bankName) && (
+					{!(bankName || profile?.bankName) && (
 						<View style={{ marginTop: 20 }}>
 							<ActiveButton
 								title="Bank Details"
@@ -368,23 +368,23 @@ const DriverProfilePage = () => {
 					)}
 
 					{}
-					{(profile?.bankName || bankName) && (
+					{(bankName || profile?.bankName) && (
 						<View style={styles.bankDetailsCont}>
 							<Text style={styles.bankHeader}>Bank Information</Text>
 							<View style={styles.bankRow}>
 								<Text style={styles.bankLabel}>Bank Name:</Text>
-								<Text style={styles.bankValue}>{profile?.bankName || bankName}</Text>
+								<Text style={styles.bankValue}>{bankName || profile?.bankName}</Text>
 							</View>
 							<View style={styles.bankRow}>
 								<Text style={styles.bankLabel}>Account Number:</Text>
 								<Text style={styles.bankValue}>
-									{profile?.accountNumber || accountNumber}
+									{accountNumber || profile?.accountNumber}
 								</Text>
 							</View>
 							<View style={styles.bankRow}>
 								<Text style={styles.bankLabel}>Account Name:</Text>
 								<Text style={styles.bankValue}>
-									{profile?.accountName || accountName}
+									{accountName || profile?.accountName}
 								</Text>
 							</View>
 							<TouchableOpacity

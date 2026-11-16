@@ -1136,7 +1136,7 @@ app.get('/api/payments/banks', async (req, res) => {
 // strangers' accounts in bulk. create-subaccount still resolves the account itself.
 const accountResolveLimiter = createIpRateLimiter({ windowMs: 15 * 60 * 1000, max: 15 });
 
-app.post('/api/payments/resolve-account', lookupLimiter.middleware, async (req, res) => {
+app.post('/api/payments/resolve-account', async (req, res) => {
     const decoded = await verifyFirebaseToken(req);
     if (!decoded) return res.status(401).json({ error: 'Unauthorized' });
 
@@ -1192,6 +1192,9 @@ app.post('/api/payments/create-subaccount', async (req, res) => {
     if (!bankCode || !accountNumber || !accountName) {
         return res.status(400).json({ error: 'Missing required fields' });
     }
+    if (!/^\d{10}$/.test(String(accountNumber)) || !/^\d{3,6}$/.test(String(bankCode))) {
+        return res.status(400).json({ error: 'Enter a 10-digit account number and pick a bank.' });
+    }
 
     const secretKey = process.env.FLUTTERWAVE_SECRET_KEY;
     if (!secretKey) {
@@ -1227,12 +1230,20 @@ app.post('/api/payments/create-subaccount', async (req, res) => {
         const existing = driverSnap.data();
         let isUpdate = !!(existing?.subaccountId && existing?.bankCode === bankCode);
 
+        // Flutterwave needs a mobile number for the subaccount. Use the one on the driver's
+        // record rather than trusting the app to send it, so a missing value can't leave a
+        // driver unable to finish the compulsory bank setup.
+        const contactPhone = cleanString(existing?.phone, 20) || cleanString(phone, 20);
+        if (!contactPhone) {
+            return res.status(400).json({ error: 'Your account has no phone number. Add one in your profile and try again.' });
+        }
+
         const createPayload = {
             account_bank: bankCode,
             account_number: accountNumber,
             business_name: businessName || verifiedAccountName,
-            business_email: `${phone}@rideapp.com`,
-            business_mobile: phone,
+            business_email: `${contactPhone}@rideapp.com`,
+            business_mobile: contactPhone,
             country: 'NG',
             split_type: 'flat',
             split_value: 50,
